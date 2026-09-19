@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Executive Dashboard - Diamond Flanges & Fittings</title>
+  
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="../css/styles.css">
+</head>
+<body>
+  <div id="toast-container" class="toast-container"></div>
+
+  <div class="app-container">
+    <div id="sidebar-container"></div>
+
+    <div class="main-wrapper">
+      <div id="header-container"></div>
+
+      <main class="content-body">
+        <!-- Top Executive Banner -->
+        <div class="widget-card" style="background: linear-gradient(135deg, #1e3a8a, #0f172a); color:#ffffff; margin-bottom: 24px;">
+          <div class="flex-space-between flex-wrap" style="gap:16px;">
+            <div>
+              <h2 style="color:#ffffff; font-size: 22px; margin-bottom: 4px;">Diamond Flanges & Fittings - Operational Command Center</h2>
+              <p style="color:#94a3b8; font-size:13px;">Overview of manufacturing work orders, QA inspections, dispatch schedules, and vendor tracking.</p>
+            </div>
+            <div style="display:flex; gap:12px; align-items:center;">
+              <span class="badge" style="background:rgba(255,255,255,0.15); color:#ffffff; padding:6px 12px; font-size:12px;">
+                <i class="fas fa-industry"></i> Plant Active
+              </span>
+              <button class="btn btn-primary" onclick="openModal('add-project-modal')" style="background:#2563eb;">
+                <i class="fas fa-plus"></i> New Work Order
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="dashboard-grid">
+          <!-- KPI Row 1: Tasks -->
+          <div class="kpi-section">
+            <div class="kpi-group-title"><i class="fas fa-tasks"></i> Task & Dispatch Deadlines</div>
+            <div class="kpi-row" id="kpi-row-tasks"></div>
+          </div>
+
+          <!-- KPI Row 2: Projects -->
+          <div class="kpi-section">
+            <div class="kpi-group-title"><i class="fas fa-cubes"></i> Manufacturing Projects & POs</div>
+            <div class="kpi-row" id="kpi-row-projects"></div>
+          </div>
+
+          <!-- Dashboard Split View -->
+          <div class="dashboard-main-split">
+            <div style="display:flex; flex-direction:column; gap:24px;">
+              <!-- Project Status Overview -->
+              <div class="widget-card">
+                <div class="widget-header">
+                  <div class="widget-title"><i class="fas fa-chart-pie" style="color:var(--accent);"></i> Project Lifecycle Status Overview</div>
+                  <a href="projects.html" class="btn btn-secondary btn-sm">View All Projects</a>
+                </div>
+                <div class="grid-2col" style="align-items:center;">
+                  <div class="chart-container" style="display:flex; align-items:center; justify-content:center;">
+                    <canvas id="projectStatusDoughnutCanvas" width="220" height="220"></canvas>
+                  </div>
+                  <div id="project-status-bars-container" style="display:flex; flex-direction:column; gap:10px;"></div>
+                </div>
+              </div>
+
+              <!-- Upcoming Deadlines -->
+              <div class="widget-card">
+                <div class="widget-header">
+                  <div class="widget-title"><i class="fas fa-clock" style="color:var(--status-pending);"></i> Upcoming Task & Delivery Deadlines</div>
+                  <a href="tasks.html" class="btn btn-secondary btn-sm">Manage Tasks</a>
+                </div>
+                <div class="data-table-wrapper">
+                  <table class="data-table">
+                    <thead>
+                      <tr>
+                        <th>Task / Project</th>
+                        <th>Assigned User</th>
+                        <th>Due Date</th>
+                        <th>Priority</th>
+                        <th>Action</th>
+                      </tr>
+                    </thead>
+                    <tbody id="upcoming-deadlines-tbody"></tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            <!-- Right Sidebar Widgets -->
+            <div style="display:flex; flex-direction:column; gap:24px;">
+              <!-- Mini Calendar -->
+              <div class="widget-card">
+                <div class="widget-header">
+                  <div class="widget-title"><i class="fas fa-calendar-alt" style="color:var(--accent);"></i> Schedule Overview</div>
+                  <a href="calendar.html" class="btn btn-secondary btn-sm">Full Calendar</a>
+                </div>
+                <div class="mini-calendar" id="dashboard-mini-calendar"></div>
+              </div>
+
+              <!-- Recent Activity -->
+              <div class="widget-card">
+                <div class="widget-header">
+                  <div class="widget-title"><i class="fas fa-history" style="color:var(--accent);"></i> Recent Plant Activities</div>
+                </div>
+                <div class="timeline-list" id="dashboard-activity-timeline"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+
+      <div id="footer-container"></div>
+    </div>
+  </div>
+
+  <div id="modals-container"></div>
+
+  <script src="../data/storage.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="../js/dashboard.js"></script>
+</body>
+</html>

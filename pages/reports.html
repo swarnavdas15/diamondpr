@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reports Analytics - Diamond Flanges & Fittings</title>
+  
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="../css/styles.css">
+</head>
+<body>
+  <div id="toast-container" class="toast-container"></div>
+
+  <div class="app-container">
+    <div id="sidebar-container"></div>
+
+    <div class="main-wrapper">
+      <div id="header-container"></div>
+
+      <main class="content-body" id="reports-main-content">
+        <div class="section-header">
+          <div class="section-title-group">
+            <h2>Reports & Business Analytics</h2>
+            <p>Comprehensive operational metrics, revenue analysis, and plant performance charts.</p>
+          </div>
+          <div class="section-actions">
+            <button class="btn btn-secondary" onclick="window.print()"><i class="fas fa-print"></i> Print Report</button>
+            <button class="btn btn-primary" onclick="exportProjectsCSV()"><i class="fas fa-download"></i> Export CSV</button>
+          </div>
+        </div>
+
+        <div class="widget-card" style="margin-bottom:24px; background:linear-gradient(135deg, #1e3a8a, #2563eb); color:#ffffff;">
+          <div class="flex-space-between flex-wrap" style="gap:16px;">
+            <div>
+              <div style="font-size:12px; text-transform:uppercase; letter-spacing:0.05em; opacity:0.8;">Total Order Book Value</div>
+              <div id="reports-total-revenue" style="font-size:32px; font-weight:700; font-family:'Outfit';">₹0</div>
+              <div style="font-size:13px; opacity:0.9;">Across Active & Completed Work Orders</div>
+            </div>
+            <div style="display:flex; gap:16px;">
+              <div style="background:rgba(255,255,255,0.1); padding:10px 16px; border-radius:var(--radius-sm);">
+                <div style="font-size:11px; opacity:0.8;">On-Time Delivery Rate</div>
+                <div style="font-size:18px; font-weight:700; color:#4ade80;">94.2%</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Charts Grid -->
+        <div class="grid-2col" style="margin-bottom:24px;">
+          <div class="widget-card">
+            <div class="widget-header">
+              <div class="widget-title"><i class="fas fa-chart-bar" style="color:var(--accent);"></i> Project Revenue Value Breakdown (Lakhs INR)</div>
+            </div>
+            <div class="chart-container" style="height:260px;">
+              <canvas id="revenueBarChartCanvas" width="500" height="250"></canvas>
+            </div>
+          </div>
+
+          <div class="widget-card">
+            <div class="widget-header">
+              <div class="widget-title"><i class="fas fa-chart-pie" style="color:var(--accent);"></i> Task Priority Distribution</div>
+            </div>
+            <div class="chart-container" style="height:260px; display:flex; align-items:center; justify-content:center;">
+              <canvas id="taskPriorityPieCanvas" width="220" height="220"></canvas>
+            </div>
+          </div>
+        </div>
+      </main>
+
+      <div id="footer-container"></div>
+    </div>
+  </div>
+
+  <div id="modals-container"></div>
+
+  <script src="../data/storage.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="../js/reports.js"></script>
+</body>
+</html>

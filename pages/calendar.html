@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Corporate Calendar - Diamond Flanges & Fittings</title>
+  
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="../css/styles.css">
+</head>
+<body>
+  <div id="toast-container" class="toast-container"></div>
+
+  <div class="app-container">
+    <div id="sidebar-container"></div>
+
+    <div class="main-wrapper">
+      <div id="header-container"></div>
+
+      <main class="content-body">
+        <div class="section-header">
+          <div class="section-title-group">
+            <h2>Corporate Calendar & Delivery Schedules</h2>
+            <p>Interactive schedule for third-party quality audits, project dispatches, and client meetings.</p>
+          </div>
+          <div class="section-actions">
+            <div class="btn-group" style="display:flex; border:1px solid var(--border-color); border-radius:var(--radius-sm); overflow:hidden;">
+              <button class="btn btn-secondary active">Month</button>
+              <button class="btn btn-secondary" onclick="showToast('Week view active', 'info')">Week</button>
+              <button class="btn btn-secondary" onclick="showToast('Day view active', 'info')">Day</button>
+            </div>
+            <button class="btn btn-primary" onclick="showToast('Add Event Modal opened', 'info')"><i class="fas fa-calendar-plus"></i> Add Event</button>
+          </div>
+        </div>
+
+        <div class="widget-card" style="margin-bottom:20px; padding:14px;">
+          <div class="flex-space-between">
+            <div class="flex-row">
+              <button class="btn btn-secondary btn-sm" onclick="changeCalendarMonth(-1)"><i class="fas fa-chevron-left"></i></button>
+              <h3 id="calendar-month-title" style="font-size:18px; width:180px; text-align:center;">September 2026</h3>
+              <button class="btn btn-secondary btn-sm" onclick="changeCalendarMonth(1)"><i class="fas fa-chevron-right"></i></button>
+            </div>
+            <div class="flex-row" style="font-size:12px; gap:12px;">
+              <span><i class="fas fa-circle" style="color:#2563eb; font-size:8px;"></i> QA Audit</span>
+              <span><i class="fas fa-circle" style="color:#dc2626; font-size:8px;"></i> Dispatch Deadline</span>
+              <span><i class="fas fa-circle" style="color:#059669; font-size:8px;"></i> Project Milestone</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="widget-card">
+          <div id="full-calendar-grid"></div>
+        </div>
+      </main>
+
+      <div id="footer-container"></div>
+    </div>
+  </div>
+
+  <div id="modals-container"></div>
+
+  <script src="../data/storage.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="../js/calendar.js"></script>
+</body>
+</html>

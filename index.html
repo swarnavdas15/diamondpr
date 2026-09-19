@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login - Diamond Flanges & Fittings Pvt Ltd</title>
+  <meta name="description" content="Enterprise ERP System Login for Diamond Flanges & Fittings Pvt Ltd.">
+  
+  <!-- FontAwesome CDN -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+  <!-- Toast Container -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <!-- AUTHENTICATION CONTAINER (LOGIN PAGE) -->
+  <div class="auth-wrapper">
+    <div class="auth-card">
+      <div class="auth-brand">
+        <div class="auth-logo-badge">
+          <i class="fas fa-gem"></i>
+        </div>
+        <h2>Diamond Flanges & Fittings</h2>
+        <p>Enterprise Business Management ERP System</p>
+      </div>
+
+      <form id="login-form">
+        <div class="form-group">
+          <label for="login-email">Email Address</label>
+          <input type="email" id="login-email" class="form-control" value="admin@diamondflanges.com" required placeholder="name@diamondflanges.com">
+        </div>
+
+        <div class="form-group">
+          <label for="login-password">Password</label>
+          <input type="password" id="login-password" class="form-control" value="admin123" required placeholder="Enter your password">
+        </div>
+
+        <div class="auth-options">
+          <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+            <input type="checkbox" id="login-remember" checked> Remember Me
+          </label>
+          <a href="#" onclick="showToast('Contact IT Administrator to reset password', 'info')">Forgot Password?</a>
+        </div>
+
+        <button type="submit" class="btn-primary-auth">
+          Sign In to ERP <i class="fas fa-arrow-right" style="margin-left:6px;"></i>
+        </button>
+      </form>
+
+      <div class="auth-demo-hint">
+        🔑 Demo Login: <strong>admin@diamondflanges.com</strong> / <strong>admin123</strong>
+      </div>
+    </div>
+  </div>
+
+  <script src="data/storage.js"></script>
+  <script src="js/common.js"></script>
+  <script>
+    document.getElementById('login-form').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const email = document.getElementById('login-email').value;
+      const pass = document.getElementById('login-password').value;
+
+      const res = window.storage.login(email, pass);
+      if (res.success) {
+        showToast('Login successful! Redirecting to Dashboard...', 'success');
+        setTimeout(() => {
+          window.location.href = 'pages/dashboard.html';
+        }, 500);
+      } else {
+        showToast(res.message, 'error');
+      }
+    });
+  </script>
+</body>
+</html>

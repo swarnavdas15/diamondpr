@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Projects & POs - Diamond Flanges & Fittings</title>
+  
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="../css/styles.css">
+</head>
+<body>
+  <div id="toast-container" class="toast-container"></div>
+
+  <div class="app-container">
+    <div id="sidebar-container"></div>
+
+    <div class="main-wrapper">
+      <div id="header-container"></div>
+
+      <main class="content-body">
+        <div class="section-header">
+          <div class="section-title-group">
+            <h2>Project & Work Order Management</h2>
+            <p>Track manufacturing POs, material forging, hydrostatic testing, and dispatch milestones.</p>
+          </div>
+          <div class="section-actions">
+            <button class="btn btn-secondary" onclick="exportProjectsCSV()"><i class="fas fa-file-csv"></i> Export Projects</button>
+            <button class="btn btn-primary" onclick="openModal('add-project-modal')"><i class="fas fa-plus"></i> Create Work Order</button>
+          </div>
+        </div>
+
+        <!-- Filter & Search Controls -->
+        <div class="widget-card" style="margin-bottom:20px; padding:14px;">
+          <div class="flex-space-between flex-wrap" style="gap:12px;">
+            <div class="flex-row" style="flex:1; max-width:360px;">
+              <input type="text" id="project-search-input" class="form-control" placeholder="Search by Project #, Client, PO..." onkeyup="filterProjectsList()">
+            </div>
+            <div class="flex-row" style="gap:10px;">
+              <select id="project-status-filter" class="form-control" onchange="filterProjectsList()" style="width:200px;">
+                <option value="">All Statuses</option>
+                <option value="Work Order Pending">Work Order Pending</option>
+                <option value="In Process">In Process</option>
+                <option value="Vendor Material Pending">Vendor Material Pending</option>
+                <option value="Waiting Client Approval">Waiting Client Approval</option>
+                <option value="Part Dispatched">Part Dispatched</option>
+                <option value="Completed">Completed</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Projects Table -->
+        <div class="widget-card">
+          <div class="data-table-wrapper">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Project #</th>
+                  <th>Client Name & PO</th>
+                  <th>Delivery Date</th>
+                  <th>Project Value</th>
+                  <th>Material Status</th>
+                  <th>Progress</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="projects-table-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </main>
+
+      <div id="footer-container"></div>
+    </div>
+  </div>
+
+  <div id="modals-container"></div>
+
+  <script src="../data/storage.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="../js/projects.js"></script>
+</body>
+</html>
