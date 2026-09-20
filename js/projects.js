@@ -1,5 +1,5 @@
 /**
- * DIAMOND FLANGES & FITTINGS PVT LTD - PROJECTS PAGE CONTROLLER
+ * DIAMOND FLANGES & FITTINGS PVT LTD - PROJECTS PAGE CONTROLLER (V3 - Masking & Timeline Support)
  */
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -11,12 +11,14 @@ document.addEventListener('DOMContentLoaded', () => {
 function initProjectsView() {
   const tbody = document.getElementById('projects-table-tbody');
   if (!tbody) return;
-  tbody.innerHTML = renderProjectsTableRows(window.storage.data.projects);
+
+  const orders = window.storage.getOrdersForCurrentUser();
+  tbody.innerHTML = renderProjectsTableRows(orders);
 }
 
 function renderProjectsTableRows(list) {
-  if (list.length === 0) {
-    return `<tr><td colspan="8" style="text-align:center; padding:30px; color:var(--text-muted);">No projects found.</td></tr>`;
+  if (!list || list.length === 0) {
+    return `<tr><td colspan="8" style="text-align:center; padding:30px; color:var(--text-muted);">No work orders found.</td></tr>`;
   }
 
   const todayStr = new Date().toISOString().split('T')[0];
@@ -37,21 +39,24 @@ function renderProjectsTableRows(list) {
     return `
       <tr>
         <td>
-          <a href="project-details.html?id=${p.id}" style="font-weight:700; color:var(--accent); font-family:'Outfit'; font-size:14px;">
+          <a href="javascript:void(0)" onclick="renderOrderOverviewModal('${p.id}')" style="font-weight:700; color:var(--accent); font-family:'Outfit'; font-size:14px;">
             ${p.projectNumber}
           </a>
         </td>
         <td>
-          <div style="font-weight:600;">${p.clientName}</div>
-          <div style="font-size:11px; color:var(--text-muted);"><i class="fas fa-file-invoice"></i> ${p.poNumber} (${p.poDate})</div>
+          <div style="font-weight:600; font-size:13px;">${p.clientName}</div>
+          <div style="font-size:11px; color:var(--text-muted);">
+            <span class="badge badge-inprocess" style="font-size:10px; padding:1px 5px;">${p.clientCode || 'CLI-8821'}</span> 
+            <i class="fas fa-file-invoice" style="margin-left:4px;"></i> ${p.poNumber} (${p.poDate || 'N/A'})
+          </div>
         </td>
         <td style="font-weight:600;">
           <i class="far fa-calendar-alt"></i> ${p.deliveryDate}
           ${isOverdue ? '<span class="badge badge-urgent" style="font-size:9px; margin-left:4px;">OVERDUE</span>' : ''}
           ${isToday ? '<span class="badge badge-pending" style="font-size:9px; margin-left:4px;">DUE TODAY</span>' : ''}
         </td>
-        <td style="font-weight:700;">₹${(p.value).toLocaleString('en-IN')}</td>
-        <td style="font-size:12px; max-width:200px;">${p.materialStatus}</td>
+        <td style="font-weight:700;">₹${(p.value || 0).toLocaleString('en-IN')}</td>
+        <td style="font-size:12px; max-width:200px;">${p.materialStatus || 'Scheduled'}</td>
         <td style="min-width:110px;">
           <div class="flex-space-between" style="font-size:11px; margin-bottom:2px;"><span>${p.progress}%</span></div>
           <div class="progress-bar-bg">
@@ -60,7 +65,7 @@ function renderProjectsTableRows(list) {
         </td>
         <td><span class="badge ${statusBadgeMap[p.status] || 'badge-inprocess'}">${p.status}</span></td>
         <td>
-          <a href="project-details.html?id=${p.id}" class="btn btn-secondary btn-sm" title="View Full Details"><i class="fas fa-eye"></i> Details</a>
+          <button onclick="renderOrderOverviewModal('${p.id}')" class="btn btn-secondary btn-sm" title="View Stepper Timeline"><i class="fas fa-route"></i> Stepper</button>
         </td>
       </tr>
     `;
@@ -71,8 +76,13 @@ function filterProjectsList() {
   const query = document.getElementById('project-search-input')?.value.toLowerCase() || '';
   const status = document.getElementById('project-status-filter')?.value || '';
 
-  const filtered = window.storage.data.projects.filter(p => {
-    const matchQ = p.projectNumber.toLowerCase().includes(query) || p.clientName.toLowerCase().includes(query) || p.poNumber.toLowerCase().includes(query);
+  const orders = window.storage.getOrdersForCurrentUser();
+
+  const filtered = orders.filter(p => {
+    const matchQ = p.projectNumber.toLowerCase().includes(query) || 
+                   p.clientName.toLowerCase().includes(query) || 
+                   (p.clientCode || '').toLowerCase().includes(query) ||
+                   p.poNumber.toLowerCase().includes(query);
     const matchSt = status === '' || p.status === status;
     return matchQ && matchSt;
   });
@@ -82,8 +92,9 @@ function filterProjectsList() {
 }
 
 function exportProjectsCSV() {
-  let csv = 'Project Number,Client Name,PO Number,Delivery Date,Value INR,Status,Progress Pct\n';
-  window.storage.data.projects.forEach(p => {
+  const orders = window.storage.getOrdersForCurrentUser();
+  let csv = 'Project Number,Client Code/Name,PO Number,Delivery Date,Value INR,Status,Progress Pct\n';
+  orders.forEach(p => {
     csv += `"${p.projectNumber}","${p.clientName}","${p.poNumber}","${p.deliveryDate}",${p.value},"${p.status}",${p.progress}\n`;
   });
 
@@ -91,7 +102,7 @@ function exportProjectsCSV() {
   const url = window.URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.setAttribute('href', url);
-  a.setAttribute('download', 'Diamond_ERP_Projects_Report.csv');
+  a.setAttribute('download', 'Diamond_ERP_Work_Orders_Report.csv');
   a.click();
-  showToast('Exported project pipeline to CSV', 'success');
+  showToast('Exported work order pipeline to CSV', 'success');
 }

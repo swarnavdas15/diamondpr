@@ -13,8 +13,8 @@
   </div>
 
   <div class="header-right">
-    <button class="btn-quick-create" onclick="openModal('add-project-modal')">
-      <i class="fas fa-plus"></i> <span>+ New PO</span>
+    <button class="btn-quick-create" onclick="openInitiateOrderModal()" title="Initiate New Customer Work Order (PO)">
+      <i class="fas fa-file-signature"></i> <span>+ Initiate Customer PO</span>
     </button>
     
     <button id="theme-toggle-btn" class="header-icon-btn" title="Toggle Dark/Light Mode">
@@ -25,6 +25,15 @@
       <i class="fas fa-bell"></i>
       <span class="notification-dot"></span>
     </button>
+
+    <!-- Compact Top-Bar Calendar Dropdown Pill -->
+    <button id="header-date-btn" class="header-date-pill" onclick="toggleHeaderCalendar(event)">
+      <i class="fas fa-calendar-day"></i>
+      <span id="header-date-text">Loading...</span>
+    </button>
+
+    <!-- Dropdown Calendar Popover -->
+    <div id="header-calendar-popover" class="calendar-dropdown-popover"></div>
 
     <div class="flex-row" style="gap:10px; padding-left:8px; border-left:1px solid var(--border-color);">
       <img id="header-user-avatar" src="https://images.unsplash.com/photo-1560250097-0b93528c311a?w=150" style="width:36px;height:36px;border-radius:50%;object-fit:cover;" alt="">

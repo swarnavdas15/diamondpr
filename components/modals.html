@@ -12,67 +12,228 @@
   </div>
 </div>
 
-<!-- ADD / EDIT PROJECT MODAL -->
-<div id="add-project-modal" class="modal-overlay">
+<!-- DYNAMIC ORDER OVERVIEW & STEPPER TIMELINE MODAL -->
+<div id="order-overview-modal" class="modal-overlay">
+  <div class="modal-container" style="max-width: 750px;">
+    <div class="modal-header">
+      <div class="flex-row">
+        <span id="overview-order-status-badge" class="badge badge-inprocess">In Process</span>
+        <h3 id="overview-order-number" class="modal-title">PRJ-2026-089</h3>
+      </div>
+      <button class="modal-close-btn" onclick="closeModal('order-overview-modal')">&times;</button>
+    </div>
+    <div class="modal-body" style="display:flex; flex-direction:column; gap:20px;">
+      <!-- Order Header Info Box -->
+      <div class="widget-card" style="padding:14px; background:var(--bg-app);">
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; font-size:13px;">
+          <div><strong>Client:</strong> <span id="overview-client-name" style="color:var(--accent); font-weight:700;">Larsen & Toubro</span></div>
+          <div><strong>Client Code:</strong> <span id="overview-client-code" class="badge badge-inprocess">CLI-8821</span></div>
+          <div><strong>PO Number:</strong> <span id="overview-po-number">PO-LT-99481</span></div>
+          <div><strong>Target Delivery:</strong> <span id="overview-delivery-date">2026-09-30</span></div>
+          <div style="grid-column: 1/-1;"><strong>Items & Items Specs:</strong> <div id="overview-items-list" style="font-weight:600; margin-top:2px;">24" ANSI Class 1500 Weld Neck Flanges</div></div>
+        </div>
+      </div>
+
+      <!-- Real-Time Timeline Stepper Component -->
+      <div>
+        <h4 style="font-size:14px; font-weight:700; margin-bottom:12px;"><i class="fas fa-route" style="color:var(--accent);"></i> Active Department Workflow Stepper</h4>
+        <div id="overview-stepper-timeline" class="stepper-timeline-container">
+          <!-- Dynamically populated -->
+        </div>
+      </div>
+
+      <!-- Order Remarks & Notes -->
+      <div class="widget-card" style="padding:14px;">
+        <h4 style="font-size:13px; font-weight:700; margin-bottom:6px;"><i class="fas fa-sticky-note" style="color:var(--status-pending);"></i> Plant Technical Remarks</h4>
+        <p id="overview-remarks" style="font-size:12px; color:var(--text-muted); margin:0;">Hydrostatic test passed at 150 BAR.</p>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-secondary" onclick="closeModal('order-overview-modal')">Close Overview</button>
+    </div>
+  </div>
+</div>
+
+<!-- SALES ORDER INITIATION & STAGE CUSTOMIZER MODAL -->
+<div id="initiate-order-modal" class="modal-overlay">
+  <div class="modal-container" style="max-width: 750px;">
+    <div class="modal-header">
+      <h3 class="modal-title"><i class="fas fa-file-signature" style="color:var(--primary);"></i> Initiate New Customer Work Order</h3>
+      <button class="modal-close-btn" onclick="closeModal('initiate-order-modal')">&times;</button>
+    </div>
+    <form id="initiate-order-form" onsubmit="handleInitiateOrderSubmit(event)">
+      <div class="modal-body" style="display:flex; flex-direction:column; gap:16px;">
+        
+        <!-- STEP INDICATOR BAR -->
+        <div class="form-step-bar">
+          <div class="form-step-item active">
+            <div class="form-step-num">1</div>
+            <span>Client & PO Details</span>
+          </div>
+          <div class="form-step-item active">
+            <div class="form-step-num">2</div>
+            <span>Sales Approvals</span>
+          </div>
+          <div class="form-step-item active">
+            <div class="form-step-num">3</div>
+            <span>Plant Pipeline</span>
+          </div>
+        </div>
+
+        <!-- SECTION 1: MASTER ORDER DATA -->
+        <div class="form-section-header">
+          <i class="fas fa-building"></i> Section 1: Client Account & PO Information
+        </div>
+        <div class="grid-2col">
+          <div class="form-group">
+            <label>Work Order # <span class="text-danger">*</span></label>
+            <input type="text" id="init-order-number" class="form-control" required placeholder="PRJ-2026-105">
+          </div>
+          <div class="form-group">
+            <label>Select Client Account <span class="text-danger">*</span></label>
+            <select id="init-client-select" class="form-control" required onchange="updateClientCodePreview()">
+              <!-- Populated dynamically -->
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Automated Client Code (ID)</label>
+            <input type="text" id="init-client-code" class="form-control" readonly style="background:var(--bg-app); font-weight:700;">
+          </div>
+          <div class="form-group">
+            <label>Client PO Number <span class="text-danger">*</span></label>
+            <input type="text" id="init-po-number" class="form-control" required placeholder="PO-RIL-9921">
+          </div>
+          <div class="form-group">
+            <label>PO Date <span class="text-danger">*</span></label>
+            <input type="date" id="init-po-date" class="form-control" required>
+          </div>
+          <div class="form-group">
+            <label>Delivery Target Date <span class="text-danger">*</span></label>
+            <input type="date" id="init-delivery-date" class="form-control" required>
+          </div>
+          <div class="form-group">
+            <label>Total Order Value (INR ₹) <span class="text-danger">*</span></label>
+            <input type="number" id="init-value" class="form-control" required placeholder="2500000">
+          </div>
+          <div class="form-group">
+            <label>Quotation Status</label>
+            <select id="init-quotation-status" class="form-control">
+              <option value="Approved">Approved</option>
+              <option value="Pending">Pending Approval</option>
+            </select>
+          </div>
+          <div class="form-group" style="grid-column: 1/-1;">
+            <label>Items Specification & Flange Quantities <span class="text-danger">*</span></label>
+            <textarea id="init-items-list" class="form-control" rows="2" required placeholder="e.g. 16'' Class 300 Slip-On Flanges - ASTM A105 (Qty: 200 Pcs)"></textarea>
+          </div>
+        </div>
+
+        <!-- SECTION 2: SALES APPROVAL WORKFLOW SETUP -->
+        <div class="form-section-header" style="margin-top:10px;">
+          <i class="fas fa-check-square"></i> Section 2: Initial Sales 6-Stage Approval Milestones
+        </div>
+        <div style="background:var(--bg-app); padding:14px; border-radius:var(--radius-sm); border:1px solid var(--border-color);">
+          <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap:10px; font-size:12.5px;">
+            <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+              <input type="checkbox" id="init-cb-req" checked> 1. Requirement Received
+            </label>
+            <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+              <input type="checkbox" id="init-cb-quot" checked> 2. Quotation Prepared
+            </label>
+            <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+              <input type="checkbox" id="init-cb-quot-app" checked> 3. Quotation Approved
+            </label>
+            <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+              <input type="checkbox" id="init-cb-drw" checked> 4. Drawing Submitted
+            </label>
+            <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+              <input type="checkbox" id="init-cb-drw-app" checked> 5. Drawing Approved
+            </label>
+            <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+              <input type="checkbox" id="init-cb-ord-conf" checked> 6. Order Confirmed
+            </label>
+          </div>
+        </div>
+
+        <!-- SECTION 3: PLANT PIPELINE CUSTOMIZER -->
+        <div class="form-section-header" style="margin-top:10px;">
+          <i class="fas fa-sliders"></i> Section 3: Plant Department Stages
+        </div>
+        <div style="background:var(--bg-app); padding:14px; border-radius:var(--radius-sm); border:1px solid var(--border-color);">
+          <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap:10px; font-size:13px;">
+            <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+              <input type="checkbox" id="stage-cb-purchase" checked> 🛒 Purchase Stage
+            </label>
+            <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+              <input type="checkbox" id="stage-cb-production" checked> ⚙️ Production Stage
+            </label>
+            <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+              <input type="checkbox" id="stage-cb-qc" checked> 🧪 Quality Testing (QC)
+            </label>
+            <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+              <input type="checkbox" id="stage-cb-dispatch" checked> 🚚 Dispatch Stage
+            </label>
+          </div>
+        </div>
+
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('initiate-order-modal')">Cancel</button>
+        <button type="submit" class="btn btn-primary"><i class="fas fa-paper-plane"></i> Initiate Work Order</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- USER CREATION MODAL (SUPER ADMIN PRIVILEGE ONLY) -->
+<div id="create-user-modal" class="modal-overlay">
   <div class="modal-container">
     <div class="modal-header">
-      <h3 class="modal-title">Create / Edit Manufacturing Work Order</h3>
-      <button class="modal-close-btn" onclick="closeModal('add-project-modal')">&times;</button>
+      <h3 class="modal-title"><i class="fas fa-user-plus" style="color:var(--accent);"></i> Create New System User (Super Admin Only)</h3>
+      <button class="modal-close-btn" onclick="closeModal('create-user-modal')">&times;</button>
     </div>
-    <form id="project-form" onsubmit="handleSaveProject(event)">
-      <input type="hidden" id="proj-id">
+    <form id="create-user-form" onsubmit="handleCreateUserSubmit(event)">
       <div class="modal-body grid-2col">
         <div class="form-group">
-          <label>Project Number</label>
-          <input type="text" id="proj-number" class="form-control" required placeholder="PRJ-2026-101">
+          <label>Full Name</label>
+          <input type="text" id="user-new-name" class="form-control" required placeholder="e.g. Ramesh Chandra">
         </div>
         <div class="form-group">
-          <label>Client Name</label>
-          <input type="text" id="proj-client" class="form-control" required placeholder="e.g. Larsen & Toubro">
+          <label>Email Address (Login)</label>
+          <input type="email" id="user-new-email" class="form-control" required placeholder="ramesh@diamondflanges.com">
         </div>
         <div class="form-group">
-          <label>PO Number</label>
-          <input type="text" id="proj-po" class="form-control" required placeholder="PO-LT-9988">
+          <label>Username</label>
+          <input type="text" id="user-new-username" class="form-control" required placeholder="rameshc">
         </div>
         <div class="form-group">
-          <label>PO Date</label>
-          <input type="date" id="proj-po-date" class="form-control" required>
+          <label>Password</label>
+          <input type="password" id="user-new-password" class="form-control" required value="emp123">
         </div>
         <div class="form-group">
-          <label>Delivery Target Date</label>
-          <input type="date" id="proj-delivery-date" class="form-control" required>
-        </div>
-        <div class="form-group">
-          <label>Project Order Value (INR)</label>
-          <input type="number" id="proj-value" class="form-control" required placeholder="500000">
-        </div>
-        <div class="form-group">
-          <label>Lifecycle Status</label>
-          <select id="proj-status" class="form-control">
-            <option value="Work Order Pending">Work Order Pending</option>
-            <option value="In Process">In Process</option>
-            <option value="Vendor Material Pending">Vendor Material Pending</option>
-            <option value="Waiting Client Approval">Waiting Client Approval</option>
-            <option value="Part Dispatched">Part Dispatched</option>
-            <option value="Completed">Completed</option>
+          <label>System Role & Access Rights</label>
+          <select id="user-new-role" class="form-control" required>
+            <option value="Sales">Sales Department</option>
+            <option value="Purchase">Purchase Department</option>
+            <option value="Production">Production Department</option>
+            <option value="Quality Testing">Quality Testing (QC)</option>
+            <option value="Dispatch">Dispatch & Logistics</option>
+            <option value="Admin">Admin (Supervisor)</option>
+            <option value="Super Admin">Super Admin</option>
           </select>
         </div>
         <div class="form-group">
-          <label>Progress Percentage</label>
-          <input type="number" id="proj-progress" class="form-control" min="0" max="100" value="10">
+          <label>Department Name</label>
+          <input type="text" id="user-new-dept" class="form-control" required placeholder="e.g. Quality Control">
         </div>
-        <div class="form-group" style="grid-column: 1/-1;">
-          <label>Raw Material Status</label>
-          <input type="text" id="proj-material-status" class="form-control" placeholder="e.g. SS 316L Rough Forgings In Stock">
-        </div>
-        <div class="form-group" style="grid-column: 1/-1;">
-          <label>Dispatch Remarks & Notes</label>
-          <textarea id="proj-notes" class="form-control" rows="2" placeholder="Hydrostatic test passed at 150 BAR..."></textarea>
+        <div class="form-group" style="grid-column:1/-1;">
+          <label>Designation Title</label>
+          <input type="text" id="user-new-designation" class="form-control" required placeholder="e.g. QA Testing Engineer">
         </div>
       </div>
       <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" onclick="closeModal('add-project-modal')">Cancel</button>
-        <button type="submit" class="btn btn-primary">Save Work Order</button>
+        <button type="button" class="btn btn-secondary" onclick="closeModal('create-user-modal')">Cancel</button>
+        <button type="submit" class="btn btn-primary"><i class="fas fa-check"></i> Create User Account</button>
       </div>
     </form>
   </div>
@@ -82,7 +243,7 @@
 <div id="add-task-modal" class="modal-overlay">
   <div class="modal-container">
     <div class="modal-header">
-      <h3 class="modal-title">Create / Edit Task</h3>
+      <h3 class="modal-title">Create Cross-Team Task</h3>
       <button class="modal-close-btn" onclick="closeModal('add-task-modal')">&times;</button>
     </div>
     <form id="task-form" onsubmit="handleSaveTask(event)">
@@ -91,6 +252,16 @@
         <div class="form-group" style="grid-column:1/-1;">
           <label>Task Title</label>
           <input type="text" id="task-title" class="form-control" required placeholder="e.g. Inspect Final Packaging of 24 Flanges">
+        </div>
+        <div class="form-group">
+          <label>Assigned To Department</label>
+          <select id="task-dept-assign" class="form-control">
+            <option value="Purchase">Purchase</option>
+            <option value="Production">Production</option>
+            <option value="Quality Testing">Quality Testing</option>
+            <option value="Dispatch">Dispatch</option>
+            <option value="Sales">Sales</option>
+          </select>
         </div>
         <div class="form-group">
           <label>Priority</label>
@@ -102,17 +273,7 @@
           </select>
         </div>
         <div class="form-group">
-          <label>Status</label>
-          <select id="task-status" class="form-control">
-            <option value="To Do">To Do</option>
-            <option value="In Progress">In Progress</option>
-            <option value="Waiting on Vendor">Waiting on Vendor</option>
-            <option value="Waiting on Client">Waiting on Client</option>
-            <option value="Completed">Completed</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>Assigned User</label>
+          <label>Assigned Individual</label>
           <select id="task-assignee" class="form-control">
             <!-- Rendered dynamically -->
           </select>
