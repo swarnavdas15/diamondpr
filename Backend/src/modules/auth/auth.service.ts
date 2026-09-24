@@ -1,12 +1,13 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { PrismaClient } from '@prisma/client';
+import { db } from '../../prisma/db';
 
-const prisma = new PrismaClient();
 const JWT_SECRET = process.env.JWT_SECRET || 'supersecretkey';
 
 export const loginUser = async (email: string, pass: string) => {
-  const user = await prisma.user.findUnique({ where: { email } });
+  const user = await db.orm.public.User
+    .where({ email, isDeleted: 0 })
+    .first();
   if (!user) throw new Error('Invalid email or password');
 
   const isMatch = await bcrypt.compare(pass, user.password);
