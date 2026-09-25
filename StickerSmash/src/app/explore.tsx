@@ -3,6 +3,7 @@ import { SymbolView } from 'expo-symbols';
 import { Platform, Pressable, ScrollView, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { DEFAULT_EMOJIS } from '@/components/emoji-list';
 import { ExternalLink } from '@/components/external-link';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -11,7 +12,7 @@ import { WebBadge } from '@/components/web-badge';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
-export default function TabTwoScreen() {
+export default function ExploreScreen() {
   const safeAreaInsets = useSafeAreaInsets();
   const insets = {
     ...safeAreaInsets,
@@ -39,9 +40,9 @@ export default function TabTwoScreen() {
       contentContainerStyle={[styles.contentContainer, contentPlatformStyle]}>
       <ThemedView style={styles.container}>
         <ThemedView style={styles.titleContainer}>
-          <ThemedText type="subtitle">Explore</ThemedText>
+          <ThemedText type="subtitle">Sticker Smash Features</ThemedText>
           <ThemedText style={styles.centerText} themeColor="textSecondary">
-            This starter app includes example{'\n'}code to help you get started.
+            Explore stickers, gestures, and Expo Router functionality.
           </ThemedText>
 
           <ExternalLink href="https://docs.expo.dev" asChild>
@@ -59,63 +60,32 @@ export default function TabTwoScreen() {
         </ThemedView>
 
         <ThemedView style={styles.sectionsWrapper}>
-          <Collapsible title="File-based routing">
+          <Collapsible title="Sticker Catalog & Collection">
             <ThemedText type="small">
-              This app has two screens: <ThemedText type="code">src/app/index.tsx</ThemedText> and{' '}
-              <ThemedText type="code">src/app/explore.tsx</ThemedText>
+              Choose from a wide variety of emojis and custom stickers:
             </ThemedText>
-            <ThemedText type="small">
-              The layout file in <ThemedText type="code">src/app/_layout.tsx</ThemedText> sets up
-              the tab navigator.
-            </ThemedText>
-            <ExternalLink href="https://docs.expo.dev/router/introduction">
-              <ThemedText type="linkPrimary">Learn more</ThemedText>
-            </ExternalLink>
-          </Collapsible>
-
-          <Collapsible title="Android, iOS, and web support">
-            <ThemedView type="backgroundElement" style={styles.collapsibleContent}>
-              <ThemedText type="small">
-                You can open this project on Android, iOS, and the web. To open the web version,
-                press <ThemedText type="smallBold">w</ThemedText> in the terminal running this
-                project.
-              </ThemedText>
-              <Image
-                source={require('@/assets/images/tutorial-web.png')}
-                style={styles.imageTutorial}
-              />
+            <ThemedView type="backgroundElement" style={styles.stickerRow}>
+              {DEFAULT_EMOJIS.map((uri, idx) => (
+                <Image key={idx} source={{ uri }} style={styles.stickerPreview} contentFit="contain" />
+              ))}
             </ThemedView>
           </Collapsible>
 
-          <Collapsible title="Images">
+          <Collapsible title="Double-Tap Gesture Scaling">
             <ThemedText type="small">
-              For static images, you can use the <ThemedText type="code">@2x</ThemedText> and{' '}
-              <ThemedText type="code">@3x</ThemedText> suffixes to provide files for different
-              screen densities.
+              Double-tap any sticker placed on your photo to dynamically double or reset its scale using <ThemedText type="code">react-native-reanimated</ThemedText>.
             </ThemedText>
-            <Image source={require('@/assets/images/react-logo.png')} style={styles.imageReact} />
-            <ExternalLink href="https://reactnative.dev/docs/images">
-              <ThemedText type="linkPrimary">Learn more</ThemedText>
-            </ExternalLink>
           </Collapsible>
 
-          <Collapsible title="Light and dark mode components">
+          <Collapsible title="Device Photo Picker">
             <ThemedText type="small">
-              This template has light and dark mode support. The{' '}
-              <ThemedText type="code">useColorScheme()</ThemedText> hook lets you inspect what the
-              user&apos;s current color scheme is, and so you can adjust UI colors accordingly.
+              Uses <ThemedText type="code">expo-image-picker</ThemedText> to access media library photos seamlessly on iOS, Android, and Web.
             </ThemedText>
-            <ExternalLink href="https://docs.expo.dev/develop/user-interface/color-themes/">
-              <ThemedText type="linkPrimary">Learn more</ThemedText>
-            </ExternalLink>
           </Collapsible>
 
-          <Collapsible title="Animations">
+          <Collapsible title="Theme Support (Light & Dark)">
             <ThemedText type="small">
-              This template includes an example of an animated component. The{' '}
-              <ThemedText type="code">src/components/ui/collapsible.tsx</ThemedText> component uses
-              the powerful <ThemedText type="code">react-native-reanimated</ThemedText> library to
-              animate opening this hint.
+              Automatically adapts to the device color scheme with custom themed primitives <ThemedText type="code">&lt;ThemedView&gt;</ThemedText> and <ThemedText type="code">&lt;ThemedText&gt;</ThemedText>.
             </ThemedText>
           </Collapsible>
         </ThemedView>
@@ -163,18 +133,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.four,
     paddingTop: Spacing.three,
   },
-  collapsibleContent: {
-    alignItems: 'center',
-  },
-  imageTutorial: {
-    width: '100%',
-    aspectRatio: 296 / 171,
+  stickerRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.two,
+    padding: Spacing.three,
     borderRadius: Spacing.three,
     marginTop: Spacing.two,
+    justifyContent: 'center',
   },
-  imageReact: {
-    width: 100,
-    height: 100,
-    alignSelf: 'center',
+  stickerPreview: {
+    width: 44,
+    height: 44,
   },
 });

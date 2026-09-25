@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Settings - Diamond Flanges & Fittings</title>
+  
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="../css/styles.css">
+</head>
+<body>
+  <div id="toast-container" class="toast-container"></div>
+
+  <div class="app-container">
+    <div id="sidebar-container"></div>
+
+    <div class="main-wrapper">
+      <div id="header-container"></div>
+
+      <main class="content-body">
+        <div class="section-header">
+          <div class="section-title-group">
+            <h2>ERP System Settings & Data Backup</h2>
+            <p>Manage system configuration, LocalStorage data backups, and demo reset.</p>
+          </div>
+        </div>
+
+        <div class="grid-2col">
+          <div class="widget-card">
+            <h3 style="font-size:16px; margin-bottom:14px;"><i class="fas fa-sliders" style="color:var(--accent);"></i> General Company Parameters</h3>
+            <div class="form-group">
+              <label>Company Legal Name</label>
+              <input type="text" id="setting-company-name" class="form-control">
+            </div>
+            <div class="form-group">
+              <label>Corporate Tagline</label>
+              <input type="text" id="setting-tagline" class="form-control">
+            </div>
+            <div class="form-group">
+              <label>Default Currency</label>
+              <input type="text" id="setting-currency" class="form-control">
+            </div>
+            <button class="btn btn-primary" onclick="saveSettingsForm()"><i class="fas fa-save"></i> Save System Settings</button>
+          </div>
+
+          <div class="widget-card">
+            <h3 style="font-size:16px; margin-bottom:14px;"><i class="fas fa-database" style="color:var(--accent);"></i> Data Backup & Restore</h3>
+            <p style="font-size:13px; color:var(--text-muted); margin-bottom:16px;">
+              Export your entire Diamond ERP system database as a JSON file or restore from a previously exported backup.
+            </p>
+            <div style="display:flex; flex-direction:column; gap:12px;">
+              <button class="btn btn-secondary" onclick="exportFullJSONBackup()"><i class="fas fa-file-export"></i> Export Complete System Backup (JSON)</button>
+              
+              <div style="border-top:1px solid var(--border-color); padding-top:12px; margin-top:6px;">
+                <label style="font-size:12px; font-weight:700;">Restore from Backup JSON</label>
+                <input type="file" id="import-backup-file" accept=".json" class="form-control" style="margin-top:6px;">
+                <button class="btn btn-primary" onclick="importFullJSONBackup()" style="margin-top:8px;"><i class="fas fa-file-import"></i> Restore Backup File</button>
+              </div>
+
+              <div style="border-top:1px solid var(--border-color); padding-top:12px; margin-top:6px;">
+                <button class="btn btn-danger" onclick="window.storage.resetToDemo()"><i class="fas fa-arrow-rotate-left"></i> Reset System to Initial Demo Data</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+
+      <div id="footer-container"></div>
+    </div>
+  </div>
+
+  <div id="modals-container"></div>
+
+  <script src="../data/storage.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="../js/settings.js"></script>
+</body>
+</html>

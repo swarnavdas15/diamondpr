@@ -1,0 +1,43 @@
+<!-- REUSABLE HEADER COMPONENT -->
+<header class="top-header">
+  <div class="header-left">
+    <div>
+      <h1 id="header-page-title" class="header-title">Executive Dashboard</h1>
+      <nav id="breadcrumb-nav" class="breadcrumb-container" aria-label="Breadcrumb"></nav>
+    </div>
+    <button id="global-search-trigger" class="global-search-btn" style="margin-left: 20px;">
+      <i class="fas fa-search"></i>
+      <span>Search projects, tasks, clients...</span>
+      <span class="search-shortcut">Ctrl+K</span>
+    </button>
+  </div>
+
+  <div class="header-right">
+    <button class="btn-quick-create" onclick="openInitiateOrderModal()" title="Initiate New Customer Work Order (PO)">
+      <i class="fas fa-file-signature"></i> <span>+ Initiate Customer PO</span>
+    </button>
+    
+    <button id="theme-toggle-btn" class="header-icon-btn" title="Toggle Dark/Light Mode">
+      <i id="theme-icon" class="fas fa-moon"></i>
+    </button>
+
+    <button class="header-icon-btn" title="Notifications" onclick="showToast('No unread notifications', 'info')">
+      <i class="fas fa-bell"></i>
+      <span class="notification-dot"></span>
+    </button>
+
+    <!-- Compact Top-Bar Calendar Dropdown Pill -->
+    <button id="header-date-btn" class="header-date-pill" onclick="toggleHeaderCalendar(event)">
+      <i class="fas fa-calendar-day"></i>
+      <span id="header-date-text">Loading...</span>
+    </button>
+
+    <!-- Dropdown Calendar Popover -->
+    <div id="header-calendar-popover" class="calendar-dropdown-popover"></div>
+
+    <div class="flex-row" style="gap:10px; padding-left:8px; border-left:1px solid var(--border-color);">
+      <img id="header-user-avatar" src="https://images.unsplash.com/photo-1560250097-0b93528c311a?w=150" style="width:36px;height:36px;border-radius:50%;object-fit:cover;" alt="">
+      <span id="header-user-name" style="font-weight:600; font-size:13px;">User</span>
+    </div>
+  </div>
+</header>
