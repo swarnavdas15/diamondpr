@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { DarkTheme, DefaultTheme, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useColorScheme, Platform } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider } from '../context/AuthContext';
 import { ERPProvider } from '../context/ERPContext';
 import MainScreen from './index';
@@ -12,6 +13,7 @@ export default function RootLayout() {
   const colorScheme = useColorScheme();
 
   useEffect(() => {
+    SplashScreen.hideAsync();
     if (Platform.OS === 'web' && typeof document !== 'undefined') {
       const styleId = 'disable-native-password-reveal';
       if (!document.getElementById(styleId)) {
@@ -35,11 +37,13 @@ export default function RootLayout() {
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <AuthProvider>
-        <ERPProvider>
-          <MainScreen />
-        </ERPProvider>
-      </AuthProvider>
+      <SafeAreaProvider>
+        <AuthProvider>
+          <ERPProvider>
+            <MainScreen />
+          </ERPProvider>
+        </AuthProvider>
+      </SafeAreaProvider>
     </ThemeProvider>
   );
 }
