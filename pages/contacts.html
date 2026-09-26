@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Contacts Registry - Diamond Flanges & Fittings</title>
+  
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="../css/styles.css">
+</head>
+<body>
+  <div id="toast-container" class="toast-container"></div>
+
+  <div class="app-container">
+    <div id="sidebar-container"></div>
+
+    <div class="main-wrapper">
+      <div id="header-container"></div>
+
+      <main class="content-body">
+        <div class="section-header">
+          <div class="section-title-group">
+            <h2>Executive Contacts Registry</h2>
+            <p>Unified directory of all client decision-makers, quality inspectors, and commercial heads.</p>
+          </div>
+        </div>
+
+        <div class="widget-card">
+          <div class="data-table-wrapper">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Contact Name</th>
+                  <th>Company</th>
+                  <th>Designation</th>
+                  <th>Mobile / WhatsApp</th>
+                  <th>Official Email</th>
+                  <th>DOB & Anniversary</th>
+                </tr>
+              </thead>
+              <tbody id="contacts-table-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </main>
+
+      <div id="footer-container"></div>
+    </div>
+  </div>
+
+  <div id="modals-container"></div>
+
+  <script src="../data/storage.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="../js/contacts.js"></script>
+</body>
+</html>

@@ -1,13 +1,21 @@
 import { Router } from 'express';
 import { authenticateToken } from '../../middlewares/auth.middleware';
-import { createTaskHandler, updateTaskStatusHandler, getMyTasksHandler } from './task.controller';
+import { requireRole } from '../../middlewares/role.middleware';
+import {
+  handleCreateTask,
+  handleListTasks,
+  handleUpdateTaskStatus,
+  handleDeleteTask,
+} from './task.controller';
 
 const router = Router();
 
-router.use(authenticateToken);
+// All authenticated roles can list tasks and update task status
+router.get('/', authenticateToken, handleListTasks);
+router.post('/', authenticateToken, handleCreateTask);
+router.patch('/:id/status', authenticateToken, handleUpdateTaskStatus);
 
-router.post('/create', createTaskHandler);
-router.patch('/:taskId/status', updateTaskStatusHandler);
-router.get('/my-tasks', getMyTasksHandler);
+// STRICT: Only SUPER_ADMIN and ADMIN can delete tasks
+router.delete('/:id', authenticateToken, requireRole(['SUPER_ADMIN', 'ADMIN']), handleDeleteTask);
 
 export default router;

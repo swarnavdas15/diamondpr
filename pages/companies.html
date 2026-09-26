@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Company CRM & Accounts - Diamond Flanges & Fittings</title>
+  
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="../css/styles.css">
+</head>
+<body>
+  <div id="toast-container" class="toast-container"></div>
+
+  <div class="app-container">
+    <div id="sidebar-container"></div>
+
+    <div class="main-wrapper">
+      <div id="header-container"></div>
+
+      <main class="content-body">
+        <div class="section-header">
+          <div class="section-title-group">
+            <h2>Company CRM & Client Accounts</h2>
+            <p>Manage key client accounts, addresses, GST details, and executive contacts.</p>
+          </div>
+          <div class="section-actions">
+            <button class="btn btn-secondary" onclick="exportCompaniesCSV()"><i class="fas fa-file-csv"></i> Export CSV</button>
+            <button class="btn btn-primary" onclick="openModal('add-company-modal')"><i class="fas fa-building"></i> Add New Client</button>
+          </div>
+        </div>
+
+        <!-- Filter Bar -->
+        <div class="widget-card" style="margin-bottom:20px; padding:14px;">
+          <div class="flex-space-between flex-wrap" style="gap:12px;">
+            <div class="flex-row" style="flex:1; max-width:400px;">
+              <input type="text" id="company-search-input" class="form-control" placeholder="Search by Company Name, GST, Code..." onkeyup="filterCompaniesList()">
+            </div>
+            <div class="flex-row" style="gap:10px;">
+              <select id="company-industry-filter" class="form-control" onchange="filterCompaniesList()" style="width:200px;">
+                <option value="">All Industries</option>
+                <option value="Oil & Gas EPC">Oil & Gas EPC</option>
+                <option value="Petrochemicals & Refining">Petrochemicals & Refining</option>
+                <option value="Power Generation & Defense">Power Generation & Defense</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Companies Grid -->
+        <div class="grid-2col" id="companies-cards-grid" style="grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));"></div>
+      </main>
+
+      <div id="footer-container"></div>
+    </div>
+  </div>
+
+  <div id="modals-container"></div>
+
+  <script src="../data/storage.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="../js/companies.js"></script>
+</body>
+</html>

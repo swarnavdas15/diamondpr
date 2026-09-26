@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login - Diamond Flanges & Fittings Pvt Ltd</title>
+  <meta name="description" content="Enterprise ERP System Login for Diamond Flanges & Fittings Pvt Ltd.">
+  
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="css/styles.css">
+  <style>
+    .demo-role-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+      gap: 6px;
+      margin-top: 16px;
+    }
+    .demo-role-btn {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      color: #e2e8f0;
+      padding: 6px 4px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.15s ease;
+    }
+    .demo-role-btn:hover {
+      background: #2563eb;
+      color: #ffffff;
+      border-color: #3b82f6;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="toast-container" class="toast-container"></div>
+
+  <!-- AUTHENTICATION CONTAINER (LOGIN PAGE) -->
+  <div class="auth-wrapper">
+    <div class="auth-card" style="max-width: 480px;">
+      <div class="auth-brand">
+        <div class="auth-logo-badge">
+          <i class="fas fa-gem"></i>
+        </div>
+        <h2>Diamond Flanges & Fittings</h2>
+        <p>Enterprise Business Management ERP System</p>
+      </div>
+
+      <form id="login-form">
+        <div class="form-group">
+          <label for="login-email">Email Address</label>
+          <input type="email" id="login-email" class="form-control" value="admin@diamondflanges.com" required placeholder="name@diamondflanges.com">
+        </div>
+
+        <div class="form-group">
+          <label for="login-password">Password</label>
+          <input type="password" id="login-password" class="form-control" value="admin123" required placeholder="Enter your password">
+        </div>
+
+        <div class="auth-options">
+          <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+            <input type="checkbox" id="login-remember" checked> Remember Me
+          </label>
+          <a href="#" onclick="showToast('Contact Super Admin to reset password', 'info')">Forgot Password?</a>
+        </div>
+
+        <button type="submit" class="btn-primary-auth">
+          Sign In to ERP <i class="fas fa-arrow-right" style="margin-left:6px;"></i>
+        </button>
+      </form>
+
+      <div class="auth-demo-hint">
+        <div style="font-weight: 700; margin-bottom: 6px; color:#ffffff;">🔑 One-Click Quick Role Switchers:</div>
+        <div class="demo-role-grid">
+          <button type="button" class="demo-role-btn" onclick="quickLogin('admin@diamondflanges.com', 'admin123')">👑 Super Admin</button>
+          <button type="button" class="demo-role-btn" onclick="quickLogin('supervisor@diamondflanges.com', 'mgr123')">🛡️ Admin</button>
+          <button type="button" class="demo-role-btn" onclick="quickLogin('sales@diamondflanges.com', 'emp123')">💼 Sales</button>
+          <button type="button" class="demo-role-btn" onclick="quickLogin('purchase@diamondflanges.com', 'emp123')">🛒 Purchase</button>
+          <button type="button" class="demo-role-btn" onclick="quickLogin('production@diamondflanges.com', 'emp123')">⚙️ Production</button>
+          <button type="button" class="demo-role-btn" onclick="quickLogin('qc@diamondflanges.com', 'emp123')">🧪 Quality QC</button>
+          <button type="button" class="demo-role-btn" onclick="quickLogin('dispatch@diamondflanges.com', 'emp123')">🚚 Dispatch</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="data/storage.js"></script>
+  <script src="js/common.js"></script>
+  <script>
+    document.getElementById('login-form').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const email = document.getElementById('login-email').value;
+      const pass = document.getElementById('login-password').value;
+
+      const res = window.storage.login(email, pass);
+      if (res.success) {
+        showToast(`Welcome back ${res.user.name} (${res.user.role})!`, 'success');
+        setTimeout(() => {
+          window.location.href = 'pages/dashboard.html';
+        }, 400);
+      } else {
+        showToast(res.message, 'error');
+      }
+    });
+
+    function quickLogin(email, pass) {
+      document.getElementById('login-email').value = email;
+      document.getElementById('login-password').value = pass;
+      const res = window.storage.login(email, pass);
+      if (res.success) {
+        showToast(`Logged in as ${res.user.role}! Loading Dashboard...`, 'success');
+        setTimeout(() => {
+          window.location.href = 'pages/dashboard.html';
+        }, 300);
+      } else {
+        showToast(res.message, 'error');
+      }
+    }
+  </script>
+</body>
+</html>

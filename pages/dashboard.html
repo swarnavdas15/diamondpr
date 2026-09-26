@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Executive Dashboard - Diamond Flanges & Fittings</title>
+  
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="../css/styles.css">
+</head>
+<body>
+  <div id="toast-container" class="toast-container"></div>
+
+  <div class="app-container">
+    <div id="sidebar-container"></div>
+
+    <div class="main-wrapper">
+      <div id="header-container"></div>
+
+      <main class="content-body">
+        <!-- Top Executive Role Banner -->
+        <div class="widget-card" id="dashboard-role-banner" style="background: linear-gradient(135deg, #1e3a8a, #0f172a); color:#ffffff; margin-bottom: 24px;">
+          <div class="flex-space-between flex-wrap" style="gap:16px;">
+            <div>
+              <h2 style="color:#ffffff; font-size: 22px; margin-bottom: 4px;">Diamond Flanges & Fittings - Operational Command Center</h2>
+              <p style="color:#94a3b8; font-size:13px;">Overview of manufacturing work orders, QA inspections, dispatch schedules, and vendor tracking.</p>
+            </div>
+            <div style="display:flex; gap:12px; align-items:center;">
+              <span class="badge" style="background:rgba(255,255,255,0.15); color:#ffffff; padding:6px 12px; font-size:12px;">
+                <i class="fas fa-industry"></i> Plant Active
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Dynamic Department Dashboard Content -->
+        <div id="dashboard-dynamic-content"></div>
+      </main>
+
+      <div id="footer-container"></div>
+    </div>
+  </div>
+
+  <div id="modals-container"></div>
+
+  <script src="../data/storage.js"></script>
+  <script src="../js/common.js"></script>
+  <script src="../js/dashboard.js"></script>
+</body>
+</html>

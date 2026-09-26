@@ -1,56 +1,149 @@
 import { Response } from 'express';
 import { AuthRequest } from '../../middlewares/auth.middleware';
-import { OrderService } from './order.service';
-import { parseBulkOrderExcel } from '../../utils/excelParser';
-import { db } from '../../prisma/db';
+import * as orderService from './order.service';
+import { maskOrderList, maskOrderData } from '../../middlewares/masking.middleware';
 
-export const createClientController = async (req: AuthRequest, res: Response) => {
+export const handleCreateOrder = async (req: AuthRequest, res: Response) => {
   try {
-    const client = await OrderService.createClient(req.body, req.user!.userId);
-    res.status(201).json({ success: true, client });
-  } catch (error: any) {
-    res.status(400).json({ success: false, message: error.message });
+    const {
+      poNumber,
+      clientId,
+      budget,
+      technicalRequirements,
+      materialRequirements,
+      requiredQuantity,
+      purchaseRequired,
+      productionRequired,
+      qualityTestingRequired,
+      dispatchRequired,
+      items,
+    } = req.body;
+
+    if (!poNumber || !clientId) {
+      return res.status(400).json({ error: 'PO Number and Client are required' });
+    }
+
+    const createdById = req.user?.userId || '';
+    const order = await orderService.createOrder({
+      poNumber,
+      clientId,
+      budget,
+      technicalRequirements,
+      materialRequirements,
+      requiredQuantity,
+      purchaseRequired,
+      productionRequired,
+      qualityTestingRequired,
+      dispatchRequired,
+      items,
+      createdById,
+    });
+
+    return res.status(201).json({
+      message: 'Order created with custom pipeline options',
+      order: maskOrderData(order, req.user?.role),
+    });
+  } catch (err: any) {
+    return res.status(400).json({ error: err.message || 'Failed to create order' });
   }
 };
 
-export const createOrderController = async (req: AuthRequest, res: Response) => {
+export const handleGetOrders = async (req: AuthRequest, res: Response) => {
   try {
-    const order = await OrderService.createOrder(req.body, req.user!.userId);
-    res.status(201).json({ success: true, order });
-  } catch (error: any) {
-    res.status(400).json({ success: false, message: error.message });
+    const role = req.user?.role;
+    const orders = await orderService.getOrders(role);
+    const maskedOrders = maskOrderList(orders, role);
+    return res.status(200).json({ orders: maskedOrders });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message || 'Failed to fetch orders' });
   }
 };
 
-export const bulkUploadOrdersController = async (req: AuthRequest, res: Response) => {
+export const handleGetOrderById = async (req: AuthRequest, res: Response) => {
   try {
-    if (!req.file) {
-      return res.status(400).json({ message: 'Excel file is required' });
-    }
+    const id = req.params.id as string;
+    const order = await orderService.getOrderById(id);
+    if (!order) return res.status(404).json({ error: 'Order not found' });
 
-    const rows = await parseBulkOrderExcel(req.file.buffer);
-    const createdOrders = [];
+    const maskedOrder = maskOrderData(order, req.user?.role);
+    return res.status(200).json({ order: maskedOrder });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message || 'Failed to fetch order details' });
+  }
+};
 
-    for (const row of rows) {
-      const client = await db.orm.public.Client
-        .where({ clientcode: row.clientCode })
-        .first();
+export const handleUpdateSalesWorkflow = async (req: AuthRequest, res: Response) => {
+  try {
+    const id = req.params.id as string;
+    const { stage, remarks } = req.body;
+    const userId = req.user?.userId || '';
+    const order = await orderService.updateSalesWorkflowStage(id, stage, userId, remarks);
+    return res.status(200).json({ message: 'Sales workflow stage updated', order: maskOrderData(order, req.user?.role) });
+  } catch (err: any) {
+    return res.status(400).json({ error: err.message || 'Failed to update sales workflow' });
+  }
+};
 
-      if (!client) continue;
+export const handleUpdatePurchaseStage = async (req: AuthRequest, res: Response) => {
+  try {
+    const id = req.params.id as string;
+    const { status, vendorSelected, procurementNotes } = req.body;
+    const userId = req.user?.userId || '';
+    const order = await orderService.updatePurchaseStage(id, { status, vendorSelected, procurementNotes }, userId);
+    return res.status(200).json({ message: 'Purchase stage updated', order: maskOrderData(order, req.user?.role) });
+  } catch (err: any) {
+    return res.status(400).json({ error: err.message || 'Failed to update purchase stage' });
+  }
+};
 
-      const order = await OrderService.createOrder({
-        poNumber: row.poNumber,
-        clientId: client.id,
-        requirements: row.requirements,
-        stageSequence: ['QUOTATION', 'PURCHASE', 'MACHINING', 'DISPATCH', 'COMPLETED'],
-        items: [{ itemName: row.itemName, size: row.size, quantity: row.quantity, unitPrice: row.unitPrice }]
-      }, req.user!.userId);
+export const handleUpdateProductionStage = async (req: AuthRequest, res: Response) => {
+  try {
+    const id = req.params.id as string;
+    const { status, shopFloorNotes } = req.body;
+    const userId = req.user?.userId || '';
+    const order = await orderService.updateProductionStage(id, { status, shopFloorNotes }, userId);
+    return res.status(200).json({ message: 'Production stage updated', order: maskOrderData(order, req.user?.role) });
+  } catch (err: any) {
+    return res.status(400).json({ error: err.message || 'Failed to update production stage' });
+  }
+};
 
-      createdOrders.push(order);
-    }
+export const handleUpdateQualityStage = async (req: AuthRequest, res: Response) => {
+  try {
+    const id = req.params.id as string;
+    const { status, qcResult, qcRemarks } = req.body;
+    const userId = req.user?.userId || '';
+    const order = await orderService.updateQualityStage(id, { status, qcResult, qcRemarks }, userId);
+    return res.status(200).json({ message: 'Quality testing stage updated', order: maskOrderData(order, req.user?.role) });
+  } catch (err: any) {
+    return res.status(400).json({ error: err.message || 'Failed to update quality stage' });
+  }
+};
 
-    res.status(200).json({ success: true, count: createdOrders.length, createdOrders });
-  } catch (error: any) {
-    res.status(500).json({ success: false, message: error.message });
+export const handleUpdateDispatchStage = async (req: AuthRequest, res: Response) => {
+  try {
+    const id = req.params.id as string;
+    const { status, logisticsEntry, transportRef, dispatchNotes } = req.body;
+    const userId = req.user?.userId || '';
+    const order = await orderService.updateDispatchStage(
+      id,
+      { status, logisticsEntry, transportRef, dispatchNotes },
+      userId
+    );
+    return res.status(200).json({ message: 'Dispatch stage updated', order: maskOrderData(order, req.user?.role) });
+  } catch (err: any) {
+    return res.status(400).json({ error: err.message || 'Failed to update dispatch stage' });
+  }
+};
+
+export const handleVerifyAndCompleteOrder = async (req: AuthRequest, res: Response) => {
+  try {
+    const id = req.params.id as string;
+    const { remarks } = req.body;
+    const userId = req.user?.userId || '';
+    const order = await orderService.verifyAndCompleteOrder(id, userId, remarks);
+    return res.status(200).json({ message: 'Order verified and closed by Sales', order: maskOrderData(order, req.user?.role) });
+  } catch (err: any) {
+    return res.status(400).json({ error: err.message || 'Failed to verify order completion' });
   }
 };

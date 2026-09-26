@@ -1,0 +1,253 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// ======================================
+// ENUMS
+// ======================================
+
+enum Role {
+  SUPER_ADMIN
+  ADMIN
+  SALES
+  PURCHASE
+  PRODUCTION
+  QUALITY_TESTING
+  DISPATCH
+}
+
+enum SalesWorkflowStage {
+  REQUIREMENT_RECEIVED
+  QUOTATION_PREPARED
+  QUOTATION_APPROVED
+  DRAWING_SUBMITTED
+  DRAWING_APPROVED
+  QUALITY_TESTING_REQUIRED
+  ORDER_CONFIRMED
+}
+
+enum DepartmentStatus {
+  PENDING
+  IN_PROGRESS
+  APPROVED
+  REJECTED
+  COMPLETED
+}
+
+enum QCResult {
+  PENDING
+  PASSED
+  FAILED
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum TaskStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+}
+
+enum CalendarEventType {
+  IMPORTANT_DATE
+  MEETING
+  FOLLOW_UP
+  DEADLINE
+  REMINDER
+  MILESTONE
+  BIRTHDAY
+  ANNIVERSARY
+}
+
+// ======================================
+// MODELS
+// ======================================
+
+model User {
+  id           String   @id @default(uuid())
+  name         String
+  username     String   @unique
+  email        String   @unique
+  password     String
+  role         Role     @default(PRODUCTION)
+  isActive     Boolean  @default(true)
+  fcmToken     String?
+  refreshToken String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relations
+  createdClients Client[]        @relation("ClientCreatedBy")
+  createdOrders  Order[]         @relation("OrderCreatedBy")
+  assignedTasks  Task[]          @relation("TaskAssignedTo")
+  createdTasks   Task[]          @relation("TaskCreatedBy")
+  drawings       Drawing[]
+  notes          Note[]
+  stageLogs      StageLog[]
+  calendarEvents CalendarEvent[]
+}
+
+model Client {
+  id          String   @id @default(uuid())
+  clientCode  String   @unique
+  companyName String
+  contactName String?
+  gstNumber   String?
+  contactNo   String
+  email       String?
+  address     String?
+  createdById String
+  createdAt   DateTime @default(now())
+
+  // Relations
+  createdBy User    @relation("ClientCreatedBy", fields: [createdById], references: [id])
+  orders    Order[]
+}
+
+model Order {
+  id                     String             @id @default(uuid())
+  orderNumber            String             @unique
+  poNumber               String             @unique
+  clientId               String
+  clientCode             String
+  budget                 Decimal?           @db.Decimal(12, 2)
+  technicalRequirements String?
+  materialRequirements   String?
+  requiredQuantity       Int                @default(1)
+  status                 DepartmentStatus   @default(PENDING)
+  drawingApproved        Boolean            @default(false)
+  createdById            String
+  createdAt              DateTime           @default(now())
+  updatedAt              DateTime           @updatedAt
+
+  // Pipeline Customizer Options
+  purchaseRequired       Boolean            @default(true)
+  productionRequired     Boolean            @default(true)
+  qualityTestingRequired Boolean            @default(true)
+  dispatchRequired       Boolean            @default(true)
+
+  // Sales 7-stage initiation workflow
+  salesWorkflowStage     SalesWorkflowStage @default(REQUIREMENT_RECEIVED)
+
+  // Department Stages & Verification
+  purchaseStatus         DepartmentStatus   @default(PENDING)
+  vendorSelected         String?
+  procurementNotes       String?
+
+  productionStatus       DepartmentStatus   @default(PENDING)
+  shopFloorNotes         String?
+
+  qualityStatus          DepartmentStatus   @default(PENDING)
+  qcResult               QCResult           @default(PENDING)
+  qcRemarks              String?
+
+  dispatchStatus         DepartmentStatus   @default(PENDING)
+  logisticsEntry         String?
+  transportRef           String?
+  dispatchNotes          String?
+
+  salesVerification      DepartmentStatus   @default(PENDING)
+
+  // Relations
+  client    Client      @relation(fields: [clientId], references: [id])
+  createdBy User        @relation("OrderCreatedBy", fields: [createdById], references: [id])
+  items     OrderItem[]
+  tasks     Task[]
+  drawings  Drawing[]
+  notes     Note[]
+  stageLogs StageLog[]
+}
+
+model OrderItem {
+  id        String   @id @default(uuid())
+  orderId   String
+  itemName  String   // e.g., Carbon Steel Flange
+  size      String   // e.g., 4 inch 300#
+  quantity  Int
+  unitPrice Decimal? @db.Decimal(10, 2)
+
+  // Relations
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+}
+
+model StageLog {
+  id          String   @id @default(uuid())
+  orderId     String
+  department  String
+  action      String
+  currentStatus String
+  remarks     String?
+  changedById String
+  createdAt   DateTime @default(now())
+
+  // Relations
+  order     Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  changedBy User  @relation(fields: [changedById], references: [id])
+}
+
+model Task {
+  id                   String     @id @default(uuid())
+  orderId              String?
+  title                String
+  description          String?
+  priority             Priority   @default(MEDIUM)
+  status               TaskStatus @default(PENDING)
+  assignedToDepartment Role?
+  assignedToId         String?
+  createdById          String
+  dueDate              DateTime?
+  createdAt            DateTime   @default(now())
+
+  // Relations
+  order      Order? @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  assignedTo User?  @relation("TaskAssignedTo", fields: [assignedToId], references: [id])
+  createdBy  User   @relation("TaskCreatedBy", fields: [createdById], references: [id])
+}
+
+model Drawing {
+  id           String   @id @default(uuid())
+  orderId      String
+  filename     String
+  fileUrl      String
+  uploadedById String
+  createdAt    DateTime @default(now())
+
+  // Relations
+  order      Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  uploadedBy User  @relation(fields: [uploadedById], references: [id])
+}
+
+model Note {
+  id        String   @id @default(uuid())
+  orderId   String
+  userId    String
+  content   String
+  createdAt DateTime @default(now())
+
+  // Relations
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id])
+}
+
+model CalendarEvent {
+  id          String            @id @default(uuid())
+  title       String
+  type        CalendarEventType @default(MEETING)
+  eventDate   DateTime
+  description String?
+  createdById String
+  createdAt   DateTime          @default(now())
+
+  // Relations
+  createdBy User @relation(fields: [createdById], references: [id])
+}
