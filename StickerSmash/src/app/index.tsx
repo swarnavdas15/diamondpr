@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, useWindowDimensions } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, useWindowDimensions } from 'react-native';
 import { useAuth } from '../context/AuthContext';
+
 import { useERP } from '../context/ERPContext';
 import { NavMenuItem } from '../types';
 
@@ -188,7 +189,7 @@ export default function MainScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <View style={styles.safeArea}>
       <View style={styles.appContainer}>
         {/* Top Corporate Header */}
         <Header
@@ -222,7 +223,7 @@ export default function MainScreen() {
         <CreateTaskModal visible={createTaskVisible} onClose={() => setCreateTaskVisible(false)} />
         <CreateQuotationModal visible={createQuotationVisible} onClose={() => setCreateQuotationVisible(false)} />
       </View>
-    </SafeAreaView>
+    </View>
   );
 }
 
