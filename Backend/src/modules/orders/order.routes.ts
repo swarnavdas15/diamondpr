@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { authenticateToken } from '../../middlewares/auth.middleware';
-import { requireRole } from '../../middlewares/role.middleware';
+import { requireRole, authorizeRoles } from '../../middlewares/role.middleware';
+import { uploadExcel } from '../../middlewares/upload.middleware';
 import {
   handleCreateOrder,
   handleGetOrders,
@@ -11,53 +12,37 @@ import {
   handleUpdateQualityStage,
   handleUpdateDispatchStage,
   handleVerifyAndCompleteOrder,
+  createClientController,
+  createOrderController,
+  bulkUploadOrdersController,
 } from './order.controller';
+import { getDepartmentOrdersController, advanceOrderStageController } from './workflow.controller';
 
 const router = Router();
 
-// All authenticated roles can list/view orders (with data masking applied automatically based on role)
-router.get('/', authenticateToken, handleGetOrders);
-router.get('/:id', authenticateToken, handleGetOrderById);
+router.use(authenticateToken);
 
-// Order creation & Sales verification restricted to Sales, Admin, Super Admin
-router.post('/', authenticateToken, requireRole(['SUPER_ADMIN', 'ADMIN', 'SALES']), handleCreateOrder);
-router.patch(
-  '/:id/sales-workflow',
-  authenticateToken,
-  requireRole(['SUPER_ADMIN', 'ADMIN', 'SALES']),
-  handleUpdateSalesWorkflow
-);
-router.patch(
-  '/:id/verify-completion',
-  authenticateToken,
-  requireRole(['SUPER_ADMIN', 'ADMIN', 'SALES']),
-  handleVerifyAndCompleteOrder
-);
+// All authenticated roles can list/view orders
+router.get('/', handleGetOrders);
+router.get('/:id', handleGetOrderById);
 
-// Department-specific stage routes
-router.patch(
-  '/:id/purchase',
-  authenticateToken,
-  requireRole(['SUPER_ADMIN', 'ADMIN', 'PURCHASE']),
-  handleUpdatePurchaseStage
-);
-router.patch(
-  '/:id/production',
-  authenticateToken,
-  requireRole(['SUPER_ADMIN', 'ADMIN', 'PRODUCTION']),
-  handleUpdateProductionStage
-);
-router.patch(
-  '/:id/quality',
-  authenticateToken,
-  requireRole(['SUPER_ADMIN', 'ADMIN', 'QUALITY_TESTING']),
-  handleUpdateQualityStage
-);
-router.patch(
-  '/:id/dispatch',
-  authenticateToken,
-  requireRole(['SUPER_ADMIN', 'ADMIN', 'DISPATCH']),
-  handleUpdateDispatchStage
-);
+// Client creation & Bulk Upload
+router.post('/client', requireRole(['SUPER_ADMIN', 'ADMIN', 'SALES']), createClientController);
+router.post('/create', requireRole(['SUPER_ADMIN', 'ADMIN', 'SALES']), createOrderController);
+router.post('/bulk-upload', requireRole(['SUPER_ADMIN', 'ADMIN', 'SALES']), uploadExcel.single('file'), bulkUploadOrdersController);
+
+// Order creation & Sales verification
+router.post('/', requireRole(['SUPER_ADMIN', 'ADMIN', 'SALES']), handleCreateOrder);
+router.patch('/:id/sales-workflow', requireRole(['SUPER_ADMIN', 'ADMIN', 'SALES']), handleUpdateSalesWorkflow);
+router.patch('/:id/verify-completion', requireRole(['SUPER_ADMIN', 'ADMIN', 'SALES']), handleVerifyAndCompleteOrder);
+
+// Department stage routes
+router.patch('/:id/purchase', requireRole(['SUPER_ADMIN', 'ADMIN', 'PURCHASE']), handleUpdatePurchaseStage);
+router.patch('/:id/production', requireRole(['SUPER_ADMIN', 'ADMIN', 'PRODUCTION']), handleUpdateProductionStage);
+router.patch('/:id/quality', requireRole(['SUPER_ADMIN', 'ADMIN', 'QUALITY_TESTING', 'TESTING']), handleUpdateQualityStage);
+router.patch('/:id/dispatch', requireRole(['SUPER_ADMIN', 'ADMIN', 'DISPATCH']), handleUpdateDispatchStage);
+
+// Stage advancement
+router.post('/:orderId/advance-stage', authorizeRoles('SUPER_ADMIN', 'ADMIN', 'PURCHASE', 'PRODUCTION', 'TESTING', 'DISPATCH'), advanceOrderStageController);
 
 export default router;

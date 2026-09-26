@@ -7,3 +7,6 @@ export const db = postgres<Contract>({
   contractJson,
   url: process.env['DATABASE_URL']!,
 });
+
+// Re-export Contract types for usage in controllers/services
+export type { Contract };

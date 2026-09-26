@@ -17,7 +17,7 @@ export const authenticateToken = (req: AuthRequest, res: Response, next: NextFun
   const token = authHeader && authHeader.split(' ')[1];
 
   if (!token) {
-    return res.status(401).json({ error: 'Access token required' });
+    return res.status(401).json({ error: 'Access token required', message: 'Access token required' });
   }
 
   try {
@@ -25,6 +25,6 @@ export const authenticateToken = (req: AuthRequest, res: Response, next: NextFun
     req.user = decoded;
     next();
   } catch (err) {
-    return res.status(403).json({ error: 'Invalid or expired token' });
+    return res.status(403).json({ error: 'Invalid or expired token', message: 'Invalid or expired token' });
   }
 };
