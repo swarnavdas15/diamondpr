@@ -6,7 +6,6 @@ import { sendOtpEmail } from '../../utils/mailer';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'supersecretkey';
 
-// In-memory secure hashed OTP store: email -> { hashedOtp, expiresAt, resetToken }
 interface OtpRecord {
   hashedOtp: string;
   expiresAt: number;
@@ -18,22 +17,12 @@ interface OtpRecord {
 const otpStore = new Map<string, OtpRecord>();
 
 export const loginUser = async (identifier: string, pass: string) => {
-  let user = await db.orm.public.User
+  const user = await db.orm.public.User
     .where({ email: identifier, isDeleted: 0 })
     .first();
 
   if (!user) {
-    user = await db.orm.public.User
-      .where({ username: identifier, isDeleted: 0 })
-      .first();
-  }
-
-  if (!user) {
     throw new Error('Invalid credentials');
-  }
-
-  if (user.isActive === 0) {
-    throw new Error('Your account has been deactivated by Super Admin. Please contact administrator.');
   }
 
   const isMatch = await bcrypt.compare(pass, user.password);
@@ -42,7 +31,7 @@ export const loginUser = async (identifier: string, pass: string) => {
   }
 
   const token = jwt.sign(
-    { userId: user.id, role: user.role, name: user.name, username: user.username },
+    { userId: user.id, role: user.role, name: user.name, email: user.email },
     JWT_SECRET,
     { expiresIn: '7d' }
   );
@@ -51,23 +40,20 @@ export const loginUser = async (identifier: string, pass: string) => {
     user: {
       id: user.id,
       name: user.name,
-      username: user.username,
+      username: user.email,
       email: user.email,
       role: user.role,
-      isActive: user.isActive,
+      isActive: true,
     },
     token,
   };
 };
 
 export const requestPasswordResetOtp = async (identifier: string) => {
-  let user = await db.orm.public.User.where({ email: identifier, isDeleted: 0 }).first();
-  if (!user) {
-    user = await db.orm.public.User.where({ username: identifier, isDeleted: 0 }).first();
-  }
+  const user = await db.orm.public.User.where({ email: identifier, isDeleted: 0 }).first();
 
   if (!user) {
-    throw new Error(`No account found for User ID or Email: '${identifier}'`);
+    throw new Error(`No account found for Email: '${identifier}'`);
   }
 
   const email = user.email.toLowerCase();
@@ -101,10 +87,7 @@ export const requestPasswordResetOtp = async (identifier: string) => {
 };
 
 export const verifyOtpCode = async (identifier: string, inputOtp: string) => {
-  let user = await db.orm.public.User.where({ email: identifier, isDeleted: 0 }).first();
-  if (!user) {
-    user = await db.orm.public.User.where({ username: identifier, isDeleted: 0 }).first();
-  }
+  const user = await db.orm.public.User.where({ email: identifier, isDeleted: 0 }).first();
 
   if (!user) {
     throw new Error('User account not found.');
@@ -150,10 +133,7 @@ export const resetUserPassword = async (identifier: string, resetToken: string, 
     throw new Error('Reset token is invalid or expired. Please request a new OTP.');
   }
 
-  let user = await db.orm.public.User.where({ email: identifier, isDeleted: 0 }).first();
-  if (!user) {
-    user = await db.orm.public.User.where({ username: identifier, isDeleted: 0 }).first();
-  }
+  const user = await db.orm.public.User.where({ email: identifier, isDeleted: 0 }).first();
 
   if (!user) {
     throw new Error('User account not found.');

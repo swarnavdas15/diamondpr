@@ -15,16 +15,19 @@ export class TaskService {
     },
     createdById: string
   ) {
-    const task = await db.orm.public.Task.create({
-      orderId: data.orderId ? dbId(data.orderId) : null,
+    const taskData: any = {
       title: data.title,
       description: data.description ?? null,
       priority: data.priority ?? Priority.MEDIUM,
       status: TaskStatus.PENDING,
       dueDate: data.dueDate ?? null,
-      assignedToId: data.assignedToId ? dbId(data.assignedToId) : null,
-      createdById: dbId(createdById)
-    });
+      createdById: dbId(createdById),
+    };
+
+    if (data.orderId) taskData.orderId = dbId(data.orderId);
+    if (data.assignedToId) taskData.assignedToId = dbId(data.assignedToId);
+
+    const task = await db.orm.public.Task.create(taskData);
 
     return await db.orm.public.Task
       .where({ id: task.id })
@@ -49,7 +52,6 @@ export class TaskService {
 
   static async listTasks() {
     return await db.orm.public.Task
-      .where({ isDeleted: 0 })
       .include('assignedTo', (user) => user.select('id', 'name', 'role'))
       .include('createdBy', (user) => user.select('id', 'name', 'role'))
       .orderBy((task) => task.createdAt.desc())
@@ -59,7 +61,7 @@ export class TaskService {
   static async deleteTask(taskId: string) {
     return await db.orm.public.Task
       .where({ id: dbId(taskId) })
-      .update({ isDeleted: 1 });
+      .delete();
   }
 }
 
