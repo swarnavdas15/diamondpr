@@ -244,6 +244,8 @@ export interface OrderDrawing {
   reviewRemarks?: string;
 }
 
+export type WorkflowStageName = 'PURCHASE' | 'PRODUCTION' | 'QUALITY_TESTING' | 'DISPATCH' | 'COMPLETED';
+
 export interface Order {
   id: string;
   orderNumber: string;
@@ -261,6 +263,11 @@ export interface Order {
   requiredQuantity: number;
   status: DepartmentStatus;
   drawingApproved: boolean;
+
+  // Active Workflow Routing & Department Assignment
+  currentStage?: WorkflowStageName;
+  nextStage?: WorkflowStageName;
+  assignedDepartment?: Role | WorkflowStageName;
 
   // Partial Quantity Tracking Properties
   purchaseQuantity?: number;
@@ -391,6 +398,14 @@ export interface Quotation {
   lostDate?: string;
   lostReason?: LostReason;
   lostRemarks?: string;
+  competitorName?: string;
+
+  sentVia?: 'Email' | 'WhatsApp' | 'Phone' | 'Meeting' | 'Other';
+  sentAt?: string;
+  sentNotes?: string;
+  negotiationDate?: string;
+  expectedClosureDate?: string;
+  isLocked?: boolean;
 
   followUps?: QuotationFollowUp[];
   createdAt: string;

@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, Modal, TextInput, ScrollView, StyleSheet } from 'react-native';
 import { Colors, Spacing, Radius, Shadows } from '../../theme';
+import { CreateClientModal } from '../CreateClientModal';
+import { Client } from '../../types';
 
 export interface DropdownOption {
   id: string;
@@ -24,6 +26,7 @@ interface SearchableDropdownProps {
   allowManual?: boolean;
   manualLabel?: string;
   manualId?: string;
+  onManualPress?: () => void;
 
   required?: boolean;
   disabled?: boolean;
@@ -41,11 +44,20 @@ export const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
   allowManual = false,
   manualLabel = '+ Manual / New Item',
   manualId = '',
+  onManualPress,
   required = false,
   disabled = false,
 }) => {
   const [modalVisible, setModalVisible] = useState(false);
+  const [clientModalVisible, setClientModalVisible] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+
+  const handleClientCreated = (newClient: Client) => {
+    if (onSelect) {
+      onSelect(newClient.id);
+    }
+    setClientModalVisible(false);
+  };
 
   // Find currently selected option for single-select display
   const selectedOption = options.find((o) => o.id === selectedValue);
@@ -169,7 +181,17 @@ export const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
                     styles.optionItem,
                     !isMulti && selectedValue === manualId && styles.optionItemActive,
                   ]}
-                  onPress={() => handleSelectSingle(manualId)}
+                  onPress={() => {
+                    setModalVisible(false);
+                    setSearchQuery('');
+                    if (onManualPress) {
+                      onManualPress();
+                    } else if (manualLabel.toLowerCase().includes('client')) {
+                      setClientModalVisible(true);
+                    } else {
+                      handleSelectSingle(manualId);
+                    }
+                  }}
                 >
                   <Text
                     style={[
@@ -246,6 +268,13 @@ export const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
           </TouchableOpacity>
         </TouchableOpacity>
       </Modal>
+
+      {/* Fallback Client Registration Modal */}
+      <CreateClientModal
+        visible={clientModalVisible}
+        onClose={() => setClientModalVisible(false)}
+        onClientCreated={handleClientCreated}
+      />
     </View>
   );
 };

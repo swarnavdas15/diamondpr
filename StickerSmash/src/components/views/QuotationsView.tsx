@@ -1,9 +1,14 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, TextInput, Modal, StyleSheet } from 'react-native';
 import { useERP } from '../../context/ERPContext';
+import { useAuth } from '../../context/AuthContext';
 import { Quotation, QuotationStatus, LostReason, FollowUpStatus } from '../../types';
 import { Colors, Spacing, Radius, Shadows } from '../../theme';
 import { SalesKPIDetailsModal } from '../dashboards/SalesKPIDetailsModal';
+import { QuotationSentModal } from '../quotations/QuotationSentModal';
+import { QuotationFollowUpModal } from '../quotations/QuotationFollowUpModal';
+import { QuotationConversionModal, QuotationConversionData } from '../quotations/QuotationConversionModal';
+import { CreateOrderModal, InitialOrderData } from '../CreateOrderModal';
 
 interface QuotationsViewProps {
   onOpenCreateQuotation?: () => void;
@@ -39,6 +44,8 @@ export const QuotationsView: React.FC<QuotationsViewProps> = ({ onOpenCreateQuot
     markQuotationLost,
     setSelectedOrder,
   } = useERP();
+  const { currentUser } = useAuth();
+  const isSuperAdmin = currentUser?.role === 'SUPER_ADMIN';
 
   // Filters State
   const [searchQuery, setSearchQuery] = useState('');
@@ -47,12 +54,19 @@ export const QuotationsView: React.FC<QuotationsViewProps> = ({ onOpenCreateQuot
   // Modals State
   const [viewQuotation, setViewQuotation] = useState<Quotation | null>(null);
   const [editQuotation, setEditQuotation] = useState<Quotation | null>(null);
-  const [followUpQuotation, setFollowUpQuotation] = useState<Quotation | null>(null);
-  const [convertQuotation, setConvertQuotation] = useState<Quotation | null>(null);
   const [lostQuotation, setLostQuotation] = useState<Quotation | null>(null);
   const [statusQuotation, setStatusQuotation] = useState<Quotation | null>(null);
   const [salesModalVisible, setSalesModalVisible] = useState(false);
   const [salesModalTab, setSalesModalTab] = useState<'TOTAL' | 'CONVERTED' | 'LOST'>('TOTAL');
+
+  // Workflow Automation Modals
+  const [sentModalQuotation, setSentModalQuotation] = useState<Quotation | null>(null);
+  const [followUpModalQuotation, setFollowUpModalQuotation] = useState<Quotation | null>(null);
+  const [followUpTargetStatus, setFollowUpTargetStatus] = useState<'UNDER_DISCUSSION' | 'NEGOTIATION'>('UNDER_DISCUSSION');
+  const [conversionModalQuotation, setConversionModalQuotation] = useState<Quotation | null>(null);
+  const [createOrderModalVisible, setCreateOrderModalVisible] = useState(false);
+  const [initialOrderData, setInitialOrderData] = useState<InitialOrderData | null>(null);
+  const [competitorName, setCompetitorName] = useState('');
 
   const handleOpenSalesModal = (tab: 'TOTAL' | 'CONVERTED' | 'LOST') => {
     setSalesModalTab(tab);
@@ -70,20 +84,6 @@ export const QuotationsView: React.FC<QuotationsViewProps> = ({ onOpenCreateQuot
   const [editFollowUpDate, setEditFollowUpDate] = useState('');
   const [editRemarks, setEditRemarks] = useState('');
   const [editError, setEditError] = useState('');
-
-  // Follow Up Form State
-  const [fupDate, setFupDate] = useState(new Date().toISOString().split('T')[0]);
-  const [fupNotes, setFupNotes] = useState('');
-  const [fupStatus, setFupStatus] = useState<FollowUpStatus>('COMPLETED');
-  const [fupError, setFupError] = useState('');
-
-  // Convert Form State
-  const [convertVal, setConvertVal] = useState('');
-  const [convertPoNum, setConvertPoNum] = useState('');
-  const [convertQty, setConvertQty] = useState('50');
-  const [convertTech, setConvertTech] = useState('');
-  const [convertError, setConvertError] = useState('');
-  const [convertSuccess, setConvertSuccess] = useState('');
 
   // Lost Form State
   const [lostReason, setLostReason] = useState<LostReason>('PRICE_TOO_HIGH');
@@ -180,78 +180,13 @@ export const QuotationsView: React.FC<QuotationsViewProps> = ({ onOpenCreateQuot
     }
   };
 
-  const handleOpenFollowUp = (q: Quotation) => {
-    setFollowUpQuotation(q);
-    setFupDate(new Date().toISOString().split('T')[0]);
-    setFupNotes('');
-    setFupStatus('COMPLETED');
-    setFupError('');
-  };
-
-  const handleSaveFollowUp = () => {
-    if (!followUpQuotation) return;
-    setFupError('');
-    if (!fupNotes.trim()) {
-      setFupError('Follow-up notes are required.');
-      return;
-    }
-
-    try {
-      addQuotationFollowUp(followUpQuotation.id, {
-        followUpDate: fupDate,
-        notes: fupNotes,
-        status: fupStatus,
-      });
-      setFollowUpQuotation(null);
-    } catch (err: any) {
-      setFupError(err.message || 'Failed to record follow-up.');
-    }
-  };
-
-  const handleOpenConvert = (q: Quotation) => {
-    setConvertQuotation(q);
-    setConvertVal(String(q.quotationAmount));
-    setConvertPoNum(`PO-${q.quotationNumber.replace('QT-', '')}`);
-    setConvertQty('50');
-    setConvertTech(q.remarks || '');
-    setConvertError('');
-    setConvertSuccess('');
-  };
-
-  const handleSaveConvert = () => {
-    if (!convertQuotation) return;
-    setConvertError('');
-    setConvertSuccess('');
-
-    const val = Number(convertVal);
-    if (isNaN(val) || val <= 0) {
-      setConvertError('Please enter a valid converted order value.');
-      return;
-    }
-
-    try {
-      const createdOrd = convertQuotationToOrder(convertQuotation.id, {
-        convertedOrderValue: val,
-        poNumber: convertPoNum.trim() || undefined,
-        requiredQuantity: Number(convertQty) || 50,
-        technicalRequirements: convertTech.trim() || undefined,
-      });
-
-      setConvertSuccess(`Successfully created Order ${createdOrd.orderNumber}!`);
-      setTimeout(() => {
-        setConvertQuotation(null);
-        setSelectedOrder(createdOrd);
-      }, 1000);
-    } catch (err: any) {
-      setConvertError(err.message || 'Failed to convert quotation to order.');
-    }
-  };
 
   const handleOpenLost = (q: Quotation) => {
     setLostQuotation(q);
     setLostReason('PRICE_TOO_HIGH');
     setLostValue(String(q.quotationAmount));
     setLostDate(new Date().toISOString().split('T')[0]);
+    setCompetitorName(q.competitorName || '');
     setLostRemarks('');
     setLostError('');
   };
@@ -265,18 +200,100 @@ export const QuotationsView: React.FC<QuotationsViewProps> = ({ onOpenCreateQuot
         lostReason,
         lostValue: lostValue ? Number(lostValue) : lostQuotation.quotationAmount,
         lostDate,
-        lostRemarks,
+        lostRemarks: competitorName ? `Competitor: ${competitorName}. ${lostRemarks}` : lostRemarks,
       });
+      updateQuotation(lostQuotation.id, { competitorName });
       setLostQuotation(null);
     } catch (err: any) {
       setLostError(err.message || 'Failed to mark quotation as lost.');
     }
   };
 
-  const handleSaveStatus = (newSt: QuotationStatus) => {
-    if (!statusQuotation) return;
-    updateQuotation(statusQuotation.id, { status: newSt });
+  const handleSelectStatusChange = (q: Quotation, newSt: QuotationStatus) => {
     setStatusQuotation(null);
+    if (newSt === 'SENT') {
+      setSentModalQuotation(q);
+    } else if (newSt === 'UNDER_DISCUSSION') {
+      setFollowUpTargetStatus('UNDER_DISCUSSION');
+      setFollowUpModalQuotation(q);
+    } else if (newSt === 'NEGOTIATION') {
+      setFollowUpTargetStatus('NEGOTIATION');
+      setFollowUpModalQuotation(q);
+    } else if (newSt === 'APPROVED') {
+      setConversionModalQuotation(q);
+    } else {
+      updateQuotation(q.id, { status: newSt });
+    }
+  };
+
+  const handleSaveSentDetails = (data: { sentVia: any; sentAt: string; sentNotes: string }) => {
+    if (!sentModalQuotation) return;
+    updateQuotation(sentModalQuotation.id, {
+      status: 'SENT',
+      sentVia: data.sentVia,
+      sentAt: data.sentAt,
+      sentNotes: data.sentNotes,
+    });
+    setSentModalQuotation(null);
+  };
+
+  const handleSaveFollowUpDetails = (data: {
+    targetStatus: QuotationStatus;
+    followUpDate: string;
+    followUpTime?: string;
+    notes: string;
+    nextAction?: string;
+    negotiationDate?: string;
+    expectedClosureDate?: string;
+  }) => {
+    if (!followUpModalQuotation) return;
+    updateQuotation(followUpModalQuotation.id, {
+      status: data.targetStatus,
+      followUpDate: data.followUpDate,
+      negotiationDate: data.negotiationDate,
+      expectedClosureDate: data.expectedClosureDate,
+    });
+
+    addQuotationFollowUp(followUpModalQuotation.id, {
+      followUpDate: data.followUpDate,
+      notes: data.notes,
+      status: 'PENDING',
+    });
+
+    setFollowUpModalQuotation(null);
+  };
+
+  const handleSaveConversion = (data: QuotationConversionData) => {
+    if (!conversionModalQuotation) return;
+    const q = conversionModalQuotation;
+    updateQuotation(q.id, {
+      status: 'APPROVED',
+      isLocked: true,
+      quotationAmount: data.approvedAmount,
+      remarks: data.finalRemarks,
+    });
+
+    const initData: InitialOrderData = {
+      clientId: q.clientId,
+      poNumber: `PO-${q.quotationNumber}`,
+      budget: data.approvedAmount,
+      technicalRequirements: q.remarks || data.finalRemarks,
+      materialRequirements: data.finalRemarks,
+      requiredQuantity: 50,
+      purchaseRequired: data.purchaseRequired,
+      productionRequired: data.productionRequired,
+      qualityTestingRequired: data.qualityTestingRequired,
+      dispatchRequired: data.dispatchRequired,
+      quotationNumber: q.quotationNumber,
+    };
+
+    setInitialOrderData(initData);
+    setConversionModalQuotation(null);
+    setCreateOrderModalVisible(true);
+  };
+
+  const handleUnlockQuotation = (q: Quotation) => {
+    updateQuotation(q.id, { isLocked: false, status: 'DRAFT' });
   };
 
   return (
@@ -432,40 +449,62 @@ export const QuotationsView: React.FC<QuotationsViewProps> = ({ onOpenCreateQuot
                     <Text style={[styles.td, { width: 130 }]} numberOfLines={1}>{q.salesExecutive}</Text>
 
                     {/* Status Badge */}
-                    <TouchableOpacity style={{ width: 130 }} onPress={() => setStatusQuotation(q)}>
-                      <View style={[styles.statusBadge, { backgroundColor: stStyle.bg, borderColor: stStyle.border }]}>
-                        <Text style={[styles.statusBadgeText, { color: stStyle.text }]}>
-                          {q.status.replace(/_/g, ' ')} ▾
+                    <View style={{ width: 130 }}>
+                      {q.isLocked || q.status === 'APPROVED' || q.status === 'FULLY_CONVERTED' ? (
+                        <View style={[styles.statusBadge, { backgroundColor: 'rgba(34, 197, 94, 0.15)', borderColor: '#22c55e' }]}>
+                          <Text style={[styles.statusBadgeText, { color: '#22c55e' }]}>
+                            {q.status.replace(/_/g, ' ')} 🔒
+                          </Text>
+                        </View>
+                      ) : (
+                        <TouchableOpacity onPress={() => setStatusQuotation(q)}>
+                          <View style={[styles.statusBadge, { backgroundColor: stStyle.bg, borderColor: stStyle.border }]}>
+                            <Text style={[styles.statusBadgeText, { color: stStyle.text }]}>
+                              {q.status.replace(/_/g, ' ')} ▾
+                            </Text>
+                          </View>
+                        </TouchableOpacity>
+                      )}
+                      {q.sentVia ? (
+                        <Text style={{ fontSize: 10, color: Colors.accentTeal, fontWeight: '700', marginTop: 2 }}>
+                          Sent via {q.sentVia}
                         </Text>
-                      </View>
-                    </TouchableOpacity>
+                      ) : null}
+                    </View>
 
                     {/* Follow-Up Date */}
                     <Text style={[styles.tdSmall, { width: 100 }]}>{q.followUpDate || 'None'}</Text>
 
-                    {/* Actions */}
-                    <View style={{ width: 270, flexDirection: 'row', gap: 4, flexWrap: 'wrap' }}>
+                    {/* Actions Column (Cleaned Up: View, Edit/Locked, Mark Lost, Unlock) */}
+                    <View style={{ width: 270, flexDirection: 'row', gap: 4, alignItems: 'center', flexWrap: 'wrap' }}>
                       <TouchableOpacity style={styles.actBtnView} onPress={() => setViewQuotation(q)}>
                         <Text style={styles.actBtnText}>View</Text>
                       </TouchableOpacity>
 
-                      <TouchableOpacity style={styles.actBtnEdit} onPress={() => handleOpenEdit(q)}>
-                        <Text style={styles.actBtnText}>Edit</Text>
-                      </TouchableOpacity>
+                      {(!q.isLocked && q.status !== 'APPROVED' && q.status !== 'FULLY_CONVERTED') || isSuperAdmin ? (
+                        <TouchableOpacity style={styles.actBtnEdit} onPress={() => handleOpenEdit(q)}>
+                          <Text style={styles.actBtnText}>Edit</Text>
+                        </TouchableOpacity>
+                      ) : (
+                        <View style={{ backgroundColor: 'rgba(148, 163, 184, 0.1)', paddingHorizontal: 6, paddingVertical: 3, borderRadius: Radius.xs, borderWidth: 1, borderColor: Colors.borderDark }}>
+                          <Text style={{ color: Colors.textMuted, fontSize: 10, fontWeight: '700' }}>
+                            Converted To Order - Locked
+                          </Text>
+                        </View>
+                      )}
 
-                      <TouchableOpacity style={styles.actBtnFup} onPress={() => handleOpenFollowUp(q)}>
-                        <Text style={styles.actBtnText}>Follow-Up</Text>
-                      </TouchableOpacity>
-
-                      {q.status !== 'FULLY_CONVERTED' && q.status !== 'LOST' && (
-                        <TouchableOpacity style={styles.actBtnConvert} onPress={() => handleOpenConvert(q)}>
-                          <Text style={styles.actBtnTextBold}>Convert</Text>
+                      {q.status !== 'LOST' && q.status !== 'FULLY_CONVERTED' && !q.isLocked && (
+                        <TouchableOpacity style={styles.actBtnLost} onPress={() => handleOpenLost(q)}>
+                          <Text style={styles.actBtnTextLost}>Mark Lost</Text>
                         </TouchableOpacity>
                       )}
 
-                      {q.status !== 'LOST' && q.status !== 'FULLY_CONVERTED' && (
-                        <TouchableOpacity style={styles.actBtnLost} onPress={() => handleOpenLost(q)}>
-                          <Text style={styles.actBtnTextLost}>Mark Lost</Text>
+                      {isSuperAdmin && (q.isLocked || q.status === 'APPROVED' || q.status === 'FULLY_CONVERTED') && (
+                        <TouchableOpacity
+                          style={{ backgroundColor: 'rgba(245, 158, 11, 0.15)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: Radius.xs, borderWidth: 1, borderColor: '#f59e0b' }}
+                          onPress={() => handleUnlockQuotation(q)}
+                        >
+                          <Text style={{ color: '#f59e0b', fontSize: 10, fontWeight: '800' }}>🔓 Unlock</Text>
                         </TouchableOpacity>
                       )}
                     </View>
@@ -627,111 +666,7 @@ export const QuotationsView: React.FC<QuotationsViewProps> = ({ onOpenCreateQuot
         </Modal>
       )}
 
-      {/* MODAL 3: ADD FOLLOW-UP */}
-      {followUpQuotation && (
-        <Modal visible={!!followUpQuotation} transparent animationType="fade" onRequestClose={() => setFollowUpQuotation(null)}>
-          <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={() => setFollowUpQuotation(null)}>
-            <TouchableOpacity activeOpacity={1} style={styles.modalCard} onPress={(e) => e.stopPropagation()}>
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>Record Follow-Up: {followUpQuotation.quotationNumber}</Text>
-                <TouchableOpacity onPress={() => setFollowUpQuotation(null)}>
-                  <Text style={styles.closeBtn}>✕</Text>
-                </TouchableOpacity>
-              </View>
 
-              <View style={{ gap: Spacing.md }}>
-                {fupError ? <View style={styles.errorBox}><Text style={styles.errorText}>⚠️ {fupError}</Text></View> : null}
-
-                <Text style={styles.inputLabel}>Follow-Up Date *</Text>
-                <TextInput style={styles.input} value={fupDate} onChangeText={setFupDate} placeholder="YYYY-MM-DD" />
-
-                <Text style={styles.inputLabel}>Follow-Up Status</Text>
-                <View style={styles.statusChipsRow}>
-                  {(['PENDING', 'COMPLETED', 'NO_RESPONSE', 'AWAITING_DECISION'] as const).map((st) => (
-                    <TouchableOpacity
-                      key={st}
-                      style={[styles.chip, fupStatus === st && styles.chipActive]}
-                      onPress={() => setFupStatus(st)}
-                    >
-                      <Text style={[styles.chipText, fupStatus === st && styles.chipTextActive]}>{st}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-
-                <Text style={styles.inputLabel}>Follow-Up Discussion Notes *</Text>
-                <TextInput
-                  style={[styles.input, { height: 70, textAlignVertical: 'top' }]}
-                  placeholder="Enter notes from call/meeting with client..."
-                  multiline
-                  value={fupNotes}
-                  onChangeText={setFupNotes}
-                />
-
-                <TouchableOpacity style={styles.submitBtn} onPress={handleSaveFollowUp}>
-                  <Text style={styles.submitBtnText}>✓ Save Follow-Up Log</Text>
-                </TouchableOpacity>
-              </View>
-            </TouchableOpacity>
-          </TouchableOpacity>
-        </Modal>
-      )}
-
-      {/* MODAL 4: CONVERT QUOTATION TO ORDER */}
-      {convertQuotation && (
-        <Modal visible={!!convertQuotation} transparent animationType="fade" onRequestClose={() => setConvertQuotation(null)}>
-          <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={() => setConvertQuotation(null)}>
-            <TouchableOpacity activeOpacity={1} style={styles.modalCard} onPress={(e) => e.stopPropagation()}>
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>Convert Quotation to ERP Order</Text>
-                <TouchableOpacity onPress={() => setConvertQuotation(null)}>
-                  <Text style={styles.closeBtn}>✕</Text>
-                </TouchableOpacity>
-              </View>
-
-              <ScrollView style={{ maxHeight: 460 }}>
-                {convertError ? <View style={styles.errorBox}><Text style={styles.errorText}>⚠️ {convertError}</Text></View> : null}
-                {convertSuccess ? <View style={styles.successBox}><Text style={styles.successText}>✅ {convertSuccess}</Text></View> : null}
-
-                <View style={styles.infoBanner}>
-                  <Text style={styles.infoBannerText}>
-                    ℹ️ Pre-filling customer data for <Text style={{ fontWeight: '800' }}>{convertQuotation.companyName} ({convertQuotation.clientCode})</Text>. Original Quotation Value: <Text style={{ fontWeight: '800' }}>{formatCurrency(convertQuotation.quotationAmount)}</Text>.
-                  </Text>
-                </View>
-
-                <Text style={styles.inputLabel}>Confirmed Order Received Value (₹) *</Text>
-                <TextInput
-                  style={[styles.input, { color: Colors.successBright, fontWeight: '800' }]}
-                  value={convertVal}
-                  onChangeText={setConvertVal}
-                  keyboardType="numeric"
-                />
-
-                {/* Partial Conversion Calculation Display */}
-                {Number(convertVal) < convertQuotation.quotationAmount && (
-                  <View style={styles.partialBox}>
-                    <Text style={styles.partialText}>
-                      ⚠️ Partial Conversion Detected: Converted = {formatCurrency(Number(convertVal))}, Lost Portion = <Text style={{ fontWeight: '800', color: Colors.industrialOrange }}>{formatCurrency(convertQuotation.quotationAmount - Number(convertVal))}</Text>
-                    </Text>
-                  </View>
-                )}
-
-                <Text style={styles.inputLabel}>Customer Purchase Order (PO) Number</Text>
-                <TextInput style={styles.input} value={convertPoNum} onChangeText={setConvertPoNum} />
-
-                <Text style={styles.inputLabel}>Required Batch Quantity (pcs)</Text>
-                <TextInput style={styles.input} value={convertQty} onChangeText={setConvertQty} keyboardType="numeric" />
-
-                <Text style={styles.inputLabel}>Technical Specifications & Order Notes</Text>
-                <TextInput style={[styles.input, { height: 60 }]} multiline value={convertTech} onChangeText={setConvertTech} />
-
-                <TouchableOpacity style={styles.submitBtnGreen} onPress={handleSaveConvert}>
-                  <Text style={styles.submitBtnText}>⚡ Convert & Generate Sales Order</Text>
-                </TouchableOpacity>
-              </ScrollView>
-            </TouchableOpacity>
-          </TouchableOpacity>
-        </Modal>
-      )}
 
       {/* MODAL 5: MARK LOST */}
       {lostQuotation && (
@@ -763,6 +698,15 @@ export const QuotationsView: React.FC<QuotationsViewProps> = ({ onOpenCreateQuot
                     );
                   })}
                 </View>
+
+                <Text style={styles.inputLabel}>Competitor Name (If Lost To Competitor)</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="e.g. Jindal Steel, L&T Valves, Precision Forge"
+                  placeholderTextColor="#94a3b8"
+                  value={competitorName}
+                  onChangeText={setCompetitorName}
+                />
 
                 <Text style={styles.inputLabel}>Lost Business Value (₹)</Text>
                 <TextInput style={styles.input} value={lostValue} onChangeText={setLostValue} keyboardType="numeric" />
@@ -799,7 +743,7 @@ export const QuotationsView: React.FC<QuotationsViewProps> = ({ onOpenCreateQuot
                   <TouchableOpacity
                     key={st}
                     style={[styles.statusOptionBtn, statusQuotation.status === st && styles.statusOptionBtnActive]}
-                    onPress={() => handleSaveStatus(st)}
+                    onPress={() => handleSelectStatusChange(statusQuotation, st)}
                   >
                     <Text style={[styles.statusOptionText, statusQuotation.status === st && styles.statusOptionTextActive]}>
                       {st.replace(/_/g, ' ')}
@@ -811,6 +755,38 @@ export const QuotationsView: React.FC<QuotationsViewProps> = ({ onOpenCreateQuot
           </TouchableOpacity>
         </Modal>
       )}
+
+      {/* Workflow Automation Popup Modals */}
+      <QuotationSentModal
+        visible={!!sentModalQuotation}
+        quotation={sentModalQuotation}
+        onClose={() => setSentModalQuotation(null)}
+        onSave={handleSaveSentDetails}
+      />
+
+      <QuotationFollowUpModal
+        visible={!!followUpModalQuotation}
+        quotation={followUpModalQuotation}
+        targetStatus={followUpTargetStatus}
+        onClose={() => setFollowUpModalQuotation(null)}
+        onSave={handleSaveFollowUpDetails}
+      />
+
+      <QuotationConversionModal
+        visible={!!conversionModalQuotation}
+        quotation={conversionModalQuotation}
+        onClose={() => setConversionModalQuotation(null)}
+        onSubmitConversion={handleSaveConversion}
+      />
+
+      <CreateOrderModal
+        visible={createOrderModalVisible}
+        onClose={() => {
+          setCreateOrderModalVisible(false);
+          setInitialOrderData(null);
+        }}
+        initialData={initialOrderData}
+      />
 
       {/* Sales KPI Details Modal */}
       <SalesKPIDetailsModal

@@ -24,6 +24,7 @@ import { TaskManagement } from '../components/TaskManagement';
 
 import { LoginScreen } from '../components/auth/LoginScreen';
 import { Colors } from '../theme';
+import { SuperAdminAnalyticsView } from '../components/analytics/SuperAdminAnalyticsView';
 
 import {
   ClientDirectoryView,
@@ -169,11 +170,11 @@ export default function MainScreen() {
         return <AdminDashboard isSuperAdmin={currentUser.role === 'SUPER_ADMIN'} />;
 
       case 'Reports':
-        // STRICT RULE: Reports is ONLY accessible by Super Admin and Admin
-        if (!isSuperAdminOrAdmin) {
+        // STRICT RULE: Reports & Analytics module is exclusively accessible by Super Admin
+        if (currentUser.role !== 'SUPER_ADMIN') {
           return renderDashboardByRole();
         }
-        return <ReportsView />;
+        return <SuperAdminAnalyticsView />;
 
       case 'Settings':
         // STRICT RULE: ERP Settings is ONLY accessible by Super Admin

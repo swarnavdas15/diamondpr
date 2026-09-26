@@ -10,7 +10,12 @@ import { OrderQuantityTracker } from '../OrderQuantityTracker';
 
 export const DispatchDashboard: React.FC = () => {
   const { getMaskedOrders, updateDispatchStage, setSelectedOrder } = useERP();
-  const maskedOrders = getMaskedOrders().filter((o) => o.dispatchRequired);
+  const maskedOrders = getMaskedOrders().filter(
+    (o) =>
+      o.dispatchRequired &&
+      (o.productionStatus === 'COMPLETED' || (o.productionQuantity || 0) > 0) &&
+      (!o.qualityTestingRequired || (o.qualityStatus === 'COMPLETED' && o.qcResult === 'PASSED'))
+  );
 
   const [transportRefMap, setTransportRefMap] = useState<{ [key: string]: string }>({});
   const [logisticsEntryMap, setLogisticsEntryMap] = useState<{ [key: string]: string }>({});

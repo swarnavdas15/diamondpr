@@ -3,15 +3,34 @@ import { View, Text, Modal, TouchableOpacity, TextInput, ScrollView, StyleSheet 
 import { useERP } from '../context/ERPContext';
 import { Colors, Spacing, Radius, Shadows } from '../theme';
 import { SearchableDropdown } from './ui/SearchableDropdown';
+import { CreateClientModal } from './CreateClientModal';
+import { Client } from '../types';
+
+export interface InitialOrderData {
+  clientId?: string;
+  poNumber?: string;
+  budget?: number;
+  technicalRequirements?: string;
+  materialRequirements?: string;
+  requiredQuantity?: number;
+  purchaseRequired?: boolean;
+  productionRequired?: boolean;
+  qualityTestingRequired?: boolean;
+  dispatchRequired?: boolean;
+  quotationNumber?: string;
+}
 
 interface CreateOrderModalProps {
   visible: boolean;
   onClose: () => void;
+  initialData?: InitialOrderData | null;
 }
 
-export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ visible, onClose }) => {
+export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ visible, onClose, initialData }) => {
   const { clients, createOrder } = useERP();
 
+  const [createClientVisible, setCreateClientVisible] = useState(false);
+  const [successMsg, setSuccessMsg] = useState('');
   const [clientId, setClientId] = useState(clients[0]?.id || '');
   const [poNumber, setPoNumber] = useState('');
   const [budget, setBudget] = useState('');
@@ -31,6 +50,27 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ visible, onC
   const [unitPrice, setUnitPrice] = useState('4500');
 
   const [error, setError] = useState('');
+
+  React.useEffect(() => {
+    if (initialData) {
+      if (initialData.clientId) setClientId(initialData.clientId);
+      if (initialData.poNumber) setPoNumber(initialData.poNumber);
+      if (initialData.budget) setBudget(String(initialData.budget));
+      if (initialData.technicalRequirements) setTechnicalRequirements(initialData.technicalRequirements);
+      if (initialData.materialRequirements) setMaterialRequirements(initialData.materialRequirements);
+      if (initialData.requiredQuantity) setRequiredQuantity(String(initialData.requiredQuantity));
+      if (initialData.purchaseRequired !== undefined) setPurchaseRequired(initialData.purchaseRequired);
+      if (initialData.productionRequired !== undefined) setProductionRequired(initialData.productionRequired);
+      if (initialData.qualityTestingRequired !== undefined) setQualityTestingRequired(initialData.qualityTestingRequired);
+      if (initialData.dispatchRequired !== undefined) setDispatchRequired(initialData.dispatchRequired);
+    }
+  }, [initialData]);
+
+  const handleClientCreated = (newClient: Client) => {
+    setClientId(newClient.id);
+    setSuccessMsg('Client Registered Successfully');
+    setTimeout(() => setSuccessMsg(''), 4000);
+  };
 
   const handleSubmit = () => {
     if (!poNumber.trim() || !clientId) {
@@ -92,6 +132,7 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ visible, onC
 
           <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>
             {error ? <Text style={styles.errorText}>{error}</Text> : null}
+            {successMsg ? <Text style={[styles.errorText, { color: Colors.successBright, backgroundColor: 'rgba(16, 185, 129, 0.1)', borderColor: Colors.successBright }]}>✅ {successMsg}</Text> : null}
 
             {/* Client Searchable Dropdown */}
             <SearchableDropdown
@@ -105,6 +146,10 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ visible, onC
               }))}
               selectedValue={clientId}
               onSelect={(id) => setClientId(id)}
+              allowManual={true}
+              manualLabel="+ Manual / New Client"
+              manualId=""
+              onManualPress={() => setCreateClientVisible(true)}
               required
             />
 
@@ -241,6 +286,12 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ visible, onC
           </ScrollView>
         </TouchableOpacity>
       </TouchableOpacity>
+      {/* Nested Register New Client Modal */}
+      <CreateClientModal
+        visible={createClientVisible}
+        onClose={() => setCreateClientVisible(false)}
+        onClientCreated={handleClientCreated}
+      />
     </Modal>
   );
 };

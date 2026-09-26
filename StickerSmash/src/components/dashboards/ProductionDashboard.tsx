@@ -77,8 +77,12 @@ export const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ isQCMo
     }
   };
 
-  const productionQueue = maskedOrders.filter((o) => o.productionRequired);
-  const qcQueue = maskedOrders.filter((o) => o.qualityTestingRequired);
+  const productionQueue = maskedOrders.filter(
+    (o) => o.productionRequired && (o.purchaseStatus === 'COMPLETED' || !o.purchaseRequired)
+  );
+  const qcQueue = maskedOrders.filter(
+    (o) => o.qualityTestingRequired && (o.productionStatus === 'COMPLETED' || (o.productionQuantity || 0) > 0)
+  );
 
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
@@ -180,13 +184,6 @@ export const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ isQCMo
                       onPress={() => handleOpenProcessModal(ord, 'PRODUCTION')}
                     >
                       <Text style={styles.actionBtnText}>⚙️ Record Finished Quantity (Batch)</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                      style={[styles.actionBtn, styles.btnDone]}
-                      onPress={() => handleOpenProcessModal(ord, 'PRODUCTION')}
-                    >
-                      <Text style={styles.actionBtnText}>✓ Production Update</Text>
                     </TouchableOpacity>
                   </View>
                 </View>

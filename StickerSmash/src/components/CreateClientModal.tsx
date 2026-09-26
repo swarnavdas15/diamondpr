@@ -3,12 +3,15 @@ import { View, Text, Modal, TouchableOpacity, TextInput, StyleSheet, ScrollView 
 import { useERP } from '../context/ERPContext';
 import { Colors, Spacing, Radius, Shadows } from '../theme';
 
+import { Client } from '../types';
+
 interface CreateClientModalProps {
   visible: boolean;
   onClose: () => void;
+  onClientCreated?: (client: Client) => void;
 }
 
-export const CreateClientModal: React.FC<CreateClientModalProps> = ({ visible, onClose }) => {
+export const CreateClientModal: React.FC<CreateClientModalProps> = ({ visible, onClose, onClientCreated }) => {
   const { clients, createClient } = useERP();
 
   const [clientCode, setClientCode] = useState('');
@@ -18,11 +21,14 @@ export const CreateClientModal: React.FC<CreateClientModalProps> = ({ visible, o
   const [email, setEmail] = useState('');
   const [address, setAddress] = useState('');
   const [gstNumber, setGstNumber] = useState('');
+  const [industry, setIndustry] = useState('');
   const [remarks, setRemarks] = useState('');
   const [error, setError] = useState('');
+  const [successMsg, setSuccessMsg] = useState('');
 
   const handleSubmit = () => {
     setError('');
+    setSuccessMsg('');
 
     const trimmedCode = clientCode.trim();
     const trimmedCompany = companyName.trim();
@@ -49,7 +55,7 @@ export const CreateClientModal: React.FC<CreateClientModalProps> = ({ visible, o
     }
 
     try {
-      createClient({
+      const newClient = createClient({
         clientCode: trimmedCode,
         companyName: trimmedCompany,
         contactName: contactName.trim(),
@@ -57,10 +63,18 @@ export const CreateClientModal: React.FC<CreateClientModalProps> = ({ visible, o
         email: email.trim(),
         address: address.trim(),
         gstNumber: gstNumber.trim(),
+        industry: industry.trim(),
         remarks: remarks.trim(),
       });
 
-      handleClose();
+      if (onClientCreated) {
+        onClientCreated(newClient);
+      }
+
+      setSuccessMsg('Client Registered Successfully');
+      setTimeout(() => {
+        handleClose();
+      }, 500);
     } catch (err: any) {
       setError(err.message || 'Failed to register client.');
     }
@@ -74,8 +88,10 @@ export const CreateClientModal: React.FC<CreateClientModalProps> = ({ visible, o
     setEmail('');
     setAddress('');
     setGstNumber('');
+    setIndustry('');
     setRemarks('');
     setError('');
+    setSuccessMsg('');
     onClose();
   };
 
@@ -91,6 +107,7 @@ export const CreateClientModal: React.FC<CreateClientModalProps> = ({ visible, o
           </View>
 
           {error ? <Text style={styles.errorText}>⚠️ {error}</Text> : null}
+          {successMsg ? <Text style={[styles.errorText, { color: Colors.successBright, backgroundColor: 'rgba(16, 185, 129, 0.1)', borderColor: Colors.successBright }]}>✅ {successMsg}</Text> : null}
 
           <ScrollView style={styles.formScroll} showsVerticalScrollIndicator={false}>
             <View style={styles.formContent}>
@@ -148,6 +165,15 @@ export const CreateClientModal: React.FC<CreateClientModalProps> = ({ visible, o
                 value={gstNumber}
                 onChangeText={setGstNumber}
                 autoCapitalize="characters"
+              />
+
+              <Text style={styles.label}>Industry Type</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="e.g. Oil & Gas, Valve Manufacturing, Aerospace"
+                placeholderTextColor="#94a3b8"
+                value={industry}
+                onChangeText={setIndustry}
               />
 
               <Text style={styles.label}>Plant / Office Address</Text>

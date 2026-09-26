@@ -102,6 +102,7 @@ interface ERPContextType {
     email?: string;
     address?: string;
     gstNumber?: string;
+    industry?: string;
     remarks?: string;
   }) => Client;
   createOrder: (data: {
@@ -900,6 +901,7 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     email?: string;
     address?: string;
     gstNumber?: string;
+    industry?: string;
     remarks?: string;
   }) => {
     const trimmedCode = data.clientCode.trim();
@@ -924,6 +926,7 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       email: data.email,
       address: data.address,
       gstNumber: data.gstNumber,
+      industry: data.industry,
       remarks: data.remarks,
       createdAt: new Date().toISOString(),
     };
@@ -948,6 +951,29 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const count = orders.length;
     const orderNumber = `ORD-2026-${String(count + 1).padStart(3, '0')}`;
 
+    // Determine initial stage & department assignment
+    let initialStage: any = 'PURCHASE';
+    let initialDept: any = 'PURCHASE';
+    let nextStage: any = 'PRODUCTION';
+
+    if (data.purchaseRequired) {
+      initialStage = 'PURCHASE';
+      initialDept = 'PURCHASE';
+      nextStage = data.productionRequired ? 'PRODUCTION' : (data.qualityTestingRequired ? 'QUALITY_TESTING' : 'DISPATCH');
+    } else if (data.productionRequired) {
+      initialStage = 'PRODUCTION';
+      initialDept = 'PRODUCTION';
+      nextStage = data.qualityTestingRequired ? 'QUALITY_TESTING' : 'DISPATCH';
+    } else if (data.qualityTestingRequired) {
+      initialStage = 'QUALITY_TESTING';
+      initialDept = 'QUALITY_TESTING';
+      nextStage = 'DISPATCH';
+    } else {
+      initialStage = 'DISPATCH';
+      initialDept = 'DISPATCH';
+      nextStage = 'COMPLETED';
+    }
+
     const newOrder: Order = {
       id: `ord-${Date.now()}`,
       orderNumber,
@@ -964,6 +990,11 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       requiredQuantity: data.requiredQuantity || 1,
       status: 'IN_PROGRESS',
       drawingApproved: false,
+
+      // Workflow Stage Routing & Department Assignment
+      currentStage: initialStage,
+      assignedDepartment: initialDept,
+      nextStage: nextStage,
 
       // Custom Pipeline Options
       purchaseRequired: data.purchaseRequired,
@@ -984,6 +1015,16 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         ? data.items.map((i, idx) => ({ id: `item-${Date.now()}-${idx}`, ...i }))
         : [],
       stageLogs: [
+        {
+          id: `log-init-${Date.now()}`,
+          department: 'SALES',
+          action: `Order Created & Automatically Assigned to ${initialDept} Department`,
+          currentStatus: `${initialStage}_PENDING`,
+          remarks: `Order ${orderNumber} created. Routed directly to ${initialDept} department queue.`,
+          changedByName: currentUser?.name || 'System',
+          changedByRole: currentUser?.role || 'SUPER_ADMIN',
+          createdAt: new Date().toISOString(),
+        },
         {
           id: `log-${Date.now()}`,
           department: 'SALES',
@@ -1169,14 +1210,47 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             procurementNotes || `Vendor: ${vendorSelected || 'N/A'}`
           );
 
+          // Automatic Stage Movement Check
+          const isCompleted = calcStatus === 'COMPLETED';
+          let currentStageVal: any = o.currentStage || 'PURCHASE';
+          let assignedDeptVal: any = o.assignedDepartment || 'PURCHASE';
+          let nextStageVal: any = o.nextStage || 'PRODUCTION';
+          let prodStatusVal = o.productionStatus;
+
+          const extraLogs: StageLog[] = [];
+
+          if (isCompleted) {
+            if (o.productionRequired) {
+              currentStageVal = 'PRODUCTION';
+              assignedDeptVal = 'PRODUCTION';
+              nextStageVal = o.qualityTestingRequired ? 'QUALITY_TESTING' : 'DISPATCH';
+              if (prodStatusVal === 'PENDING') prodStatusVal = 'PENDING';
+              extraLogs.push(addStageLog(o, 'PURCHASE', 'Purchase Completed -> Moved to Production Department', 'PRODUCTION_PENDING', 'Raw material received. Order automatically moved to Production Department queue.'));
+            } else if (o.qualityTestingRequired) {
+              currentStageVal = 'QUALITY_TESTING';
+              assignedDeptVal = 'QUALITY_TESTING';
+              nextStageVal = 'DISPATCH';
+              extraLogs.push(addStageLog(o, 'PURCHASE', 'Purchase Completed -> Moved to Quality Testing', 'QC_PENDING', 'Raw material received. Order automatically moved to Quality Testing queue.'));
+            } else {
+              currentStageVal = 'DISPATCH';
+              assignedDeptVal = 'DISPATCH';
+              nextStageVal = 'COMPLETED';
+              extraLogs.push(addStageLog(o, 'PURCHASE', 'Purchase Completed -> Moved to Dispatch', 'READY_FOR_DISPATCH', 'Raw material received. Order automatically moved to Dispatch queue.'));
+            }
+          }
+
           return {
             ...o,
             purchaseQuantity: newPurchaseQty,
             purchaseStatus: calcStatus,
+            productionStatus: prodStatusVal,
+            currentStage: currentStageVal,
+            assignedDepartment: assignedDeptVal,
+            nextStage: nextStageVal,
             vendorSelected: vendorSelected || o.vendorSelected,
             procurementNotes: procurementNotes || o.procurementNotes,
             quantityLogs: [qLog, ...(o.quantityLogs || [])],
-            stageLogs: [log, ...o.stageLogs],
+            stageLogs: [...extraLogs, log, ...o.stageLogs],
             updatedAt: new Date().toISOString(),
           };
         }
@@ -1221,13 +1295,59 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             shopFloorNotes || 'Shop floor progress updated'
           );
 
+          // Automatic Stage Movement Check
+          const isCompleted = calcStatus === 'COMPLETED';
+          let currentStageVal: any = o.currentStage || 'PRODUCTION';
+          let assignedDeptVal: any = o.assignedDepartment || 'PRODUCTION';
+          let nextStageVal: any = o.nextStage || 'QUALITY_TESTING';
+          let qualStatusVal = o.qualityStatus;
+          let qcResultVal = o.qcResult;
+          let dispStatusVal = o.dispatchStatus;
+
+          const extraLogs: StageLog[] = [];
+
+          if (isCompleted) {
+            if (o.qualityTestingRequired) {
+              currentStageVal = 'QUALITY_TESTING';
+              assignedDeptVal = 'QUALITY_TESTING';
+              nextStageVal = 'DISPATCH';
+              qualStatusVal = qualStatusVal === 'COMPLETED' ? 'COMPLETED' : 'PENDING';
+              extraLogs.push(addStageLog(o, 'PRODUCTION', 'Production Completed -> Moved to Quality Testing Queue', 'QC_PENDING', 'Shop floor production completed. Order automatically moved to Quality Testing Queue.'));
+
+              // Auto-create Quality Testing Task
+              setTimeout(() => {
+                createTask({
+                  title: `QC Inspection: ${o.orderNumber}`,
+                  description: `Quality testing required for ${o.requiredQuantity} pcs (${o.materialRequirements || 'Flanges'}).`,
+                  priority: 'HIGH',
+                  assignedToDepartment: 'QUALITY_TESTING',
+                  orderId: o.id,
+                });
+              }, 100);
+            } else {
+              currentStageVal = 'DISPATCH';
+              assignedDeptVal = 'DISPATCH';
+              nextStageVal = 'COMPLETED';
+              qualStatusVal = 'COMPLETED';
+              qcResultVal = 'PASSED';
+              if (dispStatusVal === 'PENDING') dispStatusVal = 'PENDING';
+              extraLogs.push(addStageLog(o, 'PRODUCTION', 'Production Completed (QC Not Required) -> Moved to Dispatch', 'READY_FOR_DISPATCH', 'Production completed. Quality testing not required. Order moved directly to Dispatch queue.'));
+            }
+          }
+
           return {
             ...o,
             productionQuantity: newProdQty,
             productionStatus: calcStatus,
+            qualityStatus: qualStatusVal,
+            qcResult: qcResultVal,
+            dispatchStatus: dispStatusVal,
+            currentStage: currentStageVal,
+            assignedDepartment: assignedDeptVal,
+            nextStage: nextStageVal,
             shopFloorNotes: shopFloorNotes || o.shopFloorNotes,
             quantityLogs: [qLog, ...(o.quantityLogs || [])],
-            stageLogs: [log, ...o.stageLogs],
+            stageLogs: [...extraLogs, log, ...o.stageLogs],
             updatedAt: new Date().toISOString(),
           };
         }
@@ -1273,14 +1393,56 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             qcRemarks || 'QC inspection record updated'
           );
 
+          // Automatic Stage Movement Check
+          const isFailed = qcResult === 'FAILED';
+          const isCompleted = calcStatus === 'COMPLETED' || qcResult === 'PASSED';
+
+          let currentStageVal: any = o.currentStage || 'QUALITY_TESTING';
+          let assignedDeptVal: any = o.assignedDepartment || 'QUALITY_TESTING';
+          let nextStageVal: any = o.nextStage || 'DISPATCH';
+          let prodStatusVal = o.productionStatus;
+          let qualStatusVal = calcStatus;
+
+          const extraLogs: StageLog[] = [];
+
+          if (isFailed) {
+            currentStageVal = 'PRODUCTION';
+            assignedDeptVal = 'PRODUCTION';
+            nextStageVal = 'QUALITY_TESTING';
+            prodStatusVal = 'IN_PROGRESS';
+            qualStatusVal = 'REJECTED';
+            extraLogs.push(addStageLog(o, 'QUALITY_TESTING', 'Quality Inspection Failed -> Returned to Production for Rework', 'QC_FAILED', qcRemarks || 'Quality inspection failed. Order returned to Production for rework.'));
+
+            // Auto-create Rework Task
+            setTimeout(() => {
+              createTask({
+                title: `Rework Required: ${o.orderNumber}`,
+                description: `QC Failed: ${qcRemarks || 'Defects found during quality inspection'}. Production rework needed.`,
+                priority: 'URGENT',
+                assignedToDepartment: 'PRODUCTION',
+                orderId: o.id,
+              });
+            }, 100);
+          } else if (isCompleted) {
+            currentStageVal = 'DISPATCH';
+            assignedDeptVal = 'DISPATCH';
+            nextStageVal = 'COMPLETED';
+            qualStatusVal = 'COMPLETED';
+            extraLogs.push(addStageLog(o, 'QUALITY_TESTING', 'Quality Inspection Passed -> Moved to Dispatch Queue', 'READY_FOR_DISPATCH', qcRemarks || 'Quality testing passed. Order automatically moved to Dispatch Queue.'));
+          }
+
           return {
             ...o,
             qcQuantity: newQcQty,
-            qualityStatus: calcStatus,
+            qualityStatus: qualStatusVal,
+            productionStatus: prodStatusVal,
             qcResult: qcResult || o.qcResult,
             qcRemarks: qcRemarks || o.qcRemarks,
+            currentStage: currentStageVal,
+            assignedDepartment: assignedDeptVal,
+            nextStage: nextStageVal,
             quantityLogs: [qLog, ...(o.quantityLogs || [])],
-            stageLogs: [log, ...o.stageLogs],
+            stageLogs: [...extraLogs, log, ...o.stageLogs],
             updatedAt: new Date().toISOString(),
           };
         }
@@ -1328,16 +1490,34 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             `Transport Ref: ${transportRef || 'N/A'}. ${dispatchNotes || ''}`
           );
 
+          // Automatic Stage Movement Check
+          const isCompleted = calcStatus === 'COMPLETED';
+          let currentStageVal: any = o.currentStage || 'DISPATCH';
+          let assignedDeptVal: any = o.assignedDepartment || 'DISPATCH';
+          let nextStageVal: any = o.nextStage || 'COMPLETED';
+
+          const extraLogs: StageLog[] = [];
+
+          if (isCompleted) {
+            currentStageVal = 'COMPLETED';
+            assignedDeptVal = 'COMPLETED';
+            nextStageVal = 'COMPLETED';
+            extraLogs.push(addStageLog(o, 'DISPATCH', 'Dispatch Completed -> Order Closed & Completed', 'ORDER_COMPLETED', dispatchNotes || 'Shipment dispatched successfully. Order closed.'));
+          }
+
           return {
             ...o,
             dispatchQuantity: newDispQty,
             dispatchStatus: calcStatus,
             status: overallStatus,
+            currentStage: currentStageVal,
+            assignedDepartment: assignedDeptVal,
+            nextStage: nextStageVal,
             logisticsEntry: logisticsEntry || o.logisticsEntry,
             transportRef: transportRef || o.transportRef,
             dispatchNotes: dispatchNotes || o.dispatchNotes,
             quantityLogs: [qLog, ...(o.quantityLogs || [])],
-            stageLogs: [log, ...o.stageLogs],
+            stageLogs: [...extraLogs, log, ...o.stageLogs],
             updatedAt: new Date().toISOString(),
           };
         }
@@ -1461,7 +1641,7 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       salesExecutive: data.salesExecutive || currentUser?.name || 'Sales Executive',
       salesExecutiveUserId: currentUser?.id,
       followUpDate: data.followUpDate || undefined,
-      status: data.status || 'SENT',
+      status: data.status || 'DRAFT',
       remarks: data.remarks ? data.remarks.trim() : undefined,
       followUps: data.followUpDate
         ? [

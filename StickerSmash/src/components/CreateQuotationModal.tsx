@@ -2,10 +2,11 @@ import React, { useState } from 'react';
 import { View, Text, Modal, TouchableOpacity, TextInput, ScrollView, StyleSheet } from 'react-native';
 import { useERP } from '../context/ERPContext';
 import { useAuth } from '../context/AuthContext';
-import { QuotationStatus } from '../types';
+import { QuotationStatus, Client } from '../types';
 import { Colors, Spacing, Radius, Shadows } from '../theme';
 import { SearchableDropdown } from './ui/SearchableDropdown';
 import { DatePickerInput } from './ui/DatePickerInput';
+import { CreateClientModal } from './CreateClientModal';
 
 interface CreateQuotationModalProps {
   visible: boolean;
@@ -16,6 +17,7 @@ export const CreateQuotationModal: React.FC<CreateQuotationModalProps> = ({ visi
   const { clients, quotations, createQuotation } = useERP();
   const { currentUser } = useAuth();
 
+  const [createClientVisible, setCreateClientVisible] = useState(false);
   const [selectedClientId, setSelectedClientId] = useState<string>('');
   const [clientCode, setClientCode] = useState('');
   const [companyName, setCompanyName] = useState('');
@@ -54,6 +56,16 @@ export const CreateQuotationModal: React.FC<CreateQuotationModalProps> = ({ visi
       setMobileNumber(found.contactNo);
       setEmail(found.email || '');
     }
+  };
+
+  const handleClientCreated = (newClient: Client) => {
+    setSelectedClientId(newClient.id);
+    setClientCode(newClient.clientCode);
+    setCompanyName(newClient.companyName);
+    setContactPerson(newClient.contactName || '');
+    setMobileNumber(newClient.contactNo);
+    setEmail(newClient.email || '');
+    setSuccessMsg('Client Registered Successfully');
   };
 
   const handleSubmit = () => {
@@ -176,6 +188,7 @@ export const CreateQuotationModal: React.FC<CreateQuotationModalProps> = ({ visi
                 allowManual={true}
                 manualLabel="+ Manual / New Client"
                 manualId=""
+                onManualPress={() => setCreateClientVisible(true)}
               />
 
               {/* Company Name & Client Code */}
@@ -340,6 +353,12 @@ export const CreateQuotationModal: React.FC<CreateQuotationModalProps> = ({ visi
           </ScrollView>
         </TouchableOpacity>
       </TouchableOpacity>
+      {/* Nested Register New Client Modal */}
+      <CreateClientModal
+        visible={createClientVisible}
+        onClose={() => setCreateClientVisible(false)}
+        onClientCreated={handleClientCreated}
+      />
     </Modal>
   );
 };

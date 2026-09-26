@@ -12,6 +12,7 @@ interface PlaceholderProps {
 }
 
 import { CompanyDetailModal } from '../company-hierarchy/CompanyDetailModal';
+import { SuperAdminAnalyticsView } from '../analytics/SuperAdminAnalyticsView';
 import { Client } from '../../types';
 
 // 1. Client Directory View
@@ -394,37 +395,7 @@ export const VendorsView: React.FC = () => {
 
 // 4. Reports & Industrial Analytics View
 export const ReportsView: React.FC = () => {
-  const { orders } = useERP();
-  const total = orders.length;
-  const completed = orders.filter((o) => o.status === 'COMPLETED').length;
-
-  return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      <View style={styles.topBanner}>
-        <View>
-          <Text style={styles.title}>Industrial Analytics & Performance Reports</Text>
-          <Text style={styles.subTitle}>Plant throughput, department lead times, quality pass yields, and bottleneck analysis.</Text>
-        </View>
-      </View>
-
-      <View style={styles.gridRow}>
-        <View style={styles.kpiCard}>
-          <Text style={styles.kpiVal}>{total}</Text>
-          <Text style={styles.kpiLabel}>Total Orders Initiated</Text>
-        </View>
-
-        <View style={styles.kpiCard}>
-          <Text style={[styles.kpiVal, { color: '#10b981' }]}>{completed}</Text>
-          <Text style={styles.kpiLabel}>Completed & Dispatched</Text>
-        </View>
-
-        <View style={styles.kpiCard}>
-          <Text style={[styles.kpiVal, { color: '#38bdf8' }]}>98.5%</Text>
-          <Text style={styles.kpiLabel}>Quality First-Pass Yield</Text>
-        </View>
-      </View>
-    </ScrollView>
-  );
+  return <SuperAdminAnalyticsView />;
 };
 
 // 5. Engineering Files & Drawings View

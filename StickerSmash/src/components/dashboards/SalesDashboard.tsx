@@ -18,8 +18,9 @@ export const SalesDashboard: React.FC<SalesDashboardProps> = ({
   onOpenCreateOrder,
   onOpenCreateQuotation,
 }) => {
-  const { quotations } = useERP();
+  const { quotations, orders, setSelectedOrder } = useERP();
 
+  const [activeTab, setActiveTab] = useState<'QUOTATIONS' | 'ORDERS'>('QUOTATIONS');
   const [salesModalVisible, setSalesModalVisible] = useState(false);
   const [salesModalTab, setSalesModalTab] = useState<'TOTAL' | 'CONVERTED' | 'LOST'>('TOTAL');
 
@@ -32,13 +33,23 @@ export const SalesDashboard: React.FC<SalesDashboardProps> = ({
     (q) => q.followUpDate && q.status !== 'FULLY_CONVERTED' && q.status !== 'LOST'
   );
 
+  const calculateProgress = (ord: any) => {
+    let completedStages = 0;
+    let totalStages = 4;
+    if (ord.purchaseStatus === 'COMPLETED' || ord.purchaseStatus === 'APPROVED') completedStages++;
+    if (ord.productionStatus === 'COMPLETED' || ord.productionStatus === 'APPROVED') completedStages++;
+    if (ord.qcResult === 'PASSED' || ord.qualityStatus === 'APPROVED') completedStages++;
+    if (ord.dispatchStatus === 'COMPLETED' || ord.dispatchStatus === 'APPROVED') completedStages++;
+    return Math.round((completedStages / totalStages) * 100);
+  };
+
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
       {/* Top Banner & Quick Actions */}
       <View style={styles.topBanner}>
         <View style={{ flex: 1, paddingRight: Spacing.md }}>
           <Text style={styles.title}>Sales Department Dashboard</Text>
-          <Text style={styles.subTitle}>Manage client registrations, quotations, sales order initiation, and task metrics.</Text>
+          <Text style={styles.subTitle}>Manage client registrations, quotations, sales order initiation, and real-time order tracking.</Text>
         </View>
         <View style={styles.btnRow}>
           {onOpenCreateQuotation && (
@@ -55,41 +66,136 @@ export const SalesDashboard: React.FC<SalesDashboardProps> = ({
         </View>
       </View>
 
+      {/* Main Tab Switcher: Quotations vs Sales Orders Management */}
+      <View style={styles.tabNavRow}>
+        <TouchableOpacity
+          style={[styles.tabNavBtn, activeTab === 'QUOTATIONS' && styles.tabNavBtnActive]}
+          onPress={() => setActiveTab('QUOTATIONS')}
+        >
+          <Text style={[styles.tabNavBtnText, activeTab === 'QUOTATIONS' && styles.tabNavBtnTextActive]}>
+            📜 Quotation Pipeline Overview
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.tabNavBtn, activeTab === 'ORDERS' && styles.tabNavBtnActive]}
+          onPress={() => setActiveTab('ORDERS')}
+        >
+          <Text style={[styles.tabNavBtnText, activeTab === 'ORDERS' && styles.tabNavBtnTextActive]}>
+            📋 Sales Orders & Real-Time Pipeline Tracking ({orders.length})
+          </Text>
+        </TouchableOpacity>
+      </View>
+
       {/* Row 1: Global Order KPI Cards */}
       <OrderKPICards style={{ marginBottom: Spacing.md }} />
 
       {/* Row 2: Global Task Metrics KPI Cards */}
       <TaskKPICards style={{ marginBottom: Spacing.lg }} />
 
-      {/* Quotation Pipeline Overview Widgets */}
-      <View style={styles.sectionCard}>
-        <Text style={styles.sectionTitle}>Sales Quotation & Conversion Pipeline</Text>
-        <SalesKPICards onCardPress={handleOpenSalesModal} />
-      </View>
-
-      {/* Pending Follow-Up Reminders Card */}
-      {pendingFollowUps.length > 0 && (
-        <View style={styles.sectionCard}>
-          <Text style={styles.sectionTitle}>📅 Pending Quotation Follow-Up Reminders</Text>
-          <Text style={styles.sectionSub}>Action required for scheduled sales negotiations and inquiry follow-ups.</Text>
-
-          <View style={{ marginTop: Spacing.sm, gap: Spacing.xs }}>
-            {pendingFollowUps.map((q) => (
-              <View key={q.id} style={styles.fupReminderRow}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.fupCompText}>
-                    {q.quotationNumber} • <Text style={{ fontWeight: '800', color: Colors.textLight }}>{q.companyName}</Text> ({q.clientCode})
-                  </Text>
-                  <Text style={styles.fupSubText}>
-                    Contact: {q.contactPerson} ({q.mobileNumber}) • Executive: {q.salesExecutive}
-                  </Text>
-                </View>
-                <View style={styles.fupDateBadge}>
-                  <Text style={styles.fupDateBadgeText}>📅 {q.followUpDate}</Text>
-                </View>
-              </View>
-            ))}
+      {/* TAB 1: QUOTATIONS OVERVIEW */}
+      {activeTab === 'QUOTATIONS' && (
+        <>
+          {/* Quotation Pipeline Overview Widgets */}
+          <View style={styles.sectionCard}>
+            <Text style={styles.sectionTitle}>Sales Quotation & Conversion Pipeline</Text>
+            <SalesKPICards onCardPress={handleOpenSalesModal} />
           </View>
+
+          {/* Pending Follow-Up Reminders Card */}
+          {pendingFollowUps.length > 0 && (
+            <View style={styles.sectionCard}>
+              <Text style={styles.sectionTitle}>📅 Pending Quotation Follow-Up Reminders</Text>
+              <Text style={styles.sectionSub}>Action required for scheduled sales negotiations and inquiry follow-ups.</Text>
+
+              <View style={{ marginTop: Spacing.sm, gap: Spacing.xs }}>
+                {pendingFollowUps.map((q) => (
+                  <View key={q.id} style={styles.fupReminderRow}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.fupCompText}>
+                        {q.quotationNumber} • <Text style={{ fontWeight: '800', color: Colors.textLight }}>{q.companyName}</Text> ({q.clientCode})
+                      </Text>
+                      <Text style={styles.fupSubText}>
+                        Contact: {q.contactPerson} ({q.mobileNumber}) • Executive: {q.salesExecutive}
+                      </Text>
+                    </View>
+                    <View style={styles.fupDateBadge}>
+                      <Text style={styles.fupDateBadgeText}>📅 {q.followUpDate}</Text>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            </View>
+          )}
+        </>
+      )}
+
+      {/* TAB 2: DEDICATED SALES ORDERS TAB */}
+      {activeTab === 'ORDERS' && (
+        <View style={styles.sectionCard}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.sm }}>
+            <View>
+              <Text style={styles.sectionTitle}>Sales Orders Management & Workflow Pipeline</Text>
+              <Text style={styles.sectionSub}>Monitor real-time progress across Purchase, Production, Quality Testing, and Dispatch.</Text>
+            </View>
+            <View style={{ backgroundColor: 'rgba(16, 185, 129, 0.15)', paddingHorizontal: 10, paddingVertical: 5, borderRadius: Radius.xs, borderWidth: 1, borderColor: Colors.successBright }}>
+              <Text style={{ color: Colors.successBright, fontSize: 11, fontWeight: '800' }}>
+                ✓ Custom Stage Access: Authorized (Sales / Super Admin)
+              </Text>
+            </View>
+          </View>
+
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            <View style={styles.table}>
+              <View style={styles.thRow}>
+                <Text style={[styles.th, { width: 120 }]}>Order Number</Text>
+                <Text style={[styles.th, { width: 100 }]}>Client Code</Text>
+                <Text style={[styles.th, { width: 180 }]}>Client Name</Text>
+                <Text style={[styles.th, { width: 100 }]}>Quantity</Text>
+                <Text style={[styles.th, { width: 150 }]}>Current Stage</Text>
+                <Text style={[styles.th, { width: 110 }]}>Progress %</Text>
+                <Text style={[styles.th, { width: 110 }]}>Created Date</Text>
+                <Text style={[styles.th, { width: 130 }]}>Action</Text>
+              </View>
+
+              {orders.length === 0 ? (
+                <Text style={styles.emptyText}>No sales orders created yet.</Text>
+              ) : (
+                orders.map((ord) => {
+                  const progressPct = calculateProgress(ord);
+                  return (
+                    <View key={ord.id} style={styles.trRow}>
+                      <Text style={[styles.tdHighlight, { width: 120 }]}>{ord.orderNumber}</Text>
+                      <Text style={[styles.tdBold, { width: 100 }]}>{ord.clientCode}</Text>
+                      <Text style={[styles.td, { width: 180 }]} numberOfLines={1}>{ord.clientName || 'N/A'}</Text>
+                      <Text style={[styles.tdBold, { width: 100 }]}>{ord.requiredQuantity} units</Text>
+
+                      <View style={{ width: 150 }}>
+                        <Text style={styles.tdStage}>{ord.salesWorkflowStage ? ord.salesWorkflowStage.replace(/_/g, ' ') : ord.status}</Text>
+                      </View>
+
+                      <View style={{ width: 110, justifyContent: 'center' }}>
+                        <View style={styles.progressTrack}>
+                          <View style={[styles.progressFill, { width: `${progressPct}%` }]} />
+                        </View>
+                        <Text style={{ fontSize: 10, color: Colors.accentTeal, fontWeight: '800', marginTop: 2 }}>
+                          {progressPct}% Completed
+                        </Text>
+                      </View>
+
+                      <Text style={[styles.tdSmall, { width: 110 }]}>{new Date(ord.createdAt).toLocaleDateString()}</Text>
+
+                      <View style={{ width: 130 }}>
+                        <TouchableOpacity style={styles.viewPipelineBtn} onPress={() => setSelectedOrder(ord)}>
+                          <Text style={styles.viewPipelineBtnText}>🔍 VIEW PIPELINE</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  );
+                })
+              )}
+            </View>
+          </ScrollView>
         </View>
       )}
 
@@ -249,6 +355,115 @@ const styles = StyleSheet.create({
   fupDateBadgeText: {
     color: Colors.accentTeal,
     fontSize: 11,
+    fontWeight: '800',
+  },
+  tabNavRow: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+    marginBottom: Spacing.lg,
+  },
+  tabNavBtn: {
+    backgroundColor: Colors.cardBg,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.md,
+    borderRadius: Radius.lg,
+    borderWidth: 1,
+    borderColor: Colors.borderDark,
+    ...Shadows.sm,
+  },
+  tabNavBtnActive: {
+    backgroundColor: Colors.accentTeal,
+    borderColor: Colors.accentTeal,
+  },
+  tabNavBtnText: {
+    color: Colors.textMuted,
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  tabNavBtnTextActive: {
+    color: Colors.white,
+  },
+  table: {
+    minWidth: 850,
+  },
+  thRow: {
+    flexDirection: 'row',
+    backgroundColor: Colors.inputBg,
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.px10,
+    borderRadius: Radius.sm,
+    marginBottom: Spacing.px6,
+    borderWidth: 1,
+    borderColor: Colors.borderDark,
+  },
+  th: {
+    color: Colors.accentTeal,
+    fontSize: 11,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+  },
+  trRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.cardBg,
+    paddingVertical: Spacing.px10,
+    paddingHorizontal: Spacing.px10,
+    borderRadius: Radius.sm,
+    marginBottom: 4,
+    borderWidth: 1,
+    borderColor: Colors.borderDark,
+  },
+  tdHighlight: {
+    color: Colors.accentTeal,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  tdBold: {
+    color: Colors.textLight,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  td: {
+    color: Colors.textMuted,
+    fontSize: 12,
+  },
+  tdStage: {
+    color: Colors.successBright,
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  tdSmall: {
+    color: Colors.textSubtle,
+    fontSize: 11,
+  },
+  emptyText: {
+    color: Colors.textMuted,
+    fontSize: 12,
+    fontStyle: 'italic',
+    padding: Spacing.md,
+  },
+  progressTrack: {
+    height: 8,
+    backgroundColor: Colors.inputBg,
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: Colors.successBright,
+  },
+  viewPipelineBtn: {
+    backgroundColor: 'rgba(56, 189, 248, 0.15)',
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 5,
+    borderRadius: Radius.xs,
+    borderWidth: 1,
+    borderColor: Colors.accentTeal,
+    alignItems: 'center',
+  },
+  viewPipelineBtnText: {
+    color: Colors.accentTeal,
+    fontSize: 10,
     fontWeight: '800',
   },
 });

@@ -77,7 +77,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
           'Production',
           'Dispatch',
           'Users',
-          'Reports',
           'Logout',
         ];
       case 'SALES':
