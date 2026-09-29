@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, Modal, TouchableOpacity, TextInput, ScrollView, StyleSheet } from 'react-native';
+import { View, Text, Modal, TouchableOpacity, TextInput, ScrollView, StyleSheet, useWindowDimensions } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import { Role } from '../types';
 import { Colors, Spacing, Radius, Shadows } from '../theme';
@@ -11,6 +11,8 @@ interface CreateUserModalProps {
 
 export const CreateUserModal: React.FC<CreateUserModalProps> = ({ visible, onClose }) => {
   const { createUser } = useAuth();
+  const { width } = useWindowDimensions();
+  const isMobile = width < 768;
 
   const [name, setName] = useState('');
   const [username, setUsername] = useState('');
@@ -103,8 +105,8 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({ visible, onClo
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={handleReset}>
-      <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={handleReset}>
-        <TouchableOpacity activeOpacity={1} style={styles.modalCard} onPress={(e) => e.stopPropagation()}>
+      <TouchableOpacity style={[styles.backdrop, isMobile && { padding: 10 }]} activeOpacity={1} onPress={handleReset}>
+        <TouchableOpacity activeOpacity={1} style={[styles.modalCard, isMobile && { padding: 14, maxHeight: '95%' }]} onPress={(e) => e.stopPropagation()}>
           <View style={styles.header}>
             <View>
               <Text style={styles.title}>Super Admin: Manual User Creation</Text>

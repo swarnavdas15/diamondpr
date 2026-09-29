@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, Modal, TouchableOpacity, StyleSheet, ScrollView, Linking } from 'react-native';
+import { View, Text, Modal, TouchableOpacity, StyleSheet, ScrollView, Linking, useWindowDimensions } from 'react-native';
 import { CompanyContact } from '../../types';
 import { Colors, Spacing, Radius, Shadows } from '../../theme';
 
@@ -22,6 +22,8 @@ export const ContactDrawer: React.FC<ContactDrawerProps> = ({
   onEdit,
   onDelete,
 }) => {
+  const { width } = useWindowDimensions();
+  const isMobile = width < 768;
   if (!contact) return null;
 
   // Find manager name
@@ -58,8 +60,8 @@ export const ContactDrawer: React.FC<ContactDrawerProps> = ({
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={onClose}>
-        <TouchableOpacity activeOpacity={1} style={styles.drawerCard} onPress={(e) => e.stopPropagation()}>
+      <TouchableOpacity style={[styles.backdrop, isMobile && { padding: 10 }]} activeOpacity={1} onPress={onClose}>
+        <TouchableOpacity activeOpacity={1} style={[styles.drawerCard, isMobile && { width: '100%', maxWidth: '100%', padding: 14, maxHeight: '95%' }]} onPress={(e) => e.stopPropagation()}>
           <View style={styles.header}>
             <Text style={styles.headerTitle}>Contact & Hierarchy Profile</Text>
             <TouchableOpacity onPress={onClose}>

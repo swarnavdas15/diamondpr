@@ -94,7 +94,7 @@ export const CompanyImportantDates: React.FC<CompanyImportantDatesProps> = ({
           <Text style={styles.emptyIcon}>📅</Text>
           <Text style={styles.emptyTitle}>No Important Dates Saved</Text>
           <Text style={styles.emptySub}>
-            Click "+ Add Important Date" to schedule contract renewals, plant audits, or key corporate milestones.
+            Click &quot;+ Add Important Date&quot; to schedule contract renewals, plant audits, or key corporate milestones.
           </Text>
         </View>
       ) : (

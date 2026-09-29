@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { View, Text, Modal, TouchableOpacity, TextInput, ScrollView, StyleSheet } from 'react-native';
+import { View, Text, Modal, TouchableOpacity, TextInput, ScrollView, StyleSheet, Platform, useWindowDimensions } from 'react-native';
 import { useERP } from '../context/ERPContext';
+import { useAuth } from '../context/AuthContext';
 import { Colors, Spacing, Radius, Shadows } from '../theme';
 import { SearchableDropdown } from './ui/SearchableDropdown';
 import { CreateClientModal } from './CreateClientModal';
-import { Client } from '../types';
+import { Client, CustomStage } from '../types';
 
 export interface InitialOrderData {
   clientId?: string;
@@ -28,6 +29,9 @@ interface CreateOrderModalProps {
 
 export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ visible, onClose, initialData }) => {
   const { clients, createOrder } = useERP();
+  const { users } = useAuth();
+  const { width } = useWindowDimensions();
+  const isMobile = width < 768;
 
   const [createClientVisible, setCreateClientVisible] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
@@ -36,7 +40,7 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ visible, onC
   const [budget, setBudget] = useState('');
   const [technicalRequirements, setTechnicalRequirements] = useState('');
   const [materialRequirements, setMaterialRequirements] = useState('');
-  const [requiredQuantity, setRequiredQuantity] = useState('50');
+  const [requiredQuantity, setRequiredQuantity] = useState('');
 
   // Pipeline Customizer Options
   const [purchaseRequired, setPurchaseRequired] = useState(true);
@@ -44,10 +48,18 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ visible, onC
   const [qualityTestingRequired, setQualityTestingRequired] = useState(true);
   const [dispatchRequired, setDispatchRequired] = useState(true);
 
+  // Custom Stages State
+  const [customStages, setCustomStages] = useState<CustomStage[]>([]);
+  const [addStageModalVisible, setAddStageModalVisible] = useState(false);
+  const [newStageName, setNewStageName] = useState('');
+  const [newStageDesc, setNewStageDesc] = useState('');
+  const [newStageDept, setNewStageDept] = useState('PRODUCTION');
+  const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
+
   // Line item
-  const [itemName, setItemName] = useState('SS316L Weld Neck Flange');
-  const [size, setSize] = useState('6 inch 600# RF');
-  const [unitPrice, setUnitPrice] = useState('4500');
+  const [itemName, setItemName] = useState('');
+  const [size, setSize] = useState('');
+  const [unitPrice, setUnitPrice] = useState('');
 
   const [error, setError] = useState('');
 
@@ -72,6 +84,40 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ visible, onC
     setTimeout(() => setSuccessMsg(''), 4000);
   };
 
+  const handleAddStage = () => {
+    if (!newStageName.trim()) return;
+    const assignedUserNames = users
+      .filter((u) => selectedUserIds.includes(u.id))
+      .map((u) => u.name);
+
+    const newStage: CustomStage = {
+      id: `cs-${Date.now()}`,
+      stageName: newStageName.trim(),
+      description: newStageDesc.trim(),
+      department: newStageDept,
+      assignedUserIds: selectedUserIds,
+      assignedUserNames,
+      status: 'PENDING',
+      createdAt: new Date().toISOString(),
+    };
+
+    setCustomStages((prev) => [...prev, newStage]);
+    setNewStageName('');
+    setNewStageDesc('');
+    setSelectedUserIds([]);
+    setAddStageModalVisible(false);
+  };
+
+  const handleRemoveCustomStage = (id: string) => {
+    setCustomStages((prev) => prev.filter((s) => s.id !== id));
+  };
+
+  const toggleUserSelection = (userId: string) => {
+    setSelectedUserIds((prev) =>
+      prev.includes(userId) ? prev.filter((id) => id !== userId) : [...prev, userId]
+    );
+  };
+
   const handleSubmit = () => {
     if (!poNumber.trim() || !clientId) {
       setError('PO Number and Client selection are required.');
@@ -91,6 +137,7 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ visible, onC
       productionRequired,
       qualityTestingRequired,
       dispatchRequired,
+      customStages,
 
       items: [
         {
@@ -110,19 +157,22 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ visible, onC
     setBudget('');
     setTechnicalRequirements('');
     setMaterialRequirements('');
-    setRequiredQuantity('50');
+    setRequiredQuantity('');
     setPurchaseRequired(true);
     setProductionRequired(true);
     setQualityTestingRequired(true);
     setDispatchRequired(true);
+    setCustomStages([]);
     setError('');
     onClose();
   };
 
+  const activeUsers = users.filter((u) => u.isActive !== false);
+
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={handleClose}>
-      <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={handleClose}>
-        <TouchableOpacity activeOpacity={1} style={styles.card} onPress={(e) => e.stopPropagation()}>
+      <TouchableOpacity style={[styles.backdrop, isMobile && { padding: 10 }]} activeOpacity={1} onPress={handleClose}>
+        <TouchableOpacity activeOpacity={1} style={[styles.card, isMobile && { padding: 14, maxHeight: '95%' }]} onPress={(e) => e.stopPropagation()}>
           <View style={styles.header}>
             <Text style={styles.title}>Sales: Create Order & Custom Pipeline</Text>
             <TouchableOpacity onPress={handleClose}>
@@ -162,7 +212,7 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ visible, onC
               onChangeText={setPoNumber}
             />
 
-            <View style={styles.row}>
+            <View style={[styles.row, isMobile && { flexDirection: 'column', gap: 0 }]}>
               <View style={styles.flex1}>
                 <Text style={styles.label}>Required Quantity</Text>
                 <TextInput
@@ -189,7 +239,16 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ visible, onC
 
             {/* Pipeline Customizer Section */}
             <View style={styles.pipelineCustomizerBox}>
-              <Text style={styles.customizerTitle}>PIPELINE CUSTOMIZER</Text>
+              <View style={styles.customizerHeaderRow}>
+                <Text style={styles.customizerTitle}>PIPELINE CUSTOMIZER</Text>
+                <TouchableOpacity
+                  style={styles.addStageBtn}
+                  onPress={() => setAddStageModalVisible(true)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.addStageBtnText}>➕ Add New Stage</Text>
+                </TouchableOpacity>
+              </View>
               <Text style={styles.customizerSub}>
                 Select required department workflows for this order. System will dynamically generate stage sequences.
               </Text>
@@ -227,6 +286,39 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ visible, onC
                   <Text style={styles.checkLabel}>Dispatch Required</Text>
                 </TouchableOpacity>
               </View>
+
+              {/* Render Custom Stages */}
+              {customStages.length > 0 && (
+                <View style={styles.customStagesListContainer}>
+                  <Text style={styles.customStagesListTitle}>Configured Custom Workflow Stages:</Text>
+                  {customStages.map((stg) => (
+                    <View key={stg.id} style={styles.customStageCard}>
+                      <View style={styles.customStageCardInfo}>
+                        <View style={styles.customStageBadgeRow}>
+                          <Text style={styles.customStageName}>{stg.stageName}</Text>
+                          <View style={styles.deptBadge}>
+                            <Text style={styles.deptBadgeText}>{stg.department}</Text>
+                          </View>
+                        </View>
+                        {stg.description ? (
+                          <Text style={styles.customStageDesc}>{stg.description}</Text>
+                        ) : null}
+                        {stg.assignedUserNames.length > 0 && (
+                          <Text style={styles.customStageUsers}>
+                            👤 Assigned Users: {stg.assignedUserNames.join(', ')}
+                          </Text>
+                        )}
+                      </View>
+                      <TouchableOpacity
+                        onPress={() => handleRemoveCustomStage(stg.id)}
+                        style={styles.removeStageBtn}
+                      >
+                        <Text style={styles.removeStageText}>✕</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                </View>
+              )}
             </View>
 
             <Text style={styles.label}>Technical Specifications & Standards</Text>
@@ -292,6 +384,88 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ visible, onC
         onClose={() => setCreateClientVisible(false)}
         onClientCreated={handleClientCreated}
       />
+
+      {/* Add Custom Workflow Stage Modal */}
+      <Modal visible={addStageModalVisible} transparent animationType="fade" onRequestClose={() => setAddStageModalVisible(false)}>
+        <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={() => setAddStageModalVisible(false)}>
+          <TouchableOpacity activeOpacity={1} style={[styles.card, { maxWidth: 500 }]} onPress={(e) => e.stopPropagation()}>
+            <View style={styles.header}>
+              <Text style={styles.title}>➕ Create New Custom Workflow Stage</Text>
+              <TouchableOpacity onPress={() => setAddStageModalVisible(false)}>
+                <Text style={styles.close}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={{ maxHeight: 450 }}>
+              <Text style={styles.label}>Stage Name *</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="e.g. Ultrasonic Flange Testing / Heat Treatment"
+                placeholderTextColor="#94a3b8"
+                value={newStageName}
+                onChangeText={setNewStageName}
+              />
+
+              <Text style={styles.label}>Stage Description</Text>
+              <TextInput
+                style={[styles.input, { height: 50 }]}
+                placeholder="Operational requirements or quality specifications for this stage"
+                placeholderTextColor="#94a3b8"
+                multiline
+                value={newStageDesc}
+                onChangeText={setNewStageDesc}
+              />
+
+              <Text style={styles.label}>Assign Department *</Text>
+              <View style={styles.deptPillContainer}>
+                {['PRODUCTION', 'PURCHASE', 'QUALITY_TESTING', 'DISPATCH', 'SALES'].map((dept) => (
+                  <TouchableOpacity
+                    key={dept}
+                    style={[styles.deptPill, newStageDept === dept && styles.deptPillActive]}
+                    onPress={() => setNewStageDept(dept)}
+                  >
+                    <Text style={[styles.deptPillText, newStageDept === dept && styles.deptPillTextActive]}>
+                      {dept}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <Text style={styles.label}>Assign User(s) from Directory (Multi-Select)</Text>
+              <Text style={{ fontSize: 11, color: '#94a3b8', marginBottom: 8 }}>
+                Select active users who will automatically receive dashboard task assignments for this stage.
+              </Text>
+
+              <ScrollView
+                style={styles.userSelectionContainer}
+                nestedScrollEnabled={true}
+                showsVerticalScrollIndicator={true}
+              >
+                {activeUsers.map((u) => {
+                  const isSelected = selectedUserIds.includes(u.id);
+                  return (
+                    <TouchableOpacity
+                      key={u.id}
+                      style={[styles.userRowItem, isSelected && styles.userRowItemActive]}
+                      onPress={() => toggleUserSelection(u.id)}
+                    >
+                      <Text style={styles.userCheckIcon}>{isSelected ? '☑' : '☐'}</Text>
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.userRowName, isSelected && { color: '#0284c7' }]}>{u.name}</Text>
+                        <Text style={styles.userRowRole}>{u.role} • {u.email}</Text>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+
+              <TouchableOpacity style={[styles.submitBtn, { marginTop: 16 }]} onPress={handleAddStage}>
+                <Text style={styles.submitBtnText}>Add Stage to Pipeline</Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
     </Modal>
   );
 };
@@ -344,7 +518,8 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.inputBg,
     borderRadius: 6,
     paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingVertical: 10,
+    minHeight: 44,
     color: Colors.textLight,
     fontSize: 13,
     borderWidth: 1,
@@ -463,5 +638,152 @@ const styles = StyleSheet.create({
     color: Colors.white,
     fontSize: 13,
     fontWeight: '800',
+  },
+  customizerHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+    gap: 8,
+  },
+  addStageBtn: {
+    backgroundColor: 'rgba(2, 132, 199, 0.2)',
+    borderWidth: 1,
+    borderColor: '#0284c7',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+    flexShrink: 0,
+  },
+  addStageBtnText: {
+    color: '#0284c7',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  customStagesListContainer: {
+    marginTop: 12,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#1e293b',
+  },
+  customStagesListTitle: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#38bdf8',
+    marginBottom: 8,
+  },
+  customStageCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#0f172a',
+    padding: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#334155',
+    marginBottom: 6,
+  },
+  customStageCardInfo: {
+    flex: 1,
+  },
+  customStageBadgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  customStageName: {
+    color: '#f8fafc',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  deptBadge: {
+    backgroundColor: 'rgba(56, 189, 248, 0.15)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  deptBadgeText: {
+    color: '#38bdf8',
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  customStageDesc: {
+    color: '#94a3b8',
+    fontSize: 11,
+    marginTop: 2,
+  },
+  customStageUsers: {
+    color: '#cbd5e1',
+    fontSize: 10,
+    marginTop: 4,
+  },
+  removeStageBtn: {
+    padding: 6,
+  },
+  removeStageText: {
+    color: '#ef4444',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  deptPillContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginVertical: 6,
+  },
+  deptPill: {
+    backgroundColor: '#1e293b',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#334155',
+  },
+  deptPillActive: {
+    backgroundColor: '#0284c7',
+    borderColor: '#0284c7',
+  },
+  deptPillText: {
+    color: '#94a3b8',
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  deptPillTextActive: {
+    color: '#ffffff',
+    fontWeight: '700',
+  },
+  userSelectionContainer: {
+    maxHeight: 200,
+    flexGrow: 0,
+    borderWidth: 1,
+    borderColor: '#334155',
+    borderRadius: 6,
+    backgroundColor: '#0f172a',
+    padding: 6,
+    ...(Platform.OS === 'web' ? { overflowY: 'auto' as any } : {}),
+  },
+  userRowItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 8,
+    borderRadius: 6,
+    gap: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.05)',
+  },
+  userRowItemActive: {
+    backgroundColor: 'rgba(2, 132, 199, 0.15)',
+  },
+  userCheckIcon: {
+    fontSize: 14,
+    color: '#0284c7',
+  },
+  userRowName: {
+    color: '#f8fafc',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  userRowRole: {
+    color: '#64748b',
+    fontSize: 10,
   },
 });

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, Modal, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
+import { View, Text, Modal, TouchableOpacity, ScrollView, StyleSheet, useWindowDimensions } from 'react-native';
 import { useERP } from '../../context/ERPContext';
 import { useAuth } from '../../context/AuthContext';
 import { Client, CompanyContact } from '../../types';
@@ -24,6 +24,8 @@ export const CompanyDetailModal: React.FC<CompanyDetailModalProps> = ({
   client,
   onClose,
 }) => {
+  const { width } = useWindowDimensions();
+  const isMobile = width < 768;
   const {
     companyContacts,
     addCompanyContact,
@@ -87,8 +89,8 @@ export const CompanyDetailModal: React.FC<CompanyDetailModalProps> = ({
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={onClose}>
-        <TouchableOpacity activeOpacity={1} style={styles.card} onPress={(e) => e.stopPropagation()}>
+      <TouchableOpacity style={[styles.backdrop, isMobile && { padding: 10 }]} activeOpacity={1} onPress={onClose}>
+        <TouchableOpacity activeOpacity={1} style={[styles.card, isMobile && { padding: 14, maxHeight: '95%' }]} onPress={(e) => e.stopPropagation()}>
           {/* Header Banner */}
           <View style={styles.header}>
             <View style={styles.headerTitleRow}>

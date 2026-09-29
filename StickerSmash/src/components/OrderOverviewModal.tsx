@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, Modal, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
+import { View, Text, Modal, TouchableOpacity, ScrollView, StyleSheet, useWindowDimensions, Platform, ToastAndroid } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 import { useERP } from '../context/ERPContext';
 import { useAuth } from '../context/AuthContext';
 import { SalesWorkflowStage, DepartmentStatus } from '../types';
@@ -14,6 +15,8 @@ interface OrderOverviewModalProps {
 export const OrderOverviewModal: React.FC<OrderOverviewModalProps> = ({ visible, onClose }) => {
   const { selectedOrder } = useERP();
   const { currentUser } = useAuth();
+  const { width } = useWindowDimensions();
+  const isMobile = width < 768;
 
   if (!selectedOrder) return null;
 
@@ -128,18 +131,28 @@ export const OrderOverviewModal: React.FC<OrderOverviewModalProps> = ({ visible,
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={onClose}>
-        <TouchableOpacity activeOpacity={1} style={styles.modalContainer} onPress={(e) => e.stopPropagation()}>
+      <TouchableOpacity style={[styles.backdrop, isMobile && { padding: 10 }]} activeOpacity={1} onPress={onClose}>
+        <TouchableOpacity activeOpacity={1} style={[styles.modalContainer, isMobile && { padding: 14, maxHeight: '95%' }]} onPress={(e) => e.stopPropagation()}>
           {/* Header */}
           <View style={styles.headerRow}>
             <View>
               <View style={styles.orderBadgeRow}>
-                <Text style={styles.orderNumber}>{selectedOrder.orderNumber}</Text>
+                <TouchableOpacity onPress={async () => {
+                  await Clipboard.setStringAsync(selectedOrder.orderNumber);
+                  if (Platform.OS === 'android') ToastAndroid.show('Order # copied!', ToastAndroid.SHORT);
+                }}>
+                  <Text style={styles.orderNumber}>{selectedOrder.orderNumber} 📋</Text>
+                </TouchableOpacity>
                 <View style={[styles.statusBadge, { backgroundColor: mainOrderStatus.badgeBg, borderColor: mainOrderStatus.badgeBorder }]}>
                   <Text style={[styles.statusText, { color: mainOrderStatus.badgeText }]}>{mainOrderStatus.label}</Text>
                 </View>
               </View>
-              <Text style={styles.poNumberText}>PO Number: {selectedOrder.poNumber}</Text>
+              <TouchableOpacity onPress={async () => {
+                await Clipboard.setStringAsync(selectedOrder.poNumber);
+                if (Platform.OS === 'android') ToastAndroid.show('PO # copied!', ToastAndroid.SHORT);
+              }}>
+                <Text style={styles.poNumberText}>PO Number: {selectedOrder.poNumber} 📋</Text>
+              </TouchableOpacity>
             </View>
             <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
               <Text style={styles.closeBtnText}>✕</Text>
@@ -162,7 +175,7 @@ export const OrderOverviewModal: React.FC<OrderOverviewModalProps> = ({ visible,
             <OrderQuantityTracker order={selectedOrder} />
 
             {/* Client & Technical Summary */}
-            <View style={styles.gridRow}>
+            <View style={[styles.gridRow, isMobile && styles.gridRowMobile]}>
               <View style={styles.infoCard}>
                 <Text style={styles.infoCardTitle}>Client Info (RBAC Filtered)</Text>
                 <Text style={styles.infoLabel}>Client Code: <Text style={styles.infoValHighlight}>{selectedOrder.clientCode}</Text></Text>
@@ -191,46 +204,92 @@ export const OrderOverviewModal: React.FC<OrderOverviewModalProps> = ({ visible,
             {/* 7-Stage Sales Initiation Stepper */}
             <View style={styles.stepperCard}>
               <Text style={styles.cardTitle}>Sales Initiation Workflow Stepper</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.stepperScroll}>
-                {salesWorkflowStages.map((stg, index) => {
-                  const isDone = index < currentStageIdx;
-                  const isCurrent = index === currentStageIdx;
+              {isMobile ? (
+                <View style={styles.verticalStepperContainer}>
+                  {salesWorkflowStages.map((stg, index) => {
+                    const isDone = index < currentStageIdx;
+                    const isCurrent = index === currentStageIdx;
 
-                  let circleBg = StatusColors.STEPPER.pendingCircle;
-                  let textColor = StatusColors.STEPPER.pendingText;
-                  let connectorColor = StatusColors.STEPPER.pendingConnector;
+                    let circleBg = StatusColors.STEPPER.pendingCircle;
+                    let textColor = StatusColors.STEPPER.pendingText;
+                    let connectorColor = StatusColors.STEPPER.pendingConnector;
 
-                  if (isDone) {
-                    circleBg = StatusColors.STEPPER.completedCircle;
-                    textColor = StatusColors.STEPPER.completedText;
-                    connectorColor = StatusColors.STEPPER.completedConnector;
-                  } else if (isCurrent) {
-                    circleBg = StatusColors.STEPPER.inProgressCircle;
-                    textColor = StatusColors.STEPPER.inProgressText;
-                    connectorColor = StatusColors.STEPPER.inProgressConnector;
-                  }
+                    if (isDone) {
+                      circleBg = StatusColors.STEPPER.completedCircle;
+                      textColor = StatusColors.STEPPER.completedText;
+                      connectorColor = StatusColors.STEPPER.completedConnector;
+                    } else if (isCurrent) {
+                      circleBg = StatusColors.STEPPER.inProgressCircle;
+                      textColor = StatusColors.STEPPER.inProgressText;
+                      connectorColor = StatusColors.STEPPER.inProgressConnector;
+                    }
 
-                  return (
-                    <View key={stg} style={styles.stepItem}>
-                      <View style={[styles.stepCircle, { backgroundColor: circleBg, borderColor: isCurrent ? StatusColors.IN_PROGRESS.border : circleBg }]}>
-                        <Text style={[styles.stepNumber, { color: textColor }]}>
-                          {isDone ? '✓' : index + 1}
-                        </Text>
+                    return (
+                      <View key={stg} style={styles.verticalStepItem}>
+                        <View style={styles.verticalStepLeft}>
+                          <View style={[styles.stepCircle, { backgroundColor: circleBg, borderColor: isCurrent ? StatusColors.IN_PROGRESS.border : circleBg }]}>
+                            <Text style={[styles.stepNumber, { color: textColor }]}>
+                              {isDone ? '✓' : index + 1}
+                            </Text>
+                          </View>
+                          {index < salesWorkflowStages.length - 1 && (
+                            <View style={[styles.verticalStepConnector, { backgroundColor: connectorColor }]} />
+                          )}
+                        </View>
+                        <View style={styles.verticalStepRight}>
+                          <Text style={[styles.stepLabel, isDone && { color: Colors.textLight, fontWeight: '700' }, isCurrent && { color: Colors.textLight, fontWeight: '800' }]}>
+                            {stg.replace(/_/g, ' ')}
+                          </Text>
+                          <Text style={{ fontSize: 10, color: Colors.textMuted }}>
+                            {isDone ? 'Completed' : isCurrent ? 'Active Stage' : 'Pending'}
+                          </Text>
+                        </View>
                       </View>
-                      <Text style={[styles.stepLabel, isDone && { color: Colors.textLight, fontWeight: '700' }, isCurrent && { color: Colors.textLight, fontWeight: '800' }]}>
-                        {stg.replace(/_/g, ' ')}
-                      </Text>
-                      {index < salesWorkflowStages.length - 1 && (
-                        <View style={[styles.stepConnector, { backgroundColor: connectorColor }]} />
-                      )}
-                    </View>
-                  );
-                })}
-              </ScrollView>
+                    );
+                  })}
+                </View>
+              ) : (
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.stepperScroll}>
+                  {salesWorkflowStages.map((stg, index) => {
+                    const isDone = index < currentStageIdx;
+                    const isCurrent = index === currentStageIdx;
+
+                    let circleBg = StatusColors.STEPPER.pendingCircle;
+                    let textColor = StatusColors.STEPPER.pendingText;
+                    let connectorColor = StatusColors.STEPPER.pendingConnector;
+
+                    if (isDone) {
+                      circleBg = StatusColors.STEPPER.completedCircle;
+                      textColor = StatusColors.STEPPER.completedText;
+                      connectorColor = StatusColors.STEPPER.completedConnector;
+                    } else if (isCurrent) {
+                      circleBg = StatusColors.STEPPER.inProgressCircle;
+                      textColor = StatusColors.STEPPER.inProgressText;
+                      connectorColor = StatusColors.STEPPER.inProgressConnector;
+                    }
+
+                    return (
+                      <View key={stg} style={styles.stepItem}>
+                        <View style={[styles.stepCircle, { backgroundColor: circleBg, borderColor: isCurrent ? StatusColors.IN_PROGRESS.border : circleBg }]}>
+                          <Text style={[styles.stepNumber, { color: textColor }]}>
+                            {isDone ? '✓' : index + 1}
+                          </Text>
+                        </View>
+                        <Text style={[styles.stepLabel, isDone && { color: Colors.textLight, fontWeight: '700' }, isCurrent && { color: Colors.textLight, fontWeight: '800' }]}>
+                          {stg.replace(/_/g, ' ')}
+                        </Text>
+                        {index < salesWorkflowStages.length - 1 && (
+                          <View style={[styles.stepConnector, { backgroundColor: connectorColor }]} />
+                        )}
+                      </View>
+                    );
+                  })}
+                </ScrollView>
+              )}
             </View>
 
             {/* Department Workflow Summary Cards */}
-            <View style={styles.deptSummaryRow}>
+            <View style={[styles.deptSummaryRow, isMobile && styles.deptSummaryRowMobile]}>
               <View style={[styles.deptBox, { borderLeftWidth: purchaseCardStyle.borderLeftWidth, borderLeftColor: purchaseCardStyle.borderLeftColor }]}>
                 <Text style={styles.deptTitle}>Purchase</Text>
                 <Text style={styles.deptPipelineLabel}>{selectedOrder.purchaseRequired ? '☑ Required' : '☐ Bypassed'}</Text>
@@ -283,7 +342,7 @@ export const OrderOverviewModal: React.FC<OrderOverviewModalProps> = ({ visible,
                         <Text style={styles.qlogSubText}>Accumulated: <Text style={{ fontWeight: '800', color: Colors.accentTeal }}>{qlog.accumulatedQty}/{qlog.totalQty} PCS</Text> • Remaining: <Text style={{ fontWeight: '800', color: Colors.industrialOrange }}>{qlog.remainingQty} PCS</Text></Text>
                         <Text style={styles.qlogUserText}>by {qlog.changedByName} ({qlog.changedByRole})</Text>
                       </View>
-                      {qlog.remarks ? <Text style={styles.qlogRemarksText}>"{qlog.remarks}"</Text> : null}
+                      {qlog.remarks ? <Text style={styles.qlogRemarksText}>&quot;{qlog.remarks}&quot;</Text> : null}
                     </View>
                   ))}
                 </View>
@@ -305,7 +364,7 @@ export const OrderOverviewModal: React.FC<OrderOverviewModalProps> = ({ visible,
                         <Text style={styles.timelineTime}>{new Date(log.createdAt).toLocaleString()}</Text>
                       </View>
                       <Text style={styles.timelineAction}>{log.action}</Text>
-                      {log.remarks ? <Text style={styles.timelineRemarks}>"{log.remarks}"</Text> : null}
+                      {log.remarks ? <Text style={styles.timelineRemarks}>&quot;{log.remarks}&quot;</Text> : null}
                       <Text style={styles.timelineUser}>Updated by: {log.changedByName} ({log.changedByRole})</Text>
                     </View>
                   </View>
@@ -657,5 +716,34 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontStyle: 'italic',
     marginTop: 2,
+  },
+  gridRowMobile: {
+    flexDirection: 'column',
+  },
+  deptSummaryRowMobile: {
+    flexDirection: 'column',
+  },
+  verticalStepperContainer: {
+    paddingVertical: Spacing.sm,
+  },
+  verticalStepItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: Spacing.xs,
+  },
+  verticalStepLeft: {
+    alignItems: 'center',
+    width: 36,
+  },
+  verticalStepConnector: {
+    width: 2,
+    height: 24,
+    marginVertical: 2,
+  },
+  verticalStepRight: {
+    flex: 1,
+    flexShrink: 1,
+    paddingLeft: Spacing.sm,
+    justifyContent: 'center',
   },
 });

@@ -36,6 +36,7 @@ export function EmojiPicker({ isVisible, children, onClose }: EmojiPickerProps) 
 
 const styles = StyleSheet.create({
   modalContent: {
+    maxHeight: '90%',
     height: '28%',
     width: '100%',
     position: 'absolute',

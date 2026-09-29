@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, Modal, TouchableOpacity, TextInput, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, Modal, TouchableOpacity, TextInput, StyleSheet, ScrollView, useWindowDimensions } from 'react-native';
 import { useERP } from '../context/ERPContext';
 import { Colors, Spacing, Radius, Shadows } from '../theme';
 
@@ -12,6 +12,8 @@ interface CreateClientModalProps {
 }
 
 export const CreateClientModal: React.FC<CreateClientModalProps> = ({ visible, onClose, onClientCreated }) => {
+  const { width } = useWindowDimensions();
+  const isMobile = width < 768;
   const { clients, createClient } = useERP();
 
   const [clientCode, setClientCode] = useState('');
@@ -97,8 +99,8 @@ export const CreateClientModal: React.FC<CreateClientModalProps> = ({ visible, o
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={handleClose}>
-      <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={handleClose}>
-        <TouchableOpacity activeOpacity={1} style={styles.card} onPress={(e) => e.stopPropagation()}>
+      <TouchableOpacity style={[styles.backdrop, isMobile && { padding: 10 }]} activeOpacity={1} onPress={handleClose}>
+        <TouchableOpacity activeOpacity={1} style={[styles.card, isMobile && { padding: 14, maxHeight: '95%' }]} onPress={(e) => e.stopPropagation()}>
           <View style={styles.header}>
             <Text style={styles.title}>Register New Client</Text>
             <TouchableOpacity onPress={handleClose}>
@@ -261,7 +263,8 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.inputBg,
     borderRadius: 6,
     paddingHorizontal: 12,
-    paddingVertical: 7,
+    paddingVertical: 10,
+    minHeight: 44,
     color: Colors.textLight,
     fontSize: 12,
     borderWidth: 1,

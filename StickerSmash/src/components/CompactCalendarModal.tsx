@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, Modal, TouchableOpacity, ScrollView, TextInput, StyleSheet } from 'react-native';
+import { View, Text, Modal, TouchableOpacity, ScrollView, TextInput, StyleSheet, useWindowDimensions } from 'react-native';
 import { useERP } from '../context/ERPContext';
 import { CalendarEvent, CalendarEventType } from '../types';
 import { Colors, Spacing, Radius, Shadows } from '../theme';
@@ -11,6 +11,8 @@ interface CompactCalendarModalProps {
 }
 
 export const CompactCalendarModal: React.FC<CompactCalendarModalProps> = ({ visible, onClose }) => {
+  const { width } = useWindowDimensions();
+  const isMobile = width < 768;
   const { calendarEvents, createCalendarEvent, deleteCalendarEvent } = useERP();
 
   const todayDateObj = new Date();
@@ -97,9 +99,9 @@ export const CompactCalendarModal: React.FC<CompactCalendarModalProps> = ({ visi
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={onClose}>
+      <TouchableOpacity style={[styles.backdrop, isMobile && { padding: 10 }]} activeOpacity={1} onPress={onClose}>
         {/* Top-Right Dropdown Popover Modal Card */}
-        <TouchableOpacity activeOpacity={1} style={styles.popoverCard} onPress={(e) => e.stopPropagation()}>
+        <TouchableOpacity activeOpacity={1} style={[styles.popoverCard, isMobile && { padding: 12, maxWidth: '100%', maxHeight: '95%', right: 'auto' }]} onPress={(e) => e.stopPropagation()}>
           {/* Header Bar */}
           <View style={styles.popoverHeader}>
             <View style={styles.titleRow}>
@@ -276,7 +278,7 @@ export const CompactCalendarModal: React.FC<CompactCalendarModalProps> = ({ visi
               {selectedDateEvents.length === 0 ? (
                 <View style={styles.noEventsBox}>
                   <Text style={styles.noEventsText}>No events scheduled for {selectedDate}.</Text>
-                  <Text style={styles.noEventsSub}>Click '+ Add Event' above to add a meeting or deadline.</Text>
+                  <Text style={styles.noEventsSub}>Click &apos;+ Add Event&apos; above to add a meeting or deadline.</Text>
                 </View>
               ) : (
                 selectedDateEvents.map((evt) => (
@@ -328,7 +330,7 @@ const styles = StyleSheet.create({
   },
   popoverCard: {
     width: 440,
-    maxHeight: 650,
+    maxHeight: '90%',
     backgroundColor: Colors.cardBg,
     borderRadius: Radius.xl,
     padding: Spacing.md,

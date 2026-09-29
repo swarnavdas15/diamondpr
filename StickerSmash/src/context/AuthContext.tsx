@@ -252,6 +252,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       throw new Error('Invalid OTP code. Please check your email inbox and enter the correct 6-digit code.');
     }
 
+    setOtpStore((prev) => ({
+      ...prev,
+      [cleanEmail]: { ...stored, verified: true }
+    }));
+
     addAuditLog('OTP_VERIFIED', `OTP code verified for email: ${cleanEmail}`, user);
     return true;
   };
@@ -264,6 +269,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     if (!user) {
       throw new Error('User account not found.');
+    }
+
+    const cleanEmail = user.email.toLowerCase();
+    const stored = otpStore[cleanEmail];
+
+    if (!stored || !(stored as any).verified || Date.now() > stored.expiresAt) {
+      throw new Error('Unauthorized: Valid OTP verification required prior to password reset.');
     }
 
     if (!newPass || newPass.length < 6) {
@@ -285,6 +297,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const updateSuperAdminEmail = (newEmail: string) => {
+    if (!currentUser || currentUser.role !== 'SUPER_ADMIN') {
+      throw new Error('Permission Denied: Only Super Admin can update recovery email.');
+    }
     setUsers((prev) =>
       prev.map((u) => (u.role === 'SUPER_ADMIN' ? { ...u, email: newEmail } : u))
     );
@@ -423,6 +438,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!currentUser || currentUser.role !== 'SUPER_ADMIN') {
       throw new Error('Permission Denied: Only Super Admin can modify user status.');
     }
+    if (userId === currentUser.id) {
+      throw new Error('You cannot deactivate your own account.');
+    }
     setUsers((prev) =>
       prev.map((u) => {
         if (u.id === userId) {
@@ -443,9 +461,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!currentUser || currentUser.role !== 'SUPER_ADMIN') {
       throw new Error('Permission Denied: Only Super Admin can modify user roles.');
     }
+    if (userId === currentUser.id) {
+      throw new Error('You cannot modify your own role.');
+    }
+    const userToUpdate = users.find((u) => u.id === userId);
     setUsers((prev) =>
       prev.map((u) => (u.id === userId ? { ...u, role: newRole } : u))
     );
+    if (userToUpdate) {
+      addAuditLog('USER_ROLE_UPDATED', `Super Admin updated role of ${userToUpdate.username} to ${newRole}.`, currentUser);
+    }
   };
 
   return (
@@ -453,7 +478,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       value={{
         currentUser,
         isAuthenticated,
-        users,
+        users: users.map((u) => ({ ...u, password: '' })), // Hide passwords
         authAuditLogs,
         login,
         logout,

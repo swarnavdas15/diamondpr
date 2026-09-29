@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, Modal, TouchableOpacity, ScrollView, TextInput, StyleSheet, Image } from 'react-native';
+import { View, Text, Modal, TouchableOpacity, ScrollView, TextInput, StyleSheet, Image, useWindowDimensions } from 'react-native';
 import { useERP } from '../context/ERPContext';
 import { DrawingStatus, OrderDrawing } from '../types';
 import { Colors, StatusColors, Spacing, Radius, Shadows } from '../theme';
@@ -11,6 +11,8 @@ interface DrawingManagementModalProps {
 }
 
 export const DrawingManagementModal: React.FC<DrawingManagementModalProps> = ({ visible, onClose, orderId }) => {
+  const { width } = useWindowDimensions();
+  const isMobile = width < 768;
   const { orders, uploadOrderDrawing, updateDrawingStatus, deleteOrderDrawing } = useERP();
   const order = orders.find((o) => o.id === orderId);
 
@@ -64,8 +66,8 @@ export const DrawingManagementModal: React.FC<DrawingManagementModalProps> = ({ 
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={onClose}>
-        <TouchableOpacity activeOpacity={1} style={styles.modalContainer} onPress={(e) => e.stopPropagation()}>
+      <TouchableOpacity style={[styles.backdrop, isMobile && { padding: 10 }]} activeOpacity={1} onPress={onClose}>
+        <TouchableOpacity activeOpacity={1} style={[styles.modalContainer, isMobile && { padding: 14, maxHeight: '95%' }]} onPress={(e) => e.stopPropagation()}>
           {/* Header */}
           <View style={styles.modalHeader}>
             <View style={styles.titleRow}>
@@ -159,7 +161,7 @@ export const DrawingManagementModal: React.FC<DrawingManagementModalProps> = ({ 
               <View style={styles.emptyCard}>
                 <Text style={styles.emptyIcon}>📁</Text>
                 <Text style={styles.emptyText}>No drawings uploaded for this order yet.</Text>
-                <Text style={styles.emptySubText}>Click '+ Upload New / Revision' above to attach PDF, DWG, DXF or image drawings.</Text>
+                <Text style={styles.emptySubText}>Click &apos;+ Upload New / Revision&apos; above to attach PDF, DWG, DXF or image drawings.</Text>
               </View>
             ) : (
               drawings.map((drw) => {
@@ -189,7 +191,7 @@ export const DrawingManagementModal: React.FC<DrawingManagementModalProps> = ({ 
 
                     {drw.reviewRemarks ? (
                       <View style={styles.remarksBox}>
-                        <Text style={styles.remarksLabel}>Review Remarks: <Text style={styles.remarksText}>"{drw.reviewRemarks}"</Text></Text>
+                        <Text style={styles.remarksLabel}>Review Remarks: <Text style={styles.remarksText}>&quot;{drw.reviewRemarks}&quot;</Text></Text>
                       </View>
                     ) : null}
 

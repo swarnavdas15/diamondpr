@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, Modal, TouchableOpacity, ScrollView, TextInput, StyleSheet } from 'react-native';
+import { View, Text, Modal, TouchableOpacity, ScrollView, TextInput, StyleSheet, useWindowDimensions } from 'react-native';
 import { useERP } from '../../context/ERPContext';
 import { useAuth } from '../../context/AuthContext';
 import { Order } from '../../types';
@@ -18,6 +18,8 @@ export const OrderKPIDetailsModal: React.FC<OrderKPIDetailsModalProps> = ({
   onClose,
   onSelectTab,
 }) => {
+  const { width } = useWindowDimensions();
+  const isMobile = width < 768;
   const { getMaskedOrders, setSelectedOrder } = useERP();
   const { currentUser } = useAuth();
 
@@ -33,7 +35,13 @@ export const OrderKPIDetailsModal: React.FC<OrderKPIDetailsModalProps> = ({
   const completedOrders = orders.filter((o) => o.status === 'COMPLETED');
   const completionRate = totalOrders > 0 ? Math.round((completedOrders.length / totalOrders) * 100) : 0;
   const bottleneckOrders = orders.filter(
-    (o) => o.status === 'IN_PROGRESS' && (o.purchaseStatus === 'PENDING' || o.qcResult === 'FAILED')
+    (o) =>
+      o.status === 'IN_PROGRESS' &&
+      (
+        o.qcResult === 'FAILED' ||
+        (o.productionStatus === 'IN_PROGRESS' && o.qualityStatus === 'REJECTED') ||
+        (o.purchaseStatus === 'IN_PROGRESS' && (o.purchaseQuantity || 0) > 0 && o.currentStage === 'PURCHASE')
+      )
   );
 
   const getPillStyle = (status: string) => {
@@ -378,8 +386,8 @@ export const OrderKPIDetailsModal: React.FC<OrderKPIDetailsModalProps> = ({
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={onClose}>
-        <TouchableOpacity activeOpacity={1} style={styles.modalCard} onPress={(e) => e.stopPropagation()}>
+      <TouchableOpacity style={[styles.backdrop, isMobile && { padding: 10 }]} activeOpacity={1} onPress={onClose}>
+        <TouchableOpacity activeOpacity={1} style={[styles.modalCard, isMobile && { padding: 14, maxHeight: '95%' }]} onPress={(e) => e.stopPropagation()}>
           {/* Header */}
           <View style={styles.header}>
             <View>

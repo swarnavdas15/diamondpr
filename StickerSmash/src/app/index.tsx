@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, useWindowDimensions } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, useWindowDimensions, Platform } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 
 import { useERP } from '../context/ERPContext';
@@ -22,6 +22,8 @@ import { ProductionDashboard } from '../components/dashboards/ProductionDashboar
 import { QualityDashboard } from '../components/dashboards/QualityDashboard';
 import { DispatchDashboard } from '../components/dashboards/DispatchDashboard';
 import { TaskManagement } from '../components/TaskManagement';
+import { OrdersManagement } from '../components/OrdersManagement';
+import { MobileBottomNav } from '../components/MobileBottomNav';
 
 import { LoginScreen } from '../components/auth/LoginScreen';
 import { Colors } from '../theme';
@@ -39,13 +41,20 @@ import {
 } from '../components/views/PlaceholderViews';
 
 export default function MainScreen() {
-  const { currentUser, isAuthenticated } = useAuth();
+  const { currentUser, isAuthenticated, logout } = useAuth();
   const { selectedOrder, setSelectedOrder } = useERP();
   const { width } = useWindowDimensions();
+  const isMobile = width < 768;
 
-  // Navigation Sidebar State
+  // Navigation Sidebar State — auto-collapse on mobile (< 768) and tablet (< 1024)
   const [activeMenuItem, setActiveMenuItem] = useState<NavMenuItem>('Dashboard');
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(width < 768); // Collapse by default on mobile
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(width < 1024);
+
+  useEffect(() => {
+    if (width < 768) {
+      setSidebarCollapsed(true);
+    }
+  }, [width < 768]);
 
   // Modal visibility states
   const [calendarVisible, setCalendarVisible] = useState(false);
@@ -90,16 +99,11 @@ export default function MainScreen() {
   };
 
   const handleSelectMenuItem = (item: NavMenuItem) => {
-    if (
-      (currentUser.role === 'SALES' && (item === 'Orders' || item === 'Notifications')) ||
-      ((currentUser.role === 'PRODUCTION' || currentUser.role === 'QUALITY_TESTING') &&
-        (item === 'WorkOrders' || item === 'Production' || item === 'QualityControl' || item === 'Notifications')) ||
-      (currentUser.role === 'PURCHASE' && (item === 'PurchaseOrders' || item === 'Notifications')) ||
-      (currentUser.role === 'DISPATCH' && (item === 'DispatchQueue' || item === 'Dispatch' || item === 'Logistics' || item === 'Notifications'))
-    ) {
-      setActiveMenuItem('Dashboard');
+    if (item === 'Logout') {
+      logout();
       return;
     }
+    // Open calendar for calendar/notification items
     if (item === 'Calendar' || item === 'Notifications') {
       setCalendarVisible(true);
       return;
@@ -121,6 +125,16 @@ export default function MainScreen() {
         );
 
       case 'Orders':
+        if (currentUser.role !== 'SUPER_ADMIN' && currentUser.role !== 'ADMIN' && currentUser.role !== 'SALES') {
+          return renderDashboardByRole();
+        }
+        return (
+          <OrdersManagement
+            onNavigateToQuotations={() => setActiveMenuItem('Quotations')}
+            onOpenCreateOrder={() => setCreateOrderVisible(true)}
+          />
+        );
+
       case 'WorkOrders':
         if (currentUser.role === 'SALES') {
           return renderDashboardByRole();
@@ -211,9 +225,21 @@ export default function MainScreen() {
           {/* Main ERP Work Area */}
           <View style={styles.mainContentArea}>
             {/* Active Navigation Screen Content */}
-            <View style={styles.screenViewContainer}>{renderActiveScreenContent()}</View>
+            <View style={[styles.screenViewContainer, isMobile && styles.screenViewContainerMobile]}>
+              {renderActiveScreenContent()}
+            </View>
           </View>
         </View>
+
+        {/* Mobile Fixed Bottom Navigation Bar */}
+        {isMobile && (
+          <MobileBottomNav
+            activeMenuItem={activeMenuItem}
+            onSelectMenuItem={handleSelectMenuItem}
+            onOpenMenu={() => setSidebarCollapsed(false)}
+            userRole={currentUser?.role}
+          />
+        )}
 
         {/* Modals */}
         <CompactCalendarModal visible={calendarVisible} onClose={() => setCalendarVisible(false)} />
@@ -235,6 +261,7 @@ const styles = StyleSheet.create({
   },
   appContainer: {
     flex: 1,
+    minHeight: (Platform.OS === 'web' ? ('100dvh' as any) : undefined),
     backgroundColor: Colors.bgDark,
   },
   bodyRow: {
@@ -290,5 +317,9 @@ const styles = StyleSheet.create({
   screenViewContainer: {
     flex: 1,
     padding: 20,
+  },
+  screenViewContainerMobile: {
+    padding: 10,
+    paddingBottom: (Platform.OS === 'web' ? ('calc(env(safe-area-inset-bottom, 8px) + 68px)' as any) : 72),
   },
 });

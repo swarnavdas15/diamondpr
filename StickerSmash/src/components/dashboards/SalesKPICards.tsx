@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ViewStyle } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ViewStyle, useWindowDimensions } from 'react-native';
 import { useERP } from '../../context/ERPContext';
 import { Colors, Spacing, Radius, Shadows } from '../../theme';
 
@@ -10,6 +10,8 @@ interface SalesKPICardsProps {
 
 export const SalesKPICards: React.FC<SalesKPICardsProps> = ({ onCardPress, style }) => {
   const { quotations } = useERP();
+  const { width } = useWindowDimensions();
+  const isMobile = width < 768;
 
   const totalQuotations = quotations.length;
   const totalQuotationValue = quotations.reduce((acc, q) => acc + q.quotationAmount, 0);
@@ -19,7 +21,7 @@ export const SalesKPICards: React.FC<SalesKPICardsProps> = ({ onCardPress, style
   const formatCurrency = (val: number) => `₹${val.toLocaleString('en-IN')}`;
 
   return (
-    <View style={[styles.container, style]}>
+    <View style={[styles.container, isMobile && styles.containerMobile, style]}>
       {/* Card 1: Total Quotations */}
       <TouchableOpacity
         style={[styles.metricCard, { borderLeftColor: Colors.accentTeal }]}
@@ -82,6 +84,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: Spacing.md,
     marginVertical: Spacing.sm,
+  },
+  containerMobile: {
+    flexDirection: 'column',
+    gap: Spacing.xs,
   },
   metricCard: {
     flex: 1,

@@ -7,11 +7,14 @@ import {
   TextInput,
   StyleSheet,
   Platform,
+  useWindowDimensions,
 } from 'react-native';
 import { useERP } from '../../context/ERPContext';
 import { useAuth } from '../../context/AuthContext';
 import { Colors, StatusColors, Spacing, Radius, Shadows } from '../../theme';
 import { Order, Quotation, Task, AuthAuditLog, Role } from '../../types';
+import { ExportButton } from '../ui/ExportButton';
+import { ExportDataPayload } from '../../utils/exportUtils';
 
 export type TimeframeFilter = 'MONTHLY' | 'QUARTERLY' | 'YEARLY' | 'ALL_TIME';
 export type DepartmentFilter = 'ALL' | 'SALES' | 'PURCHASE' | 'PRODUCTION' | 'QUALITY_TESTING' | 'DISPATCH';
@@ -29,9 +32,134 @@ export type ReportType =
   | 'LOST_BUSINESS'
   | 'AUDIT_LOG';
 
+import { PieChart } from 'react-native-chart-kit';
+
+interface PieChartItem {
+  label: string;
+  value: number;
+  displayValue?: string;
+  color: string;
+}
+
+interface VisualPieChartProps {
+  title?: string;
+  subtitle?: string;
+  items: PieChartItem[];
+  centerLabel?: string | number;
+  centerSubLabel?: string;
+}
+
+const VisualPieChart: React.FC<VisualPieChartProps> = ({
+  title,
+  subtitle,
+  items,
+  centerLabel,
+  centerSubLabel,
+}) => {
+  const totalValue = items.reduce(
+    (sum, item) => sum + (typeof item.value === 'number' && !isNaN(item.value) ? item.value : 0),
+    0
+  );
+
+  const chartData = items.map(item => ({
+    name: item.label,
+    population: typeof item.value === 'number' && !isNaN(item.value) ? item.value : 0,
+    color: item.color,
+    legendFontColor: '#7F7F7F',
+    legendFontSize: 15
+  }));
+
+  // Force chart to show default gray if all values are 0
+  if (totalValue === 0) {
+    chartData.push({
+      name: 'Empty',
+      population: 1,
+      color: '#e2e8f0',
+      legendFontColor: '#7F7F7F',
+      legendFontSize: 15
+    });
+  }
+
+  return (
+    <View style={styles.pieChartCard}>
+      {title ? <Text style={styles.pieChartTitle}>{title}</Text> : null}
+      {subtitle ? <Text style={styles.pieChartSubtitle}>{subtitle}</Text> : null}
+
+      <View style={styles.pieChartBodyRow}>
+        {/* Donut Circle Container */}
+        <View style={styles.pieWrapper}>
+          <View style={styles.pieCircle}>
+            <PieChart
+              data={chartData}
+              width={140}
+              height={140}
+              chartConfig={{
+                color: (opacity = 1) => `rgba(255, 255, 255, ${opacity})`,
+              }}
+              accessor={"population"}
+              backgroundColor={"transparent"}
+              paddingLeft={"0"}
+              hasLegend={false}
+              absolute
+            />
+            {/* Center Donut Hole */}
+            <View style={[styles.donutCenter, { position: 'absolute' }]}>
+              <Text style={styles.donutCenterValue}>
+                {centerLabel !== undefined ? centerLabel : totalValue}
+              </Text>
+              <Text style={styles.donutCenterSub}>
+                {centerSubLabel !== undefined ? centerSubLabel : 'Total'}
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Donut Legend Key Details */}
+        <View style={styles.legendContainer}>
+          {items.map((item, idx) => {
+            const valNum = typeof item.value === 'number' && !isNaN(item.value) ? item.value : 0;
+            const pct = totalValue > 0 ? Math.round((valNum / totalValue) * 100) : 0;
+            return (
+              <View key={idx} style={styles.legendItemRow}>
+                <View style={[styles.legendDot, { backgroundColor: item.color }]} />
+                <View style={{ flex: 1 }}>
+                  <View style={styles.legendTextHeader}>
+                    <Text style={styles.legendLabelText}>{item.label}</Text>
+                    <Text style={[styles.legendValueText, { color: item.color }]}>
+                      {item.displayValue !== undefined ? item.displayValue : item.value}
+                    </Text>
+                  </View>
+                  <View style={styles.legendProgressBarTrack}>
+                    <View
+                      style={[
+                        styles.legendProgressBarFill,
+                        { width: `${pct}%`, backgroundColor: item.color },
+                      ]}
+                    />
+                  </View>
+                </View>
+                <View
+                  style={[
+                    styles.legendPctBadge,
+                    { backgroundColor: `${item.color}15`, borderColor: item.color },
+                  ]}
+                >
+                  <Text style={[styles.legendPctText, { color: item.color }]}>{pct}%</Text>
+                </View>
+              </View>
+            );
+          })}
+        </View>
+      </View>
+    </View>
+  );
+};
+
 export const SuperAdminAnalyticsView: React.FC = () => {
   const { orders, quotations, tasks, clients, vendors } = useERP();
   const { users, authAuditLogs } = useAuth();
+  const { width } = useWindowDimensions();
+  const isMobile = width < 768;
 
   // Multi-Criteria Filter States
   const [timeframe, setTimeframe] = useState<TimeframeFilter>('MONTHLY');
@@ -44,10 +172,10 @@ export const SuperAdminAnalyticsView: React.FC = () => {
   const [activeReportType, setActiveReportType] = useState<ReportType>('ORDER');
   const [exportNotice, setExportNotice] = useState<string>('');
 
-  // Active Analytics Tab
+  // Active Analytics Tab (Cleaned up to 8 core graph analytics tabs)
   const [activeTab, setActiveTab] = useState<
-    'OVERVIEW' | 'ORDERS' | 'REVENUE' | 'QUOTATIONS' | 'DEPARTMENTS' | 'PRODUCTION' | 'QUALITY' | 'DISPATCH' | 'USERS' | 'INVENTORY' | 'AUDIT' | 'REPORTS'
-  >('OVERVIEW');
+    'ORDERS' | 'SALES' | 'PURCHASE' | 'PRODUCTION' | 'QUALITY' | 'DISPATCH' | 'USERS' | 'REVENUE'
+  >('ORDERS');
 
   // 1. Dynamic Filtering Engine
   const filteredOrders = useMemo(() => {
@@ -365,8 +493,34 @@ export const SuperAdminAnalyticsView: React.FC = () => {
     setTimeout(() => setExportNotice(''), 4000);
   };
 
+  const getAnalyticsExportPayload = (): ExportDataPayload => {
+    return {
+      title: `Executive Analytics & Operational Performance Report (${activeTab})`,
+      subtitle: `Timeframe: ${timeframe} | Department: ${selectedDept}`,
+      filename: `ERP_Analytics_Report_${activeTab}`,
+      headers: ['Order Number', 'Client Code', 'Client Name', 'Status', 'Purchase', 'Production', 'QC', 'Dispatch', 'Required Qty', 'Created Date'],
+      rows: filteredOrders.map((o) => [
+        o.orderNumber,
+        o.clientCode,
+        o.clientName || 'N/A',
+        o.status,
+        o.purchaseStatus,
+        o.productionStatus,
+        o.qcResult,
+        o.dispatchStatus,
+        o.requiredQuantity,
+        new Date(o.createdAt).toLocaleDateString(),
+      ]),
+    };
+  };
+
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.scrollContentContainer}
+      nestedScrollEnabled={true}
+      showsVerticalScrollIndicator={true}
+    >
       {/* Top Banner */}
       <View style={styles.topBanner}>
         <View style={{ flex: 1 }}>
@@ -375,8 +529,11 @@ export const SuperAdminAnalyticsView: React.FC = () => {
             Real-time multi-dimensional ERP business intelligence, financial performance, departmental throughput, security audit logs, and downloadable executive reports.
           </Text>
         </View>
-        <View style={styles.roleBadge}>
-          <Text style={styles.roleBadgeText}>👑 SUPER ADMIN EXCLUSIVE</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+          <ExportButton getData={getAnalyticsExportPayload} buttonText="Export Reports" />
+          <View style={styles.roleBadge}>
+            <Text style={styles.roleBadgeText}>👑 SUPER ADMIN EXCLUSIVE</Text>
+          </View>
         </View>
       </View>
 
@@ -429,7 +586,7 @@ export const SuperAdminAnalyticsView: React.FC = () => {
       </View>
 
       {/* Top 12 Executive KPI Summary Cards */}
-      <View style={styles.kpiGrid}>
+      <View style={[styles.kpiGrid, isMobile && styles.kpiGridMobile]}>
         <View style={styles.kpiCard}>
           <Text style={styles.kpiVal}>{metrics.totalOrders}</Text>
           <Text style={styles.kpiLabel}>Total Orders</Text>
@@ -508,21 +665,17 @@ export const SuperAdminAnalyticsView: React.FC = () => {
         </View>
       </View>
 
-      {/* Navigation Tabs for Chart Sections & Export Engine */}
+      {/* Cleaned up 8 Core Operational Graph Analytics Navigation Tabs */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabBar}>
         {[
-          { id: 'OVERVIEW', label: '📊 Master Dashboard' },
-          { id: 'ORDERS', label: '📋 Order Status Analytics' },
-          { id: 'REVENUE', label: '💰 Revenue Analytics' },
-          { id: 'QUOTATIONS', label: '📜 Quotation Analytics' },
-          { id: 'DEPARTMENTS', label: '🏢 Dept Performance' },
+          { id: 'ORDERS', label: '📋 Orders Analytics' },
+          { id: 'SALES', label: '🎯 Sales & Quotations' },
+          { id: 'PURCHASE', label: '🛒 Purchase & Procurement' },
           { id: 'PRODUCTION', label: '🏭 Production Yield' },
           { id: 'QUALITY', label: '🔍 Quality Control' },
           { id: 'DISPATCH', label: '🚚 Dispatch & Logistics' },
           { id: 'USERS', label: '👤 Staff Productivity' },
-          { id: 'INVENTORY', label: '📦 Inventory & Materials' },
-          { id: 'AUDIT', label: '🛡️ Audit & Security' },
-          { id: 'REPORTS', label: '📥 Export Reports Engine' },
+          { id: 'REVENUE', label: '💰 Revenue Analytics' },
         ].map((tab) => (
           <TouchableOpacity
             key={tab.id}
@@ -534,169 +687,202 @@ export const SuperAdminAnalyticsView: React.FC = () => {
         ))}
       </ScrollView>
 
-      {/* 4. EXPORT REPORTS ENGINE TAB */}
-      {activeTab === 'REPORTS' && (
+      {/* 1. ORDERS GRAPH ANALYTICS TAB */}
+      {activeTab === 'ORDERS' && (
         <View style={styles.sectionCard}>
-          <Text style={styles.sectionTitle}>📥 Downloadable Reports & Export Engine</Text>
-          <Text style={styles.sectionSub}>Generate and download high-precision CSV, Excel spreadsheets, or printable PDF reports across 12 ERP categories.</Text>
+          <Text style={styles.sectionTitle}>📋 Orders Workflow & Stage Pipeline Analytics</Text>
+          <Text style={styles.sectionSub}>Real-time distribution of orders across active stages and completion throughput.</Text>
 
-          {exportNotice ? (
-            <View style={styles.noticeBanner}>
-              <Text style={styles.noticeText}>✨ {exportNotice}</Text>
-            </View>
-          ) : null}
-
-          <View style={{ marginTop: Spacing.md }}>
-            <Text style={styles.inputLabel}>Select Report Category (12 Types Available):</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: Spacing.md }}>
-              {[
-                { id: 'ORDER', label: '📋 Order Comprehensive' },
-                { id: 'REVENUE', label: '💰 Financial & Revenue' },
-                { id: 'SALES', label: '📈 Sales Performance' },
-                { id: 'PURCHASE', label: '🛒 Purchase & Procurement' },
-                { id: 'PRODUCTION', label: '🏭 Manufacturing Output' },
-                { id: 'QUALITY', label: '🔍 Quality & Inspection' },
-                { id: 'DISPATCH', label: '📦 Dispatch & Logistics' },
-                { id: 'USER_PERFORMANCE', label: '👤 Staff Productivity' },
-                { id: 'INVENTORY', label: '🏢 Inventory & Vendors' },
-                { id: 'QUOTATION', label: '📜 Quotation Pipeline' },
-                { id: 'LOST_BUSINESS', label: '⚠️ Lost Business Analysis' },
-                { id: 'AUDIT_LOG', label: '🛡️ Audit & Security Logs' },
-              ].map((r) => (
-                <TouchableOpacity
-                  key={r.id}
-                  style={[styles.reportSelectBtn, activeReportType === r.id && styles.activeReportSelectBtn]}
-                  onPress={() => setActiveReportType(r.id as ReportType)}
-                >
-                  <Text style={[styles.reportSelectBtnText, activeReportType === r.id && styles.activeReportSelectBtnText]}>
-                    {r.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-
-            <View style={styles.exportActionRow}>
-              <TouchableOpacity style={styles.btnCsv} onPress={downloadCSV}>
-                <Text style={styles.btnText}>📥 Download CSV Report</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.btnExcel} onPress={downloadExcel}>
-                <Text style={styles.btnText}>📊 Download Excel (.xls)</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.btnPdf} onPress={triggerPDFPrint}>
-                <Text style={styles.btnText}>🖨️ Print / Save as PDF</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
+          <VisualPieChart
+            title="📊 Order Distribution Pie Chart"
+            subtitle="Breakdown of completed orders, active shop floor machining, and delayed bottleneck orders."
+            centerLabel={metrics.totalOrders}
+            centerSubLabel="Total Orders"
+            items={[
+              { label: 'Completed Orders', value: metrics.completedOrders, color: '#22c55e' },
+              { label: 'Active Shop Floor Work Orders', value: metrics.activeOrders, color: '#0284c7' },
+              { label: 'Delayed / Bottleneck Orders', value: metrics.delayedOrders, color: '#f97316' },
+            ]}
+          />
         </View>
       )}
 
-      {/* 5. VISUAL CHARTS & ANALYTICS SECTIONS */}
-      {(activeTab === 'OVERVIEW' || activeTab === 'ORDERS') && (
+      {/* 2. SALES & QUOTATIONS GRAPH ANALYTICS TAB */}
+      {activeTab === 'SALES' && (
         <View style={styles.sectionCard}>
-          <Text style={styles.sectionTitle}>📈 Order Status & Workflow Analytics</Text>
-          <Text style={styles.sectionSub}>Distribution of orders by ERP workflow stage and stage completion ratio.</Text>
+          <Text style={styles.sectionTitle}>🎯 Sales Pipeline & Quotation Conversion Analytics</Text>
+          <Text style={styles.sectionSub}>Inquiry conversion rates, total quotation value generated vs converted order value.</Text>
 
-          <View style={styles.chartContainer}>
-            <View style={styles.barGroup}>
-              <Text style={styles.barLabel}>Completed Orders ({metrics.completedOrders})</Text>
-              <View style={styles.track}>
-                <View style={[styles.fill, { width: `${metrics.totalOrders > 0 ? (metrics.completedOrders / metrics.totalOrders) * 100 : 0}%`, backgroundColor: Colors.successBright }]} />
-              </View>
-            </View>
-
-            <View style={styles.barGroup}>
-              <Text style={styles.barLabel}>Active Work Orders ({metrics.activeOrders})</Text>
-              <View style={styles.track}>
-                <View style={[styles.fill, { width: `${metrics.totalOrders > 0 ? (metrics.activeOrders / metrics.totalOrders) * 100 : 0}%`, backgroundColor: Colors.accentTeal }]} />
-              </View>
-            </View>
-
-            <View style={styles.barGroup}>
-              <Text style={styles.barLabel}>Delayed / Bottleneck Orders ({metrics.delayedOrders})</Text>
-              <View style={styles.track}>
-                <View style={[styles.fill, { width: `${metrics.totalOrders > 0 ? (metrics.delayedOrders / metrics.totalOrders) * 100 : 0}%`, backgroundColor: Colors.industrialOrange }]} />
-              </View>
-            </View>
-          </View>
+          <VisualPieChart
+            title="📊 Sales Quotations & Financial Win/Loss Pie Chart"
+            subtitle="Ratio of converted revenue value vs lost quotation value and issued quotations."
+            centerLabel={`${metrics.conversionRate}%`}
+            centerSubLabel="Win Rate"
+            items={[
+              { label: 'Converted Order Value', value: metrics.totalRevenue, displayValue: `₹${metrics.totalRevenue.toLocaleString()}`, color: '#22c55e' },
+              { label: 'Lost Business Value', value: metrics.lostBusinessValue, displayValue: `₹${metrics.lostBusinessValue.toLocaleString()}`, color: '#f97316' },
+              { label: 'Issued Quotations Pool', value: metrics.totalQuotations, displayValue: `${metrics.totalQuotations} Issued`, color: '#0284c7' },
+            ]}
+          />
         </View>
       )}
 
-      {(activeTab === 'OVERVIEW' || activeTab === 'REVENUE') && (
+      {/* 3. PURCHASE GRAPH ANALYTICS TAB */}
+      {activeTab === 'PURCHASE' && (
+        <View style={styles.sectionCard}>
+          <Text style={styles.sectionTitle}>🛒 Purchase & Procurement Workflow Analytics</Text>
+          <Text style={styles.sectionSub}>Raw material procurement status, vendor assignments, and purchase completion rate.</Text>
+
+          {(() => {
+            const totalProc = filteredOrders.filter((o) => o.purchaseRequired).length;
+            const completedProc = filteredOrders.filter((o) => o.purchaseRequired && o.purchaseStatus === 'COMPLETED').length;
+            const inProgProc = filteredOrders.filter((o) => o.purchaseRequired && o.purchaseStatus === 'IN_PROGRESS').length;
+            const pendingProc = filteredOrders.filter((o) => o.purchaseRequired && o.purchaseStatus === 'PENDING').length;
+            const yieldPct = totalProc > 0 ? Math.round((completedProc / totalProc) * 100) : 100;
+
+            return (
+              <VisualPieChart
+                title="🛒 Procurement & Sourcing Fulfillment Pie Chart"
+                subtitle="Distribution of raw material sourcing statuses across purchase orders."
+                centerLabel={`${yieldPct}%`}
+                centerSubLabel="Fulfilled"
+                items={[
+                  { label: 'Procurement Completed', value: completedProc, color: '#22c55e' },
+                  { label: 'Sourcing in Progress', value: inProgProc, color: '#0284c7' },
+                  { label: 'Pending Sourcing', value: pendingProc, color: '#f59e0b' },
+                ]}
+              />
+            );
+          })()}
+        </View>
+      )}
+
+      {/* 4. PRODUCTION GRAPH ANALYTICS TAB */}
+      {activeTab === 'PRODUCTION' && (
+        <View style={styles.sectionCard}>
+          <Text style={styles.sectionTitle}>🏭 Manufacturing Yield & Shop Floor Analytics</Text>
+          <Text style={styles.sectionSub}>Flange machining output, active work order status, and production completion yield.</Text>
+
+          {(() => {
+            const totalProd = filteredOrders.filter((o) => o.productionRequired).length;
+            const completedProd = filteredOrders.filter((o) => o.productionRequired && o.productionStatus === 'COMPLETED').length;
+            const inProgProd = filteredOrders.filter((o) => o.productionRequired && o.productionStatus === 'IN_PROGRESS').length;
+            const pendingProd = filteredOrders.filter((o) => o.productionRequired && o.productionStatus === 'PENDING').length;
+            const yieldPct = totalProd > 0 ? Math.round((completedProd / totalProd) * 100) : 100;
+
+            return (
+              <VisualPieChart
+                title="🏭 Shop Floor Machining Yield Pie Chart"
+                subtitle="Distribution of manufacturing output: completed production, active machining, and queued orders."
+                centerLabel={`${yieldPct}%`}
+                centerSubLabel="Machined"
+                items={[
+                  { label: 'Production Completed', value: completedProd, color: '#22c55e' },
+                  { label: 'Active Machining', value: inProgProd, color: '#38bdf8' },
+                  { label: 'Queued Work Orders', value: pendingProd, color: '#f59e0b' },
+                ]}
+              />
+            );
+          })()}
+        </View>
+      )}
+
+      {/* 5. QUALITY GRAPH ANALYTICS TAB */}
+      {activeTab === 'QUALITY' && (
+        <View style={styles.sectionCard}>
+          <Text style={styles.sectionTitle}>🔍 Quality Control & Inspection Analytics</Text>
+          <Text style={styles.sectionSub}>ISO Quality testing results, hydrostatic/ultrasonic inspection pass rates.</Text>
+
+          {(() => {
+            const totalQc = filteredOrders.filter((o) => o.qualityTestingRequired).length;
+            const passedQc = filteredOrders.filter((o) => o.qualityTestingRequired && o.qcResult === 'PASSED').length;
+            const failedQc = filteredOrders.filter((o) => o.qualityTestingRequired && o.qcResult === 'FAILED').length;
+            const pendingQc = filteredOrders.filter((o) => o.qualityTestingRequired && (o.qcResult === 'PENDING' || !o.qcResult)).length;
+            const passPct = totalQc > 0 ? Math.round((passedQc / totalQc) * 100) : 100;
+
+            return (
+              <VisualPieChart
+                title="🔍 ISO Quality Inspection Results Pie Chart"
+                subtitle="Hydrostatic/Ultrasonic testing results breakdown: Passed, Rejections, and Pending inspection."
+                centerLabel={`${passPct}%`}
+                centerSubLabel="Pass Rate"
+                items={[
+                  { label: 'QC Passed Orders', value: passedQc, color: '#22c55e' },
+                  { label: 'Inspection Rejections', value: failedQc, color: '#ef4444' },
+                  { label: 'Awaiting Inspection', value: pendingQc, color: '#f59e0b' },
+                ]}
+              />
+            );
+          })()}
+        </View>
+      )}
+
+      {/* 6. DISPATCH GRAPH ANALYTICS TAB */}
+      {activeTab === 'DISPATCH' && (
+        <View style={styles.sectionCard}>
+          <Text style={styles.sectionTitle}>🚚 Dispatch & Logistics Analytics</Text>
+          <Text style={styles.sectionSub}>Logistics tracking, shipped order throughput, and pending dispatch queue.</Text>
+
+          {(() => {
+            const totalDisp = filteredOrders.filter((o) => o.dispatchRequired).length;
+            const completedDisp = filteredOrders.filter((o) => o.dispatchRequired && o.dispatchStatus === 'COMPLETED').length;
+            const inProgDisp = filteredOrders.filter((o) => o.dispatchRequired && o.dispatchStatus === 'IN_PROGRESS').length;
+            const pendingDisp = filteredOrders.filter((o) => o.dispatchRequired && o.dispatchStatus === 'PENDING').length;
+            const dispPct = totalDisp > 0 ? Math.round((completedDisp / totalDisp) * 100) : 100;
+
+            return (
+              <VisualPieChart
+                title="🚚 Dispatch & Shipping Fulfillment Pie Chart"
+                subtitle="Status distribution of logistics orders: Shipped & Delivered, In Transit, and Queued."
+                centerLabel={`${dispPct}%`}
+                centerSubLabel="Shipped"
+                items={[
+                  { label: 'Shipped & Delivered', value: completedDisp, color: '#22c55e' },
+                  { label: 'In Transit / Dispatch Prep', value: inProgDisp, color: '#0284c7' },
+                  { label: 'Queued for Dispatch', value: pendingDisp, color: '#f59e0b' },
+                ]}
+              />
+            );
+          })()}
+        </View>
+      )}
+
+      {/* 7. USER PRODUCTIVITY GRAPH ANALYTICS TAB */}
+      {activeTab === 'USERS' && (
+        <View style={styles.sectionCard}>
+          <Text style={styles.sectionTitle}>👤 Staff & User Productivity Analytics</Text>
+          <Text style={styles.sectionSub}>Task completion yields and cross-departmental staff performance scores.</Text>
+
+          <VisualPieChart
+            title="👤 System Staff Task Performance Pie Chart"
+            subtitle="Cross-departmental staff productivity breakdown: Completed Tasks, System Users, and Open Tasks."
+            centerLabel={`${metrics.userProductivityScore}%`}
+            centerSubLabel="Score"
+            items={[
+              { label: 'Completed Tasks', value: metrics.totalTasks - metrics.pendingTasks, color: '#22c55e' },
+              { label: 'Active System Users', value: users.length, color: '#0284c7' },
+              { label: 'Open Pending Tasks', value: metrics.pendingTasks, color: '#f59e0b' },
+            ]}
+          />
+        </View>
+      )}
+
+      {/* 8. REVENUE GRAPH ANALYTICS TAB */}
+      {activeTab === 'REVENUE' && (
         <View style={styles.sectionCard}>
           <Text style={styles.sectionTitle}>💰 Revenue & Financial Performance Analytics</Text>
           <Text style={styles.sectionSub}>Comparison of Converted Revenue vs Lost Business Value.</Text>
 
-          <View style={styles.revGrid}>
-            <View style={styles.revCard}>
-              <Text style={styles.revVal}>₹{metrics.totalRevenue.toLocaleString()}</Text>
-              <Text style={styles.revLabel}>Total Converted Revenue</Text>
-              <View style={[styles.fill, { height: 8, width: '100%', backgroundColor: Colors.successBright, borderRadius: 4, marginTop: 10 }]} />
-            </View>
-
-            <View style={styles.revCard}>
-              <Text style={[styles.revVal, { color: Colors.industrialOrange }]}>₹{metrics.lostBusinessValue.toLocaleString()}</Text>
-              <Text style={styles.revLabel}>Lost Business Value</Text>
-              <View style={[styles.fill, { height: 8, width: '100%', backgroundColor: Colors.industrialOrange, borderRadius: 4, marginTop: 10 }]} />
-            </View>
-          </View>
-        </View>
-      )}
-
-      {(activeTab === 'OVERVIEW' || activeTab === 'QUOTATIONS') && (
-        <View style={styles.sectionCard}>
-          <Text style={styles.sectionTitle}>📜 Quotation Pipeline & Conversion Analytics</Text>
-          <Text style={styles.sectionSub}>Quotation lifecycle funnel and lost business breakdown.</Text>
-
-          <View style={styles.table}>
-            <View style={styles.thRow}>
-              <Text style={[styles.th, { width: 140 }]}>Quotation Number</Text>
-              <Text style={[styles.th, { width: 180 }]}>Client Name</Text>
-              <Text style={[styles.th, { width: 130 }]}>Amount (₹)</Text>
-              <Text style={[styles.th, { width: 130 }]}>Status</Text>
-              <Text style={[styles.th, { width: 140 }]}>Converted Value</Text>
-            </View>
-            {filteredQuotations.slice(0, 5).map((q) => (
-              <View key={q.id} style={styles.trRow}>
-                <Text style={[styles.tdHighlight, { width: 140 }]}>{q.quotationNumber}</Text>
-                <Text style={[styles.tdBold, { width: 180 }]}>{q.companyName}</Text>
-                <Text style={[styles.td, { width: 130 }]}>₹{q.quotationAmount.toLocaleString()}</Text>
-                <Text style={[styles.tdSmall, { width: 130 }]}>{q.status}</Text>
-                <Text style={[styles.tdBold, { width: 140, color: Colors.successBright }]}>₹{(q.convertedOrderValue || 0).toLocaleString()}</Text>
-              </View>
-            ))}
-          </View>
-        </View>
-      )}
-
-      {(activeTab === 'OVERVIEW' || activeTab === 'AUDIT') && (
-        <View style={styles.sectionCard}>
-          <Text style={styles.sectionTitle}>🛡️ Security & Authentication Audit Logs Analytics</Text>
-          <Text style={styles.sectionSub}>Real-time system login events, role modifications, and activity traces.</Text>
-
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            <View style={styles.table}>
-              <View style={styles.thRow}>
-                <Text style={[styles.th, { width: 140 }]}>Event Type</Text>
-                <Text style={[styles.th, { width: 130 }]}>User ID</Text>
-                <Text style={[styles.th, { width: 180 }]}>Email Ref</Text>
-                <Text style={[styles.th, { width: 220 }]}>Activity Details</Text>
-                <Text style={[styles.th, { width: 160 }]}>Timestamp</Text>
-              </View>
-              {authAuditLogs.map((l) => (
-                <View key={l.id} style={styles.trRow}>
-                  <View style={{ width: 140 }}>
-                    <View style={[styles.eventBadge, l.event.includes('FAILED') ? styles.failBadge : styles.successBadge]}>
-                      <Text style={styles.eventBadgeText}>{l.event}</Text>
-                    </View>
-                  </View>
-                  <Text style={[styles.tdBold, { width: 130 }]}>{l.username || 'N/A'}</Text>
-                  <Text style={[styles.td, { width: 180 }]}>{l.email || 'N/A'}</Text>
-                  <Text style={[styles.td, { width: 220 }]}>{l.details}</Text>
-                  <Text style={[styles.tdSmall, { width: 160 }]}>{new Date(l.timestamp).toLocaleString()}</Text>
-                </View>
-              ))}
-            </View>
-          </ScrollView>
+          <VisualPieChart
+            title="💰 Converted Revenue vs Lost Value Financial Pie Chart"
+            subtitle="Direct revenue comparison between successfully converted orders and lost business value."
+            centerLabel={`₹${metrics.totalRevenue.toLocaleString()}`}
+            centerSubLabel="Revenue"
+            items={[
+              { label: 'Converted Revenue', value: metrics.totalRevenue, displayValue: `₹${metrics.totalRevenue.toLocaleString()}`, color: '#22c55e' },
+              { label: 'Lost Business Value', value: metrics.lostBusinessValue, displayValue: `₹${metrics.lostBusinessValue.toLocaleString()}`, color: '#ef4444' },
+            ]}
+          />
         </View>
       )}
     </ScrollView>
@@ -706,6 +892,10 @@ export const SuperAdminAnalyticsView: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  scrollContentContainer: {
+    paddingBottom: 80,
+    ...(Platform.OS === 'web' ? ({ minHeight: '100vh', overflowY: 'auto' } as any) : {}),
   },
   topBanner: {
     backgroundColor: Colors.cardBg,
@@ -818,6 +1008,9 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: Spacing.md,
     marginBottom: Spacing.lg,
+  },
+  kpiGridMobile: {
+    gap: Spacing.xs,
   },
   kpiCard: {
     flex: 1,
@@ -960,10 +1153,10 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   chartContainer: {
-    gap: 12,
+    gap: 16,
   },
   barGroup: {
-    gap: 4,
+    gap: 6,
   },
   barLabel: {
     color: Colors.textLight,
@@ -978,6 +1171,129 @@ const styles = StyleSheet.create({
   },
   fill: {
     height: '100%',
+  },
+  // Column Chart Styles
+  // Light Mode Pie Chart Styles
+  pieChartCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: Radius.xl,
+    padding: Spacing.lg,
+    marginBottom: Spacing.md,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    ...Shadows.sm,
+  },
+  pieChartTitle: {
+    color: '#0f172a',
+    fontSize: 15,
+    fontWeight: '800',
+    marginBottom: 2,
+  },
+  pieChartSubtitle: {
+    color: '#64748b',
+    fontSize: 11,
+    marginBottom: Spacing.md,
+  },
+  pieChartBodyRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: Spacing.lg,
+  },
+  pieWrapper: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 10,
+  },
+  pieCircle: {
+    width: 170,
+    height: 170,
+    borderRadius: 85,
+    alignItems: 'center',
+    justifyContent: 'center',
+    boxShadow: '0 4px 14px rgba(0, 0, 0, 0.08)',
+  },
+  donutCenter: {
+    width: 105,
+    height: 105,
+    borderRadius: 55,
+    backgroundColor: '#ffffff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#f1f5f9',
+    paddingHorizontal: 4,
+  },
+  donutCenterValue: {
+    color: '#0f172a',
+    fontSize: 18,
+    fontWeight: '900',
+    textAlign: 'center',
+  },
+  donutCenterSub: {
+    color: '#64748b',
+    fontSize: 10,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    marginTop: 2,
+    textAlign: 'center',
+  },
+  legendContainer: {
+    flex: 1,
+    minWidth: 240,
+    gap: 10,
+  },
+  legendItemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: '#f8fafc',
+    padding: 10,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  legendDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+  },
+  legendTextHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  legendLabelText: {
+    color: '#1e293b',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  legendValueText: {
+    fontSize: 12,
+    fontWeight: '900',
+  },
+  legendProgressBarTrack: {
+    height: 6,
+    backgroundColor: '#e2e8f0',
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  legendProgressBarFill: {
+    height: '100%',
+    borderRadius: 3,
+  },
+  legendPctBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: Radius.xs,
+    borderWidth: 1,
+    minWidth: 42,
+    alignItems: 'center',
+  },
+  legendPctText: {
+    fontSize: 11,
+    fontWeight: '900',
   },
   revGrid: {
     flexDirection: 'row',

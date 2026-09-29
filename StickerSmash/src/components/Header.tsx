@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, useWindowDimensions, Platform } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import { Role } from '../types';
 import { Colors, Spacing, Radius } from '../theme';
@@ -11,6 +11,8 @@ interface HeaderProps {
 
 export const Header: React.FC<HeaderProps> = ({ onOpenCalendar, onToggleSidebar }) => {
   const { currentUser, logout } = useAuth();
+  const { width } = useWindowDimensions();
+  const isMobile = width < 768;
 
   if (!currentUser) return null;
 
@@ -18,7 +20,6 @@ export const Header: React.FC<HeaderProps> = ({ onOpenCalendar, onToggleSidebar 
     weekday: 'short',
     month: 'short',
     day: 'numeric',
-    year: 'numeric',
   });
 
   const getRoleBadgeColor = (role: Role) => {
@@ -26,7 +27,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenCalendar, onToggleSidebar 
   };
 
   return (
-    <View style={styles.headerContainer}>
+    <View style={[styles.headerContainer, isMobile && styles.headerContainerMobile]}>
       <View style={styles.brandLeftGroup}>
         {onToggleSidebar && (
           <TouchableOpacity style={styles.menuToggleBtn} onPress={onToggleSidebar}>
@@ -34,20 +35,22 @@ export const Header: React.FC<HeaderProps> = ({ onOpenCalendar, onToggleSidebar 
           </TouchableOpacity>
         )}
         <View style={styles.brandContainer}>
-          <Text style={styles.brandTitle}>DIAMOND FLANGE ERP</Text>
-          <Text style={styles.brandSubtitle}>Advanced Manufacturing & Centralized Theme System</Text>
+          <Text style={[styles.brandTitle, isMobile && styles.brandTitleMobile]}>DIAMOND FLANGE</Text>
+          {!isMobile && <Text style={styles.brandSubtitle}>Advanced Manufacturing ERP</Text>}
         </View>
       </View>
 
       {/* Right Controls: Header Calendar, User Profile, Logout */}
-      <View style={styles.controlsContainer}>
+      <View style={[styles.controlsContainer, isMobile && styles.controlsContainerMobile]}>
         {/* Global Compact Header Date Calendar Trigger */}
         <TouchableOpacity style={styles.dateHeaderBtn} onPress={onOpenCalendar}>
           <Text style={styles.calendarIcon}>📅</Text>
-          <View>
-            <Text style={styles.dateLabel}>TODAY</Text>
-            <Text style={styles.dateValue}>{todayStr}</Text>
-          </View>
+          {!isMobile && (
+            <View>
+              <Text style={styles.dateLabel}>TODAY</Text>
+              <Text style={styles.dateValue}>{todayStr}</Text>
+            </View>
+          )}
         </TouchableOpacity>
 
         {/* User Profile Badge */}
@@ -55,17 +58,19 @@ export const Header: React.FC<HeaderProps> = ({ onOpenCalendar, onToggleSidebar 
           <View style={[styles.avatarCircle, { backgroundColor: getRoleBadgeColor(currentUser.role) }]}>
             <Text style={styles.avatarText}>{currentUser.name.charAt(0)}</Text>
           </View>
-          <View>
-            <Text style={styles.userName}>{currentUser.name}</Text>
-            <Text style={[styles.userRoleTag, { color: getRoleBadgeColor(currentUser.role) }]}>
-              {currentUser.role.replace('_', ' ')}
-            </Text>
-          </View>
+          {!isMobile && (
+            <View>
+              <Text style={styles.userName}>{currentUser.name}</Text>
+              <Text style={[styles.userRoleTag, { color: getRoleBadgeColor(currentUser.role) }]}>
+                {currentUser.role.replace('_', ' ')}
+              </Text>
+            </View>
+          )}
         </View>
 
         {/* Logout Button */}
         <TouchableOpacity style={styles.logoutBtn} onPress={logout}>
-          <Text style={styles.logoutBtnText}>🚪 Logout</Text>
+          <Text style={styles.logoutBtnText}>{isMobile ? '🚪' : '🚪 Logout'}</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -82,11 +87,21 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     borderBottomWidth: 1,
     borderBottomColor: Colors.borderDark,
+    height: 64,
+  },
+  headerContainerMobile: {
+    paddingHorizontal: 12,
+    paddingVertical: Spacing.xs,
+    paddingTop: (Platform.OS === 'web' ? ('max(env(safe-area-inset-top, 24px), 24px)' as any) : 24),
+    paddingBottom: 10,
+    minHeight: 68,
+    height: 'auto' as any,
   },
   brandLeftGroup: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.md,
+    flexShrink: 1,
   },
   menuToggleBtn: {
     backgroundColor: Colors.inputBg,
@@ -103,12 +118,16 @@ const styles = StyleSheet.create({
   },
   brandContainer: {
     justifyContent: 'center',
+    flexShrink: 1,
   },
   brandTitle: {
     color: Colors.textLight,
     fontSize: 18,
     fontWeight: '800',
     letterSpacing: 0.8,
+  },
+  brandTitleMobile: {
+    fontSize: 14,
   },
   brandSubtitle: {
     color: Colors.accentTeal,
@@ -119,6 +138,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.lg,
+    flexShrink: 0,
+  },
+  controlsContainerMobile: {
+    gap: Spacing.xs,
+    flexShrink: 0,
   },
   dateHeaderBtn: {
     flexDirection: 'row',

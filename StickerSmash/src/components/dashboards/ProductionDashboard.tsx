@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, TextInput, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, TextInput, StyleSheet, useWindowDimensions } from 'react-native';
 import { useERP } from '../../context/ERPContext';
 import { DepartmentStatus, QCResult, Order } from '../../types';
 import { Colors, StatusColors, Spacing, Radius, Shadows } from '../../theme';
@@ -7,6 +7,8 @@ import { TaskKPICards } from './TaskKPICards';
 import { OrderKPICards } from './OrderKPICards';
 import { QuantityProcessModal } from '../QuantityProcessModal';
 import { OrderQuantityTracker } from '../OrderQuantityTracker';
+import { ExportButton } from '../ui/ExportButton';
+import { ExportDataPayload } from '../../utils/exportUtils';
 
 interface ProductionDashboardProps {
   isQCMode?: boolean;
@@ -15,18 +17,54 @@ interface ProductionDashboardProps {
 export const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ isQCMode = false }) => {
   const { getMaskedOrders, updateProductionStage, updateQualityStage, setSelectedOrder } = useERP();
   const maskedOrders = getMaskedOrders().filter((o) => o.productionRequired || o.qualityTestingRequired);
+  const { width } = useWindowDimensions();
+  const isMobile = width < 768;
 
   const [shopFloorNotesMap, setShopFloorNotesMap] = useState<{ [key: string]: string }>({});
   const [qcRemarksMap, setQcRemarksMap] = useState<{ [key: string]: string }>({});
-  const [activeTab, setActiveTab] = useState<'PRODUCTION' | 'QUALITY_TESTING'>(isQCMode ? 'QUALITY_TESTING' : 'PRODUCTION');
+  const [activeTab, setActiveTab] = useState<'PRODUCTION' | 'QUALITY_TESTING' | 'REWORK' | 'COMPLETED'>(isQCMode ? 'QUALITY_TESTING' : 'PRODUCTION');
 
   const [processModalVisible, setProcessModalVisible] = useState(false);
   const [selectedProcessOrder, setSelectedProcessOrder] = useState<Order | null>(null);
   const [processStage, setProcessStage] = useState<'PRODUCTION' | 'QUALITY_TESTING'>('PRODUCTION');
+  const [processIsRework, setProcessIsRework] = useState(false);
 
-  const handleOpenProcessModal = (ord: Order, stage: 'PRODUCTION' | 'QUALITY_TESTING') => {
+  const getProductionExportPayload = (): ExportDataPayload => {
+    if (activeTab === 'PRODUCTION') {
+      return {
+        title: 'Manufacturing & Shop Floor Production Report',
+        filename: 'Production_Orders_Report',
+        headers: ['Order No', 'PO Number', 'Technical Spec', 'Required Qty', 'Completed Qty', 'Status'],
+        rows: productionQueue.map((o) => [
+          o.orderNumber,
+          o.poNumber,
+          o.technicalRequirements || 'SS316L Flanges',
+          o.requiredQuantity,
+          o.productionQuantity || 0,
+          o.productionStatus,
+        ]),
+      };
+    } else {
+      return {
+        title: 'Quality Testing & Inspection Report',
+        filename: 'Quality_Testing_Report',
+        headers: ['Order No', 'PO Number', 'Inspected Qty', 'Required Qty', 'QC Result', 'Status'],
+        rows: qcQueue.map((o) => [
+          o.orderNumber,
+          o.poNumber,
+          o.qcQuantity || 0,
+          o.requiredQuantity,
+          o.qcResult,
+          o.qualityStatus,
+        ]),
+      };
+    }
+  };
+
+  const handleOpenProcessModal = (ord: Order, stage: 'PRODUCTION' | 'QUALITY_TESTING', isRework = false) => {
     setSelectedProcessOrder(ord);
     setProcessStage(stage);
+    setProcessIsRework(isRework);
     setProcessModalVisible(true);
   };
 
@@ -34,19 +72,29 @@ export const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ isQCMo
     processedQty: number;
     remarks?: string;
     qcResult?: QCResult;
+    passedQty?: number;
+    failedQty?: number;
   }) => {
     if (!selectedProcessOrder) return;
 
     if (processStage === 'PRODUCTION') {
-      const notes = data.remarks || shopFloorNotesMap[selectedProcessOrder.id] || 'Shop floor machining completed.';
-      const newQty = (selectedProcessOrder.productionQuantity || 0) + data.processedQty;
-      const calcStatus: DepartmentStatus = newQty >= selectedProcessOrder.requiredQuantity ? 'COMPLETED' : 'IN_PROGRESS';
-      updateProductionStage(selectedProcessOrder.id, calcStatus, notes, data.processedQty);
+      const notes = data.remarks || shopFloorNotesMap[selectedProcessOrder.id] || (processIsRework ? 'Rework completed.' : 'Shop floor machining completed.');
+      const newQty = processIsRework ? (selectedProcessOrder.productionQuantity || 0) : (selectedProcessOrder.productionQuantity || 0) + data.processedQty;
+      const newRework = processIsRework ? (selectedProcessOrder.reworkQuantity || 0) - data.processedQty : (selectedProcessOrder.reworkQuantity || 0);
+      const calcStatus: DepartmentStatus = (newQty >= selectedProcessOrder.requiredQuantity && newRework === 0) ? 'COMPLETED' : 'IN_PROGRESS';
+      updateProductionStage(selectedProcessOrder.id, calcStatus, notes, data.processedQty, processIsRework);
     } else {
       const remarks = data.remarks || qcRemarksMap[selectedProcessOrder.id] || 'Quality inspection completed.';
-      const newQcQty = (selectedProcessOrder.qcQuantity || 0) + data.processedQty;
-      const calcStatus: DepartmentStatus = newQcQty >= selectedProcessOrder.requiredQuantity ? 'COMPLETED' : 'IN_PROGRESS';
-      updateQualityStage(selectedProcessOrder.id, calcStatus, data.qcResult || 'PASSED', remarks, data.processedQty);
+      
+      let newPassedQty = 0;
+      if (data.passedQty !== undefined) {
+        newPassedQty = (selectedProcessOrder.qcPassedQuantity || 0) + data.passedQty;
+      } else {
+        newPassedQty = data.qcResult === 'PASSED' ? (selectedProcessOrder.qcPassedQuantity || 0) + data.processedQty : (selectedProcessOrder.qcPassedQuantity || 0);
+      }
+      
+      const calcStatus: DepartmentStatus = newPassedQty >= selectedProcessOrder.requiredQuantity ? 'COMPLETED' : 'IN_PROGRESS';
+      updateQualityStage(selectedProcessOrder.id, calcStatus, data.qcResult || 'PASSED', remarks, data.processedQty, data.passedQty, data.failedQty);
     }
 
     setProcessModalVisible(false);
@@ -78,21 +126,31 @@ export const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ isQCMo
   };
 
   const productionQueue = maskedOrders.filter(
-    (o) => o.productionRequired && (o.purchaseStatus === 'COMPLETED' || !o.purchaseRequired)
+    (o) => o.productionRequired && (o.purchaseStatus === 'COMPLETED' || !o.purchaseRequired) && o.productionStatus !== 'COMPLETED'
   );
   const qcQueue = maskedOrders.filter(
-    (o) => o.qualityTestingRequired && (o.productionStatus === 'COMPLETED' || (o.productionQuantity || 0) > 0)
+    (o) => o.qualityTestingRequired && (o.productionStatus === 'COMPLETED' || (o.productionQuantity || 0) > 0) && o.qualityStatus !== 'COMPLETED'
+  );
+  // Rework Queue: orders returned from QC failure that are back in Production
+  const reworkQueue = maskedOrders.filter(
+    (o) => o.currentStage === 'PRODUCTION' && (o.qcResult === 'FAILED' || o.qualityStatus === 'REJECTED') && o.productionRequired && o.productionStatus !== 'COMPLETED'
+  );
+  const completedQueue = maskedOrders.filter(
+    (o) => o.productionRequired && (o.qualityTestingRequired ? o.qualityStatus === 'COMPLETED' : o.productionStatus === 'COMPLETED')
   );
 
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
       {/* Unified Top Banner */}
-      <View style={styles.banner}>
+      <View style={[styles.banner, isMobile && styles.bannerMobile]}>
         <View style={{ flex: 1 }}>
           <Text style={styles.bannerTitle}>Unified Production & Quality Testing Dashboard</Text>
           <Text style={styles.bannerSub}>
             Shop floor manufacturing, quality inspection verification, and ready-to-dispatch workflow management.
           </Text>
+        </View>
+        <View style={isMobile && { marginTop: 8, width: '100%' }}>
+          <ExportButton getData={getProductionExportPayload} buttonText="Export Data" />
         </View>
       </View>
 
@@ -109,7 +167,7 @@ export const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ isQCMo
           onPress={() => setActiveTab('PRODUCTION')}
         >
           <Text style={[styles.tabText, activeTab === 'PRODUCTION' && styles.tabTextActive]}>
-            ⚙️ Production & Shop Floor Queue ({productionQueue.length})
+            ⚙️ Production ({productionQueue.length})
           </Text>
         </TouchableOpacity>
 
@@ -118,7 +176,27 @@ export const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ isQCMo
           onPress={() => setActiveTab('QUALITY_TESTING')}
         >
           <Text style={[styles.tabText, activeTab === 'QUALITY_TESTING' && styles.tabTextActive]}>
-            🔍 Quality Testing & Inspection ({qcQueue.length})
+            🔍 Quality ({qcQueue.length})
+          </Text>
+        </TouchableOpacity>
+
+        {reworkQueue.length > 0 && (
+          <TouchableOpacity
+            style={[styles.tabBtn, activeTab === 'REWORK' && { backgroundColor: '#ef4444', borderColor: '#ef4444' }]}
+            onPress={() => setActiveTab('REWORK')}
+          >
+            <Text style={[styles.tabText, activeTab === 'REWORK' && styles.tabTextActive]}>
+              🔁 Rework ({reworkQueue.length})
+            </Text>
+          </TouchableOpacity>
+        )}
+
+        <TouchableOpacity
+          style={[styles.tabBtn, activeTab === 'COMPLETED' && styles.tabBtnActive]}
+          onPress={() => setActiveTab('COMPLETED')}
+        >
+          <Text style={[styles.tabText, activeTab === 'COMPLETED' && styles.tabTextActive]}>
+            ✓ Completed ({completedQueue.length})
           </Text>
         </TouchableOpacity>
       </View>
@@ -279,6 +357,100 @@ export const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ isQCMo
         </View>
       )}
 
+      {/* SECTION 3: REWORK QUEUE — Orders returned from QC failure */}
+      {(activeTab as string) === 'REWORK' && (
+        <View style={[styles.sectionCard, { borderColor: '#ef4444' }]}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: Spacing.md, gap: Spacing.sm }}>
+            <Text style={[styles.sectionTitle, { color: '#ef4444', flex: 1, marginBottom: 0 }]}>
+              🔁 QC Failed — Production Rework Queue
+            </Text>
+            <View style={{ backgroundColor: 'rgba(239, 68, 68, 0.15)', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, borderWidth: 1, borderColor: '#ef4444' }}>
+              <Text style={{ color: '#ef4444', fontSize: 11, fontWeight: '800' }}>{reworkQueue.length} ORDERS</Text>
+            </View>
+          </View>
+          {reworkQueue.length === 0 ? (
+            <Text style={styles.emptyText}>✅ No rework required. All orders are on track.</Text>
+          ) : (
+            reworkQueue.map((ord) => (
+              <View key={ord.id} style={[styles.orderCard, { borderLeftColor: '#ef4444', borderLeftWidth: 4 }]}>
+                <TouchableOpacity onPress={() => setSelectedOrder(ord)}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                    <Text style={{ color: Colors.textLight, fontWeight: '800', fontSize: 14 }}>{ord.orderNumber}</Text>
+                    <View style={{ backgroundColor: 'rgba(239, 68, 68, 0.15)', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, borderWidth: 1, borderColor: '#ef4444' }}>
+                      <Text style={{ color: '#ef4444', fontSize: 10, fontWeight: '800' }}>🔁 REWORK REQUIRED</Text>
+                    </View>
+                  </View>
+                  <Text style={{ color: Colors.textSubtle, fontSize: 12 }}>PO: {ord.poNumber} • Client: {ord.clientCode}</Text>
+                </TouchableOpacity>
+
+                <OrderQuantityTracker order={ord} style={{ marginTop: 8 }} />
+
+                <View style={{ marginTop: 8, backgroundColor: 'rgba(239, 68, 68, 0.07)', borderRadius: 8, padding: 10 }}>
+                  <Text style={{ color: '#ef4444', fontSize: 11, fontWeight: '800', marginBottom: 4 }}>⚠️ QC FAILURE DETAILS</Text>
+                  <Text style={{ color: Colors.textSubtle, fontSize: 12 }}>
+                    QC Result: <Text style={{ fontWeight: '700', color: '#ef4444' }}>FAILED</Text>
+                  </Text>
+                  <Text style={{ color: Colors.textSubtle, fontSize: 12 }}>
+                    QC Remarks: {ord.qcRemarks || 'Defects found during quality inspection. Rework required.'}
+                  </Text>
+                  {ord.qcFailedQuantity != null && ord.qcFailedQuantity > 0 && (
+                    <Text style={{ color: Colors.textSubtle, fontSize: 12, marginTop: 3 }}>
+                      Failed Qty: <Text style={{ fontWeight: '700', color: '#ef4444' }}>{ord.qcFailedQuantity} PCS</Text>
+                      {ord.qcPassedQuantity != null && ord.qcPassedQuantity > 0 && (
+                        <Text style={{ color: '#10b981' }}> | Passed: {ord.qcPassedQuantity} PCS (dispatch eligible)</Text>
+                      )}
+                    </Text>
+                  )}
+                </View>
+
+                <TouchableOpacity
+                  style={[styles.actionBtn, { backgroundColor: '#ef4444', marginTop: 8 }]}
+                  onPress={() => handleOpenProcessModal(ord, 'PRODUCTION', true)}
+                >
+                  <Text style={styles.actionBtnText}>🔧 Record Rework Progress</Text>
+                </TouchableOpacity>
+              </View>
+            ))
+          )}
+        </View>
+      )}
+
+      {/* SECTION 4: COMPLETED QUEUE */}
+      {activeTab === 'COMPLETED' && (
+        <View style={styles.sectionCard}>
+          <Text style={styles.sectionTitle}>Completed Orders</Text>
+
+          {completedQueue.length === 0 ? (
+            <Text style={styles.emptyText}>No completed orders yet.</Text>
+          ) : (
+            completedQueue.map((ord) => {
+              const badge = getComprehensiveBadge(ord);
+              return (
+                <View key={ord.id} style={[styles.orderCard, { borderLeftWidth: 4, borderLeftColor: badge.bg, opacity: 0.8 }]}>
+                  <View style={styles.cardHeader}>
+                    <TouchableOpacity onPress={() => setSelectedOrder(ord)}>
+                      <View style={styles.orderRefRow}>
+                        <Text style={styles.orderNum}>{ord.orderNumber}</Text>
+                        <View style={styles.codeBadge}>
+                          <Text style={styles.codeBadgeText}>Client Code: {ord.clientCode}</Text>
+                        </View>
+                      </View>
+                      <Text style={styles.poNumberText}>PO Ref: {ord.poNumber}</Text>
+                    </TouchableOpacity>
+
+                    <View style={[styles.statusBadge, { backgroundColor: badge.bg, borderWidth: 1, borderColor: badge.border }]}>
+                      <Text style={[styles.statusBadgeText, { color: badge.text }]}>{badge.label}</Text>
+                    </View>
+                  </View>
+
+                  <OrderQuantityTracker order={ord} style={{ marginTop: Spacing.xs }} />
+                </View>
+              );
+            })
+          )}
+        </View>
+      )}
+
       {/* Stage-Wise Quantity Process Modal */}
       <QuantityProcessModal
         visible={processModalVisible}
@@ -286,6 +458,7 @@ export const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ isQCMo
         stage={processStage}
         onClose={() => setProcessModalVisible(false)}
         onSubmit={handleProcessSubmit}
+        isRework={processIsRework}
       />
     </ScrollView>
   );
@@ -305,6 +478,12 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.lg,
     borderWidth: 1,
     borderColor: Colors.accentTeal,
+  },
+  bannerMobile: {
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    gap: Spacing.sm,
+    padding: Spacing.md,
   },
   bannerTitle: {
     color: Colors.textLight,

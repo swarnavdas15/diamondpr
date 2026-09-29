@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, Modal, TouchableOpacity, TextInput, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, Modal, TouchableOpacity, TextInput, StyleSheet, ScrollView, useWindowDimensions } from 'react-native';
 import { useERP } from '../context/ERPContext';
 import { Vendor, VendorStatus } from '../types';
 import { Colors, Spacing, Radius, Shadows } from '../theme';
@@ -15,6 +15,8 @@ export const CreateVendorModal: React.FC<CreateVendorModalProps> = ({
   onClose,
   vendorToEdit = null,
 }) => {
+  const { width } = useWindowDimensions();
+  const isMobile = width < 768;
   const { createVendor, updateVendor } = useERP();
 
   // Basic Info
@@ -51,8 +53,40 @@ export const CreateVendorModal: React.FC<CreateVendorModalProps> = ({
   const [notes, setNotes] = useState('');
   const [error, setError] = useState('');
 
+  const resetForm = () => {
+    setVendorCode('');
+    setVendorName('');
+    setCompanyName('');
+    setGstNumber('');
+    setPanNumber('');
+
+    setContactPerson('');
+    setMobileNumber('');
+    setAlternateMobile('');
+    setEmail('');
+    setWebsite('');
+
+    setAddressLine1('');
+    setAddressLine2('');
+    setCity('');
+    setState('');
+    setPinCode('');
+    setCountry('India');
+
+    setMaterialSupplied('');
+    setVendorCategory('');
+    setPaymentTerms('Net 30');
+    setLeadTime('7 Days');
+    setStatus('ACTIVE');
+
+    setRemarks('');
+    setNotes('');
+    setError('');
+  };
+
   useEffect(() => {
     if (vendorToEdit) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setVendorCode(vendorToEdit.vendorCode || '');
       setVendorName(vendorToEdit.vendorName || '');
       setCompanyName(vendorToEdit.companyName || '');
@@ -84,37 +118,6 @@ export const CreateVendorModal: React.FC<CreateVendorModalProps> = ({
       resetForm();
     }
   }, [vendorToEdit, visible]);
-
-  const resetForm = () => {
-    setVendorCode('');
-    setVendorName('');
-    setCompanyName('');
-    setGstNumber('');
-    setPanNumber('');
-
-    setContactPerson('');
-    setMobileNumber('');
-    setAlternateMobile('');
-    setEmail('');
-    setWebsite('');
-
-    setAddressLine1('');
-    setAddressLine2('');
-    setCity('');
-    setState('');
-    setPinCode('');
-    setCountry('India');
-
-    setMaterialSupplied('');
-    setVendorCategory('');
-    setPaymentTerms('Net 30');
-    setLeadTime('7 Days');
-    setStatus('ACTIVE');
-
-    setRemarks('');
-    setNotes('');
-    setError('');
-  };
 
   const handleSubmit = () => {
     setError('');
@@ -216,8 +219,8 @@ export const CreateVendorModal: React.FC<CreateVendorModalProps> = ({
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={handleClose}>
-      <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={handleClose}>
-        <TouchableOpacity activeOpacity={1} style={styles.card} onPress={(e) => e.stopPropagation()}>
+      <TouchableOpacity style={[styles.backdrop, isMobile && { padding: 10 }]} activeOpacity={1} onPress={handleClose}>
+        <TouchableOpacity activeOpacity={1} style={[styles.card, isMobile && { padding: 14, maxHeight: '95%' }]} onPress={(e) => e.stopPropagation()}>
           <View style={styles.header}>
             <Text style={styles.title}>{vendorToEdit ? 'Edit Vendor Details' : 'Register New Supplier Vendor'}</Text>
             <TouchableOpacity onPress={handleClose}>

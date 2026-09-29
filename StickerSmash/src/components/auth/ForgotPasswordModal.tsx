@@ -227,6 +227,7 @@ const styles = StyleSheet.create({
     padding: Spacing.xl,
   },
   modalCard: {
+    maxHeight: '90%',
     width: '100%',
     maxWidth: 480,
     backgroundColor: Colors.cardBg,

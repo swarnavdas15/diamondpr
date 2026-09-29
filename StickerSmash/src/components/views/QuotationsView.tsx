@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, TextInput, Modal, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, TextInput, Modal, StyleSheet, useWindowDimensions } from 'react-native';
 import { useERP } from '../../context/ERPContext';
 import { useAuth } from '../../context/AuthContext';
 import { Quotation, QuotationStatus, LostReason, FollowUpStatus } from '../../types';
@@ -8,7 +8,8 @@ import { SalesKPIDetailsModal } from '../dashboards/SalesKPIDetailsModal';
 import { QuotationSentModal } from '../quotations/QuotationSentModal';
 import { QuotationFollowUpModal } from '../quotations/QuotationFollowUpModal';
 import { QuotationConversionModal, QuotationConversionData } from '../quotations/QuotationConversionModal';
-import { CreateOrderModal, InitialOrderData } from '../CreateOrderModal';
+import { ExportButton } from '../ui/ExportButton';
+import { ExportDataPayload } from '../../utils/exportUtils';
 
 interface QuotationsViewProps {
   onOpenCreateQuotation?: () => void;
@@ -46,9 +47,26 @@ export const QuotationsView: React.FC<QuotationsViewProps> = ({ onOpenCreateQuot
   } = useERP();
   const { currentUser } = useAuth();
   const isSuperAdmin = currentUser?.role === 'SUPER_ADMIN';
+  const { width } = useWindowDimensions();
+  const isMobile = width < 768;
+
+  const [expandedQuotations, setExpandedQuotations] = useState<Record<string, boolean>>({});
+
+  const toggleExpandQuotation = (id: string) => {
+    setExpandedQuotations((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
 
   // Filters State
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState('');
+  
+  React.useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedQuery(searchQuery);
+    }, 300);
+    return () => clearTimeout(handler);
+  }, [searchQuery]);
+
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
 
   // Modals State
@@ -64,8 +82,7 @@ export const QuotationsView: React.FC<QuotationsViewProps> = ({ onOpenCreateQuot
   const [followUpModalQuotation, setFollowUpModalQuotation] = useState<Quotation | null>(null);
   const [followUpTargetStatus, setFollowUpTargetStatus] = useState<'UNDER_DISCUSSION' | 'NEGOTIATION'>('UNDER_DISCUSSION');
   const [conversionModalQuotation, setConversionModalQuotation] = useState<Quotation | null>(null);
-  const [createOrderModalVisible, setCreateOrderModalVisible] = useState(false);
-  const [initialOrderData, setInitialOrderData] = useState<InitialOrderData | null>(null);
+  const [conversionError, setConversionError] = useState<string>('');
   const [competitorName, setCompetitorName] = useState('');
 
   const handleOpenSalesModal = (tab: 'TOTAL' | 'CONVERTED' | 'LOST') => {
@@ -120,8 +137,8 @@ export const QuotationsView: React.FC<QuotationsViewProps> = ({ onOpenCreateQuot
     if (statusFilter !== 'ALL' && q.status !== statusFilter) {
       return false;
     }
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase().trim();
+    if (debouncedQuery.trim()) {
+      const query = debouncedQuery.toLowerCase().trim();
       return (
         q.quotationNumber.toLowerCase().includes(query) ||
         q.clientCode.toLowerCase().includes(query) ||
@@ -220,6 +237,7 @@ export const QuotationsView: React.FC<QuotationsViewProps> = ({ onOpenCreateQuot
       setFollowUpTargetStatus('NEGOTIATION');
       setFollowUpModalQuotation(q);
     } else if (newSt === 'APPROVED') {
+      setConversionError('');
       setConversionModalQuotation(q);
     } else {
       updateQuotation(q.id, { status: newSt });
@@ -266,107 +284,140 @@ export const QuotationsView: React.FC<QuotationsViewProps> = ({ onOpenCreateQuot
   const handleSaveConversion = (data: QuotationConversionData) => {
     if (!conversionModalQuotation) return;
     const q = conversionModalQuotation;
-    updateQuotation(q.id, {
-      status: 'APPROVED',
-      isLocked: true,
-      quotationAmount: data.approvedAmount,
-      remarks: data.finalRemarks,
-    });
 
-    const initData: InitialOrderData = {
-      clientId: q.clientId,
-      poNumber: `PO-${q.quotationNumber}`,
-      budget: data.approvedAmount,
-      technicalRequirements: q.remarks || data.finalRemarks,
-      materialRequirements: data.finalRemarks,
-      requiredQuantity: 50,
-      purchaseRequired: data.purchaseRequired,
-      productionRequired: data.productionRequired,
-      qualityTestingRequired: data.qualityTestingRequired,
-      dispatchRequired: data.dispatchRequired,
-      quotationNumber: q.quotationNumber,
-    };
+    try {
+      // Directly call convertQuotationToOrder which properly:
+      // 1. Sets quotation status to FULLY_CONVERTED or PARTIALLY_CONVERTED
+      // 2. Stores convertedOrderValue, lostValue, convertedOrderId, convertedOrderNumber
+      // 3. Creates the linked Order with correct pipeline flags
+      const newOrder = convertQuotationToOrder(q.id, {
+        convertedOrderValue: data.approvedAmount,
+        poNumber: `PO-${q.quotationNumber}`,
+        technicalRequirements: q.remarks || data.finalRemarks,
+        materialRequirements: data.finalRemarks || q.remarks || 'As per quotation specifications',
+        requiredQuantity: data.requiredQuantity,
+        purchaseRequired: data.purchaseRequired,
+        productionRequired: data.productionRequired,
+        qualityTestingRequired: data.qualityTestingRequired,
+        dispatchRequired: data.dispatchRequired,
+        customStages: data.customStages,
+      });
 
-    setInitialOrderData(initData);
-    setConversionModalQuotation(null);
-    setCreateOrderModalVisible(true);
+      // If partial conversion, also log the lost reason
+      if (data.lostReason) {
+        updateQuotation(q.id, {
+          lostRemarks: data.lostRemarks || `Partial conversion — approved ${data.approvedAmount} of ${q.quotationAmount}`,
+          competitorName: undefined,
+        });
+      }
+
+      // Navigate to the new order
+      if (newOrder) {
+        setConversionModalQuotation(null);
+        setSelectedOrder(newOrder);
+      }
+    } catch (err: any) {
+      console.warn('Quotation conversion error:', err?.message);
+      setConversionError(err?.message || 'Failed to convert quotation.');
+    }
   };
 
   const handleUnlockQuotation = (q: Quotation) => {
     updateQuotation(q.id, { isLocked: false, status: 'DRAFT' });
   };
 
+  const getQuotationsExportPayload = (): ExportDataPayload => {
+    return {
+      title: 'Quotations Management Report',
+      filename: 'Quotations_Report',
+      headers: ['Quotation No', 'Company Name', 'Contact Person', 'Mobile', 'Amount (₹)', 'Sales Exec', 'Status', 'Follow-up Date'],
+      rows: filteredQuotations.map((q) => [
+        q.quotationNumber,
+        q.companyName,
+        q.contactPerson,
+        q.mobileNumber,
+        q.quotationAmount,
+        q.salesExecutive,
+        q.status,
+        q.followUpDate || 'N/A',
+      ]),
+    };
+  };
+
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
       {/* Top Banner */}
-      <View style={styles.topBanner}>
-        <View style={{ flex: 1, paddingRight: Spacing.md }}>
+      <View style={[styles.topBanner, isMobile && styles.topBannerMobile]}>
+        <View style={{ flex: 1, paddingRight: isMobile ? 0 : Spacing.md }}>
           <Text style={styles.title}>Sales Quotation Management</Text>
           <Text style={styles.subTitle}>
             Inquiry tracking, quotation generation, follow-ups, order conversions, and lost business analytics.
           </Text>
         </View>
-        {onOpenCreateQuotation && (
-          <TouchableOpacity style={styles.btnOrange} onPress={onOpenCreateQuotation}>
-            <Text style={styles.btnText}>+ Create Quotation</Text>
-          </TouchableOpacity>
-        )}
+        <View style={[{ flexDirection: 'row', alignItems: 'center', gap: 10 }, isMobile && { flexWrap: 'wrap', width: '100%', marginTop: 8 }]}>
+          <ExportButton getData={getQuotationsExportPayload} buttonText="Export Quotations" />
+          {onOpenCreateQuotation && (
+            <TouchableOpacity style={styles.btnOrange} onPress={onOpenCreateQuotation}>
+              <Text style={styles.btnText}>+ Create Quotation</Text>
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
       {/* Analytics KPI Summary Grid */}
-      <View style={styles.kpiGrid}>
+      <View style={[styles.kpiGrid, isMobile && { flexWrap: 'wrap', gap: Spacing.xs }]}>
         {/* Total Quotations */}
         <TouchableOpacity
-          style={styles.kpiCard}
+          style={[styles.kpiCard, isMobile && { flex: undefined, width: '48%', padding: Spacing.md }]}
           activeOpacity={0.7}
           onPress={() => handleOpenSalesModal('TOTAL')}
         >
           <Text style={styles.kpiVal}>{totalQuotations}</Text>
           <Text style={styles.kpiValSub}>{formatCurrency(totalQuotationValue)}</Text>
-          <Text style={styles.kpiLabel}>Total Quotations Pipeline ↗</Text>
+          <Text style={styles.kpiLabel}>Total Pipeline ↗</Text>
           <View style={styles.kpiBadge}>
-            <Text style={styles.kpiBadgeText}>{negotiationCount} Under Negotiation</Text>
+            <Text style={styles.kpiBadgeText}>{negotiationCount} Negotiation</Text>
           </View>
         </TouchableOpacity>
 
         {/* Converted Orders */}
         <TouchableOpacity
-          style={styles.kpiCard}
+          style={[styles.kpiCard, isMobile && { flex: undefined, width: '48%', padding: Spacing.md }]}
           activeOpacity={0.7}
           onPress={() => handleOpenSalesModal('CONVERTED')}
         >
           <Text style={[styles.kpiVal, { color: Colors.successBright }]}>{convertedCount}</Text>
           <Text style={[styles.kpiValSub, { color: Colors.successBright }]}>{formatCurrency(convertedValue)}</Text>
-          <Text style={styles.kpiLabel}>Converted to Sales Orders ↗</Text>
+          <Text style={styles.kpiLabel}>Converted ↗</Text>
           <View style={[styles.kpiBadge, { backgroundColor: 'rgba(16, 185, 129, 0.15)', borderColor: Colors.successBright }]}>
-            <Text style={[styles.kpiBadgeText, { color: Colors.successBright }]}>{conversionRate}% Conversion Rate</Text>
+            <Text style={[styles.kpiBadgeText, { color: Colors.successBright }]}>{conversionRate}% Rate</Text>
           </View>
         </TouchableOpacity>
 
         {/* Lost Business */}
         <TouchableOpacity
-          style={styles.kpiCard}
+          style={[styles.kpiCard, isMobile && { flex: undefined, width: '48%', padding: Spacing.md }]}
           activeOpacity={0.7}
           onPress={() => handleOpenSalesModal('LOST')}
         >
           <Text style={[styles.kpiVal, { color: Colors.industrialOrange }]}>{lostCount}</Text>
           <Text style={[styles.kpiValSub, { color: Colors.industrialOrange }]}>{formatCurrency(lostBusinessValue)}</Text>
-          <Text style={styles.kpiLabel}>Lost Business Value ↗</Text>
+          <Text style={styles.kpiLabel}>Lost Business ↗</Text>
           <View style={[styles.kpiBadge, { backgroundColor: 'rgba(179, 75, 32, 0.15)', borderColor: Colors.industrialOrange }]}>
-            <Text style={[styles.kpiBadgeText, { color: Colors.industrialOrange }]}>Lost Tracking Recorded</Text>
+            <Text style={[styles.kpiBadgeText, { color: Colors.industrialOrange }]}>Lost Recorded</Text>
           </View>
         </TouchableOpacity>
 
         {/* Pending Follow-Ups */}
         <TouchableOpacity
-          style={styles.kpiCard}
+          style={[styles.kpiCard, isMobile && { flex: undefined, width: '48%', padding: Spacing.md }]}
           activeOpacity={0.7}
           onPress={() => handleOpenSalesModal('TOTAL')}
         >
           <Text style={[styles.kpiVal, { color: Colors.accentTeal }]}>{pendingFollowUpCount}</Text>
-          <Text style={styles.kpiLabel}>Active Follow-Up Reminders ↗</Text>
+          <Text style={styles.kpiLabel}>Follow-Ups ↗</Text>
           <View style={[styles.kpiBadge, { backgroundColor: 'rgba(56, 189, 248, 0.15)', borderColor: Colors.accentTeal }]}>
-            <Text style={[styles.kpiBadgeText, { color: Colors.accentTeal }]}>Requires Action</Text>
+            <Text style={[styles.kpiBadgeText, { color: Colors.accentTeal }]}>Action Req.</Text>
           </View>
         </TouchableOpacity>
       </View>
@@ -376,7 +427,7 @@ export const QuotationsView: React.FC<QuotationsViewProps> = ({ onOpenCreateQuot
         <View style={styles.filterRow}>
           <TextInput
             style={styles.searchInput}
-            placeholder="🔍 Search quotation #, client code, company name, executive, inquiry ref..."
+            placeholder="🔍 Search quotation #, client code, company name..."
             placeholderTextColor="#94a3b8"
             value={searchQuery}
             onChangeText={setSearchQuery}
@@ -403,117 +454,183 @@ export const QuotationsView: React.FC<QuotationsViewProps> = ({ onOpenCreateQuot
           </View>
         </View>
 
-        {/* Table */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: Spacing.md }}>
-          <View style={styles.table}>
-            {/* Table Header */}
-            <View style={styles.thRow}>
-              <Text style={[styles.th, { width: 120 }]}>Quotation #</Text>
-              <Text style={[styles.th, { width: 95 }]}>Date</Text>
-              <Text style={[styles.th, { width: 95 }]}>Client Code</Text>
-              <Text style={[styles.th, { width: 180 }]}>Client / Company Name</Text>
-              <Text style={[styles.th, { width: 130 }]}>Quotation Amount</Text>
-              <Text style={[styles.th, { width: 130 }]}>Sales Executive</Text>
-              <Text style={[styles.th, { width: 130 }]}>Status</Text>
-              <Text style={[styles.th, { width: 100 }]}>Follow-Up</Text>
-              <Text style={[styles.th, { width: 270 }]}>Actions</Text>
-            </View>
-
-            {/* Body */}
+        {/* Table / Mobile Cards */}
+        {isMobile ? (
+          <View style={{ gap: Spacing.xs, marginTop: Spacing.md }}>
             {filteredQuotations.length === 0 ? (
-              <View style={styles.emptyContainer}>
-                <Text style={styles.emptyText}>No quotations found matching selected filter.</Text>
-              </View>
+              <Text style={styles.emptyText}>No quotations found matching selected filter.</Text>
             ) : (
               filteredQuotations.map((q) => {
                 const stStyle = STATUS_COLORS[q.status] || STATUS_COLORS.SENT;
+                const isExpanded = !!expandedQuotations[q.id];
 
                 return (
-                  <View key={q.id} style={styles.trRow}>
-                    <Text style={[styles.tdHighlight, { width: 120 }]}>{q.quotationNumber}</Text>
-                    <Text style={[styles.tdSmall, { width: 95 }]}>{q.quotationDate}</Text>
-                    <Text style={[styles.tdBold, { width: 95 }]}>{q.clientCode}</Text>
-
-                    <View style={{ width: 180 }}>
-                      <Text style={styles.tdBold} numberOfLines={1}>{q.companyName}</Text>
-                      <Text style={styles.tdSub} numberOfLines={1}>{q.contactPerson} ({q.mobileNumber})</Text>
-                    </View>
-
-                    <View style={{ width: 130 }}>
-                      <Text style={[styles.tdAmount]}>{formatCurrency(q.quotationAmount)}</Text>
-                      {q.convertedOrderValue ? (
-                        <Text style={styles.convertedText}>Ord: {formatCurrency(q.convertedOrderValue)}</Text>
-                      ) : null}
-                    </View>
-
-                    <Text style={[styles.td, { width: 130 }]} numberOfLines={1}>{q.salesExecutive}</Text>
-
-                    {/* Status Badge */}
-                    <View style={{ width: 130 }}>
-                      {q.isLocked || q.status === 'APPROVED' || q.status === 'FULLY_CONVERTED' ? (
-                        <View style={[styles.statusBadge, { backgroundColor: 'rgba(34, 197, 94, 0.15)', borderColor: '#22c55e' }]}>
-                          <Text style={[styles.statusBadgeText, { color: '#22c55e' }]}>
-                            {q.status.replace(/_/g, ' ')} 🔒
-                          </Text>
+                  <View key={q.id} style={styles.mobileCard}>
+                    <TouchableOpacity
+                      style={styles.mobileCardHeader}
+                      onPress={() => toggleExpandQuotation(q.id)}
+                      activeOpacity={0.7}
+                    >
+                      <View style={{ flex: 1 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                          <Text style={styles.mobileCardTitle}>{q.quotationNumber}</Text>
+                          <Text style={styles.mobileCardSubBadge}>{q.clientCode}</Text>
                         </View>
-                      ) : (
-                        <TouchableOpacity onPress={() => setStatusQuotation(q)}>
-                          <View style={[styles.statusBadge, { backgroundColor: stStyle.bg, borderColor: stStyle.border }]}>
-                            <Text style={[styles.statusBadgeText, { color: stStyle.text }]}>
-                              {q.status.replace(/_/g, ' ')} ▾
-                            </Text>
-                          </View>
-                        </TouchableOpacity>
-                      )}
-                      {q.sentVia ? (
-                        <Text style={{ fontSize: 10, color: Colors.accentTeal, fontWeight: '700', marginTop: 2 }}>
-                          Sent via {q.sentVia}
+                        <Text style={styles.mobileCardSubtitle}>{q.companyName}</Text>
+                      </View>
+                      <View style={{ alignItems: 'flex-end', gap: 4 }}>
+                        <Text style={{ fontSize: 13, color: Colors.accentTeal, fontWeight: '800' }}>
+                          {formatCurrency(q.quotationAmount)}
                         </Text>
-                      ) : null}
-                    </View>
-
-                    {/* Follow-Up Date */}
-                    <Text style={[styles.tdSmall, { width: 100 }]}>{q.followUpDate || 'None'}</Text>
-
-                    {/* Actions Column (Cleaned Up: View, Edit/Locked, Mark Lost, Unlock) */}
-                    <View style={{ width: 270, flexDirection: 'row', gap: 4, alignItems: 'center', flexWrap: 'wrap' }}>
-                      <TouchableOpacity style={styles.actBtnView} onPress={() => setViewQuotation(q)}>
-                        <Text style={styles.actBtnText}>View</Text>
-                      </TouchableOpacity>
-
-                      {(!q.isLocked && q.status !== 'APPROVED' && q.status !== 'FULLY_CONVERTED') || isSuperAdmin ? (
-                        <TouchableOpacity style={styles.actBtnEdit} onPress={() => handleOpenEdit(q)}>
-                          <Text style={styles.actBtnText}>Edit</Text>
-                        </TouchableOpacity>
-                      ) : (
-                        <View style={{ backgroundColor: 'rgba(148, 163, 184, 0.1)', paddingHorizontal: 6, paddingVertical: 3, borderRadius: Radius.xs, borderWidth: 1, borderColor: Colors.borderDark }}>
-                          <Text style={{ color: Colors.textMuted, fontSize: 10, fontWeight: '700' }}>
-                            Converted To Order - Locked
+                        <View style={[styles.statusBadge, { backgroundColor: stStyle.bg, borderColor: stStyle.border }]}>
+                          <Text style={[styles.statusBadgeText, { color: stStyle.text, fontSize: 9 }]}>
+                            {q.status.replace(/_/g, ' ')}
                           </Text>
                         </View>
-                      )}
+                      </View>
+                    </TouchableOpacity>
 
-                      {q.status !== 'LOST' && q.status !== 'FULLY_CONVERTED' && !q.isLocked && (
-                        <TouchableOpacity style={styles.actBtnLost} onPress={() => handleOpenLost(q)}>
-                          <Text style={styles.actBtnTextLost}>Mark Lost</Text>
-                        </TouchableOpacity>
-                      )}
+                    {isExpanded && (
+                      <View style={styles.mobileCardBody}>
+                        <Text style={styles.mobileCardDetail}>Contact: <Text style={styles.mobileCardVal}>{q.contactPerson} ({q.mobileNumber})</Text></Text>
+                        <Text style={styles.mobileCardDetail}>Sales Exec: <Text style={styles.mobileCardVal}>{q.salesExecutive}</Text></Text>
+                        <Text style={styles.mobileCardDetail}>Follow-Up: <Text style={styles.mobileCardVal}>{q.followUpDate || 'None'}</Text></Text>
+                        <Text style={styles.mobileCardDetail}>Date: <Text style={styles.mobileCardVal}>{q.quotationDate}</Text></Text>
 
-                      {isSuperAdmin && (q.isLocked || q.status === 'APPROVED' || q.status === 'FULLY_CONVERTED') && (
-                        <TouchableOpacity
-                          style={{ backgroundColor: 'rgba(245, 158, 11, 0.15)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: Radius.xs, borderWidth: 1, borderColor: '#f59e0b' }}
-                          onPress={() => handleUnlockQuotation(q)}
-                        >
-                          <Text style={{ color: '#f59e0b', fontSize: 10, fontWeight: '800' }}>🔓 Unlock</Text>
-                        </TouchableOpacity>
-                      )}
-                    </View>
+                        <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap', marginTop: Spacing.sm }}>
+                          <TouchableOpacity style={styles.actBtnView} onPress={() => setViewQuotation(q)}>
+                            <Text style={styles.actBtnText}>View</Text>
+                          </TouchableOpacity>
+                          {(!q.isLocked && q.status !== 'APPROVED' && q.status !== 'FULLY_CONVERTED') || isSuperAdmin ? (
+                            <TouchableOpacity style={styles.actBtnEdit} onPress={() => handleOpenEdit(q)}>
+                              <Text style={styles.actBtnText}>Edit</Text>
+                            </TouchableOpacity>
+                          ) : null}
+                          {q.status !== 'LOST' && q.status !== 'FULLY_CONVERTED' && !q.isLocked && (
+                            <TouchableOpacity style={styles.actBtnLost} onPress={() => handleOpenLost(q)}>
+                              <Text style={styles.actBtnTextLost}>Mark Lost</Text>
+                            </TouchableOpacity>
+                          )}
+                        </View>
+                      </View>
+                    )}
                   </View>
                 );
               })
             )}
           </View>
-        </ScrollView>
+        ) : (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: Spacing.md }}>
+            <View style={styles.table}>
+              {/* Table Header */}
+              <View style={styles.thRow}>
+                <Text style={[styles.th, { width: 120 }]}>Quotation #</Text>
+                <Text style={[styles.th, { width: 95 }]}>Date</Text>
+                <Text style={[styles.th, { width: 95 }]}>Client Code</Text>
+                <Text style={[styles.th, { width: 180 }]}>Client / Company Name</Text>
+                <Text style={[styles.th, { width: 130 }]}>Quotation Amount</Text>
+                <Text style={[styles.th, { width: 130 }]}>Sales Executive</Text>
+                <Text style={[styles.th, { width: 130 }]}>Status</Text>
+                <Text style={[styles.th, { width: 100 }]}>Follow-Up</Text>
+                <Text style={[styles.th, { width: 270 }]}>Actions</Text>
+              </View>
+
+              {/* Body */}
+              {filteredQuotations.length === 0 ? (
+                <View style={styles.emptyContainer}>
+                  <Text style={styles.emptyText}>No quotations found matching selected filter.</Text>
+                </View>
+              ) : (
+                filteredQuotations.map((q) => {
+                  const stStyle = STATUS_COLORS[q.status] || STATUS_COLORS.SENT;
+
+                  return (
+                    <View key={q.id} style={styles.trRow}>
+                      <Text style={[styles.tdHighlight, { width: 120 }]}>{q.quotationNumber}</Text>
+                      <Text style={[styles.tdSmall, { width: 95 }]}>{q.quotationDate}</Text>
+                      <Text style={[styles.tdBold, { width: 95 }]}>{q.clientCode}</Text>
+
+                      <View style={{ width: 180 }}>
+                        <Text style={styles.tdBold} numberOfLines={1}>{q.companyName}</Text>
+                        <Text style={styles.tdSub} numberOfLines={1}>{q.contactPerson} ({q.mobileNumber})</Text>
+                      </View>
+
+                      <View style={{ width: 130 }}>
+                        <Text style={[styles.tdAmount]}>{formatCurrency(q.quotationAmount)}</Text>
+                        {q.convertedOrderValue ? (
+                          <Text style={styles.convertedText}>Ord: {formatCurrency(q.convertedOrderValue)}</Text>
+                        ) : null}
+                      </View>
+
+                      <Text style={[styles.td, { width: 130 }]} numberOfLines={1}>{q.salesExecutive}</Text>
+
+                      {/* Status Badge */}
+                      <View style={{ width: 130 }}>
+                        {q.isLocked || q.status === 'APPROVED' || q.status === 'FULLY_CONVERTED' ? (
+                          <View style={[styles.statusBadge, { backgroundColor: 'rgba(34, 197, 94, 0.15)', borderColor: '#22c55e' }]}>
+                            <Text style={[styles.statusBadgeText, { color: '#22c55e' }]}>
+                              {q.status.replace(/_/g, ' ')} 🔒
+                            </Text>
+                          </View>
+                        ) : (
+                          <TouchableOpacity onPress={() => setStatusQuotation(q)}>
+                            <View style={[styles.statusBadge, { backgroundColor: stStyle.bg, borderColor: stStyle.border }]}>
+                              <Text style={[styles.statusBadgeText, { color: stStyle.text }]}>
+                                {q.status.replace(/_/g, ' ')} ▾
+                              </Text>
+                            </View>
+                          </TouchableOpacity>
+                        )}
+                        {q.sentVia ? (
+                          <Text style={{ fontSize: 10, color: Colors.accentTeal, fontWeight: '700', marginTop: 2 }}>
+                            Sent via {q.sentVia}
+                          </Text>
+                        ) : null}
+                      </View>
+
+                      {/* Follow-Up Date */}
+                      <Text style={[styles.tdSmall, { width: 100 }]}>{q.followUpDate || 'None'}</Text>
+
+                      {/* Actions Column (Cleaned Up: View, Edit/Locked, Mark Lost, Unlock) */}
+                      <View style={{ width: 270, flexDirection: 'row', gap: 4, alignItems: 'center', flexWrap: 'wrap' }}>
+                        <TouchableOpacity style={styles.actBtnView} onPress={() => setViewQuotation(q)}>
+                          <Text style={styles.actBtnText}>View</Text>
+                        </TouchableOpacity>
+
+                        {(!q.isLocked && q.status !== 'APPROVED' && q.status !== 'FULLY_CONVERTED') || isSuperAdmin ? (
+                          <TouchableOpacity style={styles.actBtnEdit} onPress={() => handleOpenEdit(q)}>
+                            <Text style={styles.actBtnText}>Edit</Text>
+                          </TouchableOpacity>
+                        ) : (
+                          <View style={{ backgroundColor: 'rgba(148, 163, 184, 0.1)', paddingHorizontal: 6, paddingVertical: 3, borderRadius: Radius.xs, borderWidth: 1, borderColor: Colors.borderDark }}>
+                            <Text style={{ color: Colors.textMuted, fontSize: 10, fontWeight: '700' }}>
+                              Converted To Order - Locked
+                            </Text>
+                          </View>
+                        )}
+
+                        {q.status !== 'LOST' && q.status !== 'FULLY_CONVERTED' && !q.isLocked && (
+                          <TouchableOpacity style={styles.actBtnLost} onPress={() => handleOpenLost(q)}>
+                            <Text style={styles.actBtnTextLost}>Mark Lost</Text>
+                          </TouchableOpacity>
+                        )}
+
+                        {isSuperAdmin && (q.isLocked || q.status === 'APPROVED' || q.status === 'FULLY_CONVERTED') && (
+                          <TouchableOpacity
+                            style={{ backgroundColor: 'rgba(245, 158, 11, 0.15)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: Radius.xs, borderWidth: 1, borderColor: '#f59e0b' }}
+                            onPress={() => handleUnlockQuotation(q)}
+                          >
+                            <Text style={{ color: '#f59e0b', fontSize: 10, fontWeight: '800' }}>🔓 Unlock</Text>
+                          </TouchableOpacity>
+                        )}
+                      </View>
+                    </View>
+                  );
+                })
+              )}
+            </View>
+          </ScrollView>
+        )}
       </View>
 
       {/* MODAL 1: VIEW QUOTATION DETAILS */}
@@ -600,7 +717,7 @@ export const QuotationsView: React.FC<QuotationsViewProps> = ({ onOpenCreateQuot
                         <Text style={styles.fupDateText}>📅 Date: {f.followUpDate} ({f.status})</Text>
                         <Text style={styles.fupByText}>by {f.createdByName}</Text>
                       </View>
-                      <Text style={styles.fupNotesText}>"{f.notes}"</Text>
+                      <Text style={styles.fupNotesText}>&quot;{f.notes}&quot;</Text>
                     </View>
                   ))
                 ) : (
@@ -777,15 +894,7 @@ export const QuotationsView: React.FC<QuotationsViewProps> = ({ onOpenCreateQuot
         quotation={conversionModalQuotation}
         onClose={() => setConversionModalQuotation(null)}
         onSubmitConversion={handleSaveConversion}
-      />
-
-      <CreateOrderModal
-        visible={createOrderModalVisible}
-        onClose={() => {
-          setCreateOrderModalVisible(false);
-          setInitialOrderData(null);
-        }}
-        initialData={initialOrderData}
+        externalError={conversionError}
       />
 
       {/* Sales KPI Details Modal */}
@@ -814,6 +923,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.borderDark,
     ...Shadows.sm,
+  },
+  topBannerMobile: {
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    gap: Spacing.sm,
+    padding: Spacing.md,
   },
   title: {
     color: Colors.textLight,
@@ -1087,6 +1202,7 @@ const styles = StyleSheet.create({
     padding: Spacing.xl,
   },
   modalCard: {
+    maxHeight: '90%',
     width: '100%',
     maxWidth: 560,
     backgroundColor: Colors.cardBg,
@@ -1342,6 +1458,55 @@ const styles = StyleSheet.create({
   successText: {
     color: Colors.successBright,
     fontSize: 12,
+    fontWeight: '700',
+  },
+  mobileCard: {
+    backgroundColor: Colors.cardBg,
+    borderRadius: Radius.lg,
+    borderWidth: 1,
+    borderColor: Colors.borderDark,
+    overflow: 'hidden',
+    ...Shadows.sm,
+  },
+  mobileCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: Spacing.md,
+    backgroundColor: Colors.cardBg,
+  },
+  mobileCardTitle: {
+    color: Colors.accentTeal,
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  mobileCardSubBadge: {
+    color: Colors.textLight,
+    fontSize: 11,
+    fontWeight: '700',
+    backgroundColor: Colors.inputBg,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: Radius.xs,
+  },
+  mobileCardSubtitle: {
+    color: Colors.textMuted,
+    fontSize: 12,
+    marginTop: 2,
+  },
+  mobileCardBody: {
+    padding: Spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: Colors.borderDark,
+    backgroundColor: Colors.inputBg,
+  },
+  mobileCardDetail: {
+    color: Colors.textMuted,
+    fontSize: 12,
+    marginBottom: 4,
+  },
+  mobileCardVal: {
+    color: Colors.textLight,
     fontWeight: '700',
   },
 });

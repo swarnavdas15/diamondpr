@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, useWindowDimensions } from 'react-native';
 import { CompanyContact } from '../../types';
 import { OrgNode } from './OrgNode';
 import { Colors, Spacing, Radius, Shadows } from '../../theme';
@@ -13,6 +13,8 @@ interface OrgChartProps {
 export const OrgChart: React.FC<OrgChartProps> = ({ contacts, onSelectNode, selectedContactId }) => {
   const [zoomLevel, setZoomLevel] = useState<number>(1);
   const [collapsedNodes, setCollapsedNodes] = useState<Record<string, boolean>>({});
+  const { width } = useWindowDimensions();
+  const isMobile = width < 768;
 
   const handleZoomIn = () => {
     setZoomLevel((prev) => Math.min(prev + 0.15, 1.6));
@@ -99,7 +101,7 @@ export const OrgChart: React.FC<OrgChartProps> = ({ contacts, onSelectNode, sele
         <Text style={styles.emptyIcon}>🌳</Text>
         <Text style={styles.emptyTitle}>No Company Contacts Registered</Text>
         <Text style={styles.emptySub}>
-          Click "+ Add Contact Person" to build the organization hierarchy tree.
+          Click &quot;+ Add Contact Person&quot; to build the organization hierarchy tree.
         </Text>
       </View>
     );
@@ -108,13 +110,13 @@ export const OrgChart: React.FC<OrgChartProps> = ({ contacts, onSelectNode, sele
   return (
     <View style={styles.container}>
       {/* Interactive Controls Toolbar */}
-      <View style={styles.toolbar}>
+      <View style={[styles.toolbar, isMobile && styles.toolbarMobile]}>
         <View style={styles.toolbarLeft}>
           <Text style={styles.toolbarTitle}>ORGANIZATION HIERARCHY TREE</Text>
           <Text style={styles.toolbarSub}>{contacts.length} Members • Top-Down Structure</Text>
         </View>
 
-        <View style={styles.toolbarRight}>
+        <View style={[styles.toolbarRight, isMobile && styles.toolbarRightMobile]}>
           <TouchableOpacity style={styles.toolBtn} onPress={handleZoomOut}>
             <Text style={styles.toolBtnText}>🔍 −</Text>
           </TouchableOpacity>
@@ -127,14 +129,14 @@ export const OrgChart: React.FC<OrgChartProps> = ({ contacts, onSelectNode, sele
             <Text style={styles.toolBtnText}>🔍 +</Text>
           </TouchableOpacity>
 
-          <View style={styles.divider} />
+          {!isMobile && <View style={styles.divider} />}
 
           <TouchableOpacity style={styles.toolBtnOutline} onPress={expandAll}>
-            <Text style={styles.toolBtnOutlineText}>Expand All</Text>
+            <Text style={styles.toolBtnOutlineText}>Expand</Text>
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.toolBtnOutline} onPress={collapseAll}>
-            <Text style={styles.toolBtnOutlineText}>Collapse All</Text>
+            <Text style={styles.toolBtnOutlineText}>Collapse</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -196,6 +198,11 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     letterSpacing: 0.5,
   },
+  toolbarMobile: {
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    gap: Spacing.xs,
+  },
   toolbarSub: {
     color: Colors.textSubtle,
     fontSize: 11,
@@ -204,6 +211,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
+  },
+  toolbarRightMobile: {
+    flexWrap: 'wrap',
+    width: '100%',
   },
   toolBtn: {
     backgroundColor: Colors.inputBg,

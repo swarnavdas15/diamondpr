@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, TextInput } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, TextInput, useWindowDimensions } from 'react-native';
 import { useERP } from '../context/ERPContext';
 import { useAuth } from '../context/AuthContext';
 import { TaskStatus, Role, Priority, Task } from '../types';
 import { Colors, StatusColors, Spacing, Radius, Shadows } from '../theme';
+import { ExportButton } from './ui/ExportButton';
+import { ExportDataPayload } from '../utils/exportUtils';
 
 interface TaskManagementProps {
   onOpenCreateTask: () => void;
@@ -15,6 +17,8 @@ type StatusFilter = 'ALL' | TaskStatus | 'OVERDUE';
 export const TaskManagement: React.FC<TaskManagementProps> = ({ onOpenCreateTask }) => {
   const { tasks, updateTaskStatus, deleteTask } = useERP();
   const { currentUser, users } = useAuth();
+  const { width } = useWindowDimensions();
+  const isMobile = width < 768;
 
   const [viewFilter, setViewFilter] = useState<TaskViewFilter>('ALL');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('ALL');
@@ -22,6 +26,11 @@ export const TaskManagement: React.FC<TaskManagementProps> = ({ onOpenCreateTask
   const [priorityFilter, setPriorityFilter] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [error, setError] = useState('');
+  const [expandedTasks, setExpandedTasks] = useState<Record<string, boolean>>({});
+
+  const toggleExpandTask = (id: string) => {
+    setExpandedTasks((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
 
   if (!currentUser) return null;
 
@@ -93,6 +102,14 @@ export const TaskManagement: React.FC<TaskManagementProps> = ({ onOpenCreateTask
     }
   };
 
+  const handleMarkAllComplete = () => {
+    filteredTasks.forEach(task => {
+      if (task.status !== 'COMPLETED') {
+        updateTaskStatus(task.id, 'COMPLETED');
+      }
+    });
+  };
+
   const getPriorityStyle = (p: string) => {
     switch (p) {
       case 'URGENT':
@@ -117,11 +134,29 @@ export const TaskManagement: React.FC<TaskManagementProps> = ({ onOpenCreateTask
     }
   };
 
+  const getTaskExportPayload = (): ExportDataPayload => {
+    return {
+      title: `Task Management Report (${viewFilter})`,
+      filename: 'Tasks_Management_Report',
+      headers: ['Task Title', 'Order Ref', 'Assigned User', 'Department', 'Priority', 'Status', 'Created By', 'Due Date'],
+      rows: filteredTasks.map((t) => [
+        t.title,
+        t.orderNumber || 'N/A',
+        t.assignedToName || 'Unassigned',
+        t.assignedToDepartment || 'N/A',
+        t.priority,
+        t.status,
+        t.createdByName,
+        t.dueDate || 'N/A',
+      ]),
+    };
+  };
+
   return (
     <View style={styles.card}>
       {/* Header & Quick Action */}
-      <View style={styles.header}>
-        <View>
+      <View style={[styles.header, isMobile && styles.headerMobile]}>
+        <View style={{ flex: 1 }}>
           <Text style={styles.title}>Task Management & Work Delegation</Text>
           <Text style={styles.subTitle}>
             {isSuperAdminOrAdmin
@@ -129,9 +164,15 @@ export const TaskManagement: React.FC<TaskManagementProps> = ({ onOpenCreateTask
               : `Department Dashboard: Viewing tasks for ${currentUser.name} (${currentUser.role.replace(/_/g, ' ')})`}
           </Text>
         </View>
-        <TouchableOpacity style={styles.createBtn} onPress={onOpenCreateTask}>
-          <Text style={styles.createBtnText}>+ Assign New Task</Text>
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          <TouchableOpacity style={styles.exportBtn} onPress={handleMarkAllComplete}>
+            <Text style={styles.exportBtnText}>✓ Mark All Complete</Text>
+          </TouchableOpacity>
+          <ExportButton getData={getTaskExportPayload} buttonText="Export Tasks" />
+          <TouchableOpacity style={styles.createBtn} onPress={onOpenCreateTask}>
+            <Text style={styles.createBtnText}>+ Assign New Task</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {error ? (
@@ -141,33 +182,35 @@ export const TaskManagement: React.FC<TaskManagementProps> = ({ onOpenCreateTask
       ) : null}
 
       {/* Main Filter Bar: Category Tabs */}
-      <View style={styles.filterRow}>
-        <View style={styles.tabGroup}>
-          {(['ALL', 'MY_TASKS', 'DEPT_TASKS', 'ASSIGNED_BY_ME'] as TaskViewFilter[]).map((tf) => {
-            const labels: Record<TaskViewFilter, string> = {
-              ALL: 'All Accessible',
-              MY_TASKS: 'My Tasks',
-              DEPT_TASKS: 'Department Tasks',
-              ASSIGNED_BY_ME: 'Assigned By Me',
-            };
-            const isActive = viewFilter === tf;
-            return (
-              <TouchableOpacity
-                key={tf}
-                style={[styles.filterTab, isActive && styles.filterTabActive]}
-                onPress={() => setViewFilter(tf)}
-              >
-                <Text style={[styles.filterTabText, isActive && styles.filterTabTextActive]}>
-                  {labels[tf]}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
+      <View style={[styles.filterRow, isMobile && styles.filterRowMobile]}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ width: '100%' }}>
+          <View style={styles.tabGroup}>
+            {(['ALL', 'MY_TASKS', 'DEPT_TASKS', 'ASSIGNED_BY_ME'] as TaskViewFilter[]).map((tf) => {
+              const labels: Record<TaskViewFilter, string> = {
+                ALL: 'All Accessible',
+                MY_TASKS: 'My Tasks',
+                DEPT_TASKS: 'Department Tasks',
+                ASSIGNED_BY_ME: 'Assigned By Me',
+              };
+              const isActive = viewFilter === tf;
+              return (
+                <TouchableOpacity
+                  key={tf}
+                  style={[styles.filterTab, isActive && styles.filterTabActive]}
+                  onPress={() => setViewFilter(tf)}
+                >
+                  <Text style={[styles.filterTabText, isActive && styles.filterTabTextActive]}>
+                    {labels[tf]}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </ScrollView>
 
         {/* Search Field */}
         <TextInput
-          style={styles.searchInput}
+          style={[styles.searchInput, isMobile && { width: '100%' }]}
           placeholder="🔍 Search tasks, orders, assignees..."
           placeholderTextColor="#94a3b8"
           value={searchQuery}
@@ -176,8 +219,8 @@ export const TaskManagement: React.FC<TaskManagementProps> = ({ onOpenCreateTask
       </View>
 
       {/* Status & Oversight Filters */}
-      <View style={styles.secondaryFilterRow}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+      <View style={[styles.secondaryFilterRow, isMobile && { width: '100%' }]}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ width: '100%' }}>
           <View style={styles.chipsScroll}>
             <Text style={styles.filterLabelText}>Status:</Text>
             {(['ALL', 'PENDING', 'IN_PROGRESS', 'COMPLETED', 'OVERDUE'] as StatusFilter[]).map((sf) => (
@@ -213,21 +256,9 @@ export const TaskManagement: React.FC<TaskManagementProps> = ({ onOpenCreateTask
         </ScrollView>
       </View>
 
-      {/* Task List Table */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-        <View style={styles.table}>
-          {/* Table Header */}
-          <View style={styles.tableHeader}>
-            <Text style={[styles.th, { width: 220 }]}>Task Title & Details</Text>
-            <Text style={[styles.th, { width: 170 }]}>Assigned Target</Text>
-            <Text style={[styles.th, { width: 110 }]}>Order Ref</Text>
-            <Text style={[styles.th, { width: 85 }]}>Priority</Text>
-            <Text style={[styles.th, { width: 100 }]}>Due Date</Text>
-            <Text style={[styles.th, { width: 210 }]}>Status (Click to Update)</Text>
-            <Text style={[styles.th, { width: 95 }]}>Actions</Text>
-          </View>
-
-          {/* Table Body */}
+      {/* Task List Table / Mobile Cards */}
+      {isMobile ? (
+        <View style={{ gap: Spacing.xs, marginTop: Spacing.sm }}>
           {filteredTasks.length === 0 ? (
             <Text style={styles.emptyText}>No tasks found matching the selected filters.</Text>
           ) : (
@@ -235,98 +266,199 @@ export const TaskManagement: React.FC<TaskManagementProps> = ({ onOpenCreateTask
               const pStyle = getPriorityStyle(task.priority);
               const sBadge = getStatusBadge(task.status);
               const isOverdue = task.dueDate && task.dueDate < todayStr && task.status !== 'COMPLETED';
+              const isExpanded = !!expandedTasks[task.id];
 
               return (
-                <View key={task.id} style={styles.tr}>
-                  {/* Title & Creator */}
-                  <View style={{ width: 220 }}>
-                    <Text style={styles.tdTitle}>{task.title}</Text>
-                    {task.description ? <Text style={styles.tdDesc}>{task.description}</Text> : null}
-                    <Text style={styles.tdMeta}>By {task.createdByName} ({task.createdByRole.replace(/_/g, ' ')})</Text>
-                  </View>
-
-                  {/* Assigned Target (User vs Dept) */}
-                  <View style={{ width: 170 }}>
-                    {task.assignedToName ? (
-                      <View>
-                        <View style={styles.userBadgeTag}>
-                          <Text style={styles.userBadgeTagText}>👤 {task.assignedToName}</Text>
+                <View key={task.id} style={styles.mobileCard}>
+                  <TouchableOpacity
+                    style={styles.mobileCardHeader}
+                    onPress={() => toggleExpandTask(task.id)}
+                    activeOpacity={0.7}
+                  >
+                    <View style={{ flex: 1, gap: 6 }}>
+                      {/* Top Badges & Expand Row */}
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                          <View style={[styles.priorityBadge, { backgroundColor: pStyle.bg }]}>
+                            <Text style={[styles.priorityBadgeText, { color: pStyle.text }]}>{task.priority}</Text>
+                          </View>
+                          <View style={[styles.statusChip, { backgroundColor: sBadge.bg, borderColor: sBadge.border }]}>
+                            <Text style={[styles.statusChipText, { color: sBadge.text, fontWeight: '800' }]}>
+                              {sBadge.label}
+                            </Text>
+                          </View>
                         </View>
-                        <Text style={styles.tdDeptSub}>
-                          {task.assignedToDepartment ? task.assignedToDepartment.replace(/_/g, ' ') : 'General'}
-                        </Text>
+                        <Text style={{ color: Colors.textMuted, fontSize: 14 }}>{isExpanded ? '▲' : '▼'}</Text>
                       </View>
-                    ) : (
-                      <View style={styles.deptBadgeTag}>
-                        <Text style={styles.deptBadgeTagText}>
-                          🏢 {task.assignedToDepartment ? task.assignedToDepartment.replace(/_/g, ' ') : 'All Depts'} Team
-                        </Text>
-                      </View>
-                    )}
-                  </View>
 
-                  {/* Order Ref */}
-                  <View style={{ width: 110 }}>
-                    <Text style={styles.tdOrder}>{task.orderNumber || 'General'}</Text>
-                  </View>
+                      {/* Full Width Title */}
+                      <Text style={styles.mobileCardTitle}>{task.title}</Text>
 
-                  {/* Priority */}
-                  <View style={{ width: 85 }}>
-                    <View style={[styles.priorityBadge, { backgroundColor: pStyle.bg }]}>
-                      <Text style={[styles.priorityBadgeText, { color: pStyle.text }]}>{task.priority}</Text>
+                      {/* Subtitle */}
+                      <Text style={styles.mobileCardSubtitle}>
+                        Assigned to: {task.assignedToName || (task.assignedToDepartment ? `${task.assignedToDepartment} Team` : 'All Depts')}
+                      </Text>
                     </View>
-                  </View>
+                  </TouchableOpacity>
 
-                  {/* Due Date & Overdue Tag */}
-                  <View style={{ width: 100 }}>
-                    <Text style={[styles.tdDate, isOverdue && styles.overdueText]}>
-                      {task.dueDate || 'N/A'}
-                    </Text>
-                    {isOverdue && (
-                      <View style={styles.overdueBadge}>
-                        <Text style={styles.overdueBadgeText}>OVERDUE</Text>
+                  {isExpanded && (
+                    <View style={styles.mobileCardBody}>
+                      {task.description ? <Text style={styles.mobileCardDetail}>Description: <Text style={styles.mobileCardVal}>{task.description}</Text></Text> : null}
+                      <Text style={styles.mobileCardDetail}>Order Ref: <Text style={styles.mobileCardVal}>{task.orderNumber || 'General'}</Text></Text>
+                      <Text style={styles.mobileCardDetail}>Due Date: <Text style={[styles.mobileCardVal, isOverdue && styles.overdueText]}>{task.dueDate || 'N/A'}</Text></Text>
+                      <Text style={styles.mobileCardDetail}>Created By: <Text style={styles.mobileCardVal}>{task.createdByName} ({task.createdByRole.replace(/_/g, ' ')})</Text></Text>
+
+                      {/* Status Toggle Row */}
+                      <View style={{ marginTop: Spacing.xs }}>
+                        <Text style={[styles.mobileCardDetail, { marginBottom: 4, fontWeight: '700' }]}>Update Task Status:</Text>
+                        <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap' }}>
+                          {(['PENDING', 'IN_PROGRESS', 'COMPLETED'] as TaskStatus[]).map((st) => {
+                            const active = task.status === st;
+                            const badge = getStatusBadge(st);
+                            return (
+                              <TouchableOpacity
+                                key={st}
+                                style={[
+                                  styles.statusChip,
+                                  active && { backgroundColor: badge.bg, borderColor: badge.border },
+                                ]}
+                                onPress={() => updateTaskStatus(task.id, st)}
+                              >
+                                <Text style={[styles.statusChipText, active && { color: badge.text, fontWeight: '800' }]}>
+                                  {st === 'IN_PROGRESS' ? 'IN PROG' : st}
+                                </Text>
+                              </TouchableOpacity>
+                            );
+                          })}
+                          {isSuperAdminOrAdmin && (
+                            <TouchableOpacity style={styles.deleteBtn} onPress={() => handleDelete(task.id)}>
+                              <Text style={styles.deleteBtnText}>Delete Task</Text>
+                            </TouchableOpacity>
+                          )}
+                        </View>
                       </View>
-                    )}
-                  </View>
-
-                  {/* Status Toggle Buttons */}
-                  <View style={{ width: 210, flexDirection: 'row', gap: 4, alignItems: 'center' }}>
-                    {(['PENDING', 'IN_PROGRESS', 'COMPLETED'] as TaskStatus[]).map((st) => {
-                      const active = task.status === st;
-                      const badge = getStatusBadge(st);
-                      return (
-                        <TouchableOpacity
-                          key={st}
-                          style={[
-                            styles.statusChip,
-                            active && { backgroundColor: badge.bg, borderColor: badge.border },
-                          ]}
-                          onPress={() => updateTaskStatus(task.id, st)}
-                        >
-                          <Text style={[styles.statusChipText, active && { color: badge.text, fontWeight: '800' }]}>
-                            {st === 'IN_PROGRESS' ? 'IN PROG' : st}
-                          </Text>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
-
-                  {/* Actions (RBAC: Delete only Super Admin & Admin) */}
-                  <View style={{ width: 95, justifyContent: 'center' }}>
-                    {isSuperAdminOrAdmin ? (
-                      <TouchableOpacity style={styles.deleteBtn} onPress={() => handleDelete(task.id)}>
-                        <Text style={styles.deleteBtnText}>Delete</Text>
-                      </TouchableOpacity>
-                    ) : (
-                      <Text style={styles.deleteDisabled}>🔒 Protected</Text>
-                    )}
-                  </View>
+                    </View>
+                  )}
                 </View>
               );
             })
           )}
         </View>
-      </ScrollView>
+      ) : (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          <View style={styles.table}>
+            {/* Table Header */}
+            <View style={styles.tableHeader}>
+              <Text style={[styles.th, { width: 220 }]}>Task Title & Details</Text>
+              <Text style={[styles.th, { width: 170 }]}>Assigned Target</Text>
+              <Text style={[styles.th, { width: 110 }]}>Order Ref</Text>
+              <Text style={[styles.th, { width: 85 }]}>Priority</Text>
+              <Text style={[styles.th, { width: 100 }]}>Due Date</Text>
+              <Text style={[styles.th, { width: 210 }]}>Status (Click to Update)</Text>
+              <Text style={[styles.th, { width: 95 }]}>Actions</Text>
+            </View>
+
+            {/* Table Body */}
+            {filteredTasks.length === 0 ? (
+              <Text style={styles.emptyText}>No tasks found matching the selected filters.</Text>
+            ) : (
+              filteredTasks.map((task) => {
+                const pStyle = getPriorityStyle(task.priority);
+                const sBadge = getStatusBadge(task.status);
+                const isOverdue = task.dueDate && task.dueDate < todayStr && task.status !== 'COMPLETED';
+
+                return (
+                  <View key={task.id} style={styles.tr}>
+                    {/* Title & Creator */}
+                    <View style={{ width: 220 }}>
+                      <Text style={styles.tdTitle}>{task.title}</Text>
+                      {task.description ? <Text style={styles.tdDesc}>{task.description}</Text> : null}
+                      <Text style={styles.tdMeta}>By {task.createdByName} ({task.createdByRole.replace(/_/g, ' ')})</Text>
+                    </View>
+
+                    {/* Assigned Target (User vs Dept) */}
+                    <View style={{ width: 170 }}>
+                      {task.assignedToName ? (
+                        <View>
+                          <View style={styles.userBadgeTag}>
+                            <Text style={styles.userBadgeTagText}>👤 {task.assignedToName}</Text>
+                          </View>
+                          <Text style={styles.tdDeptSub}>
+                            {task.assignedToDepartment ? task.assignedToDepartment.replace(/_/g, ' ') : 'General'}
+                          </Text>
+                        </View>
+                      ) : (
+                        <View style={styles.deptBadgeTag}>
+                          <Text style={styles.deptBadgeTagText}>
+                            🏢 {task.assignedToDepartment ? task.assignedToDepartment.replace(/_/g, ' ') : 'All Depts'} Team
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+
+                    {/* Order Ref */}
+                    <View style={{ width: 110 }}>
+                      <Text style={styles.tdOrder}>{task.orderNumber || 'General'}</Text>
+                    </View>
+
+                    {/* Priority */}
+                    <View style={{ width: 85 }}>
+                      <View style={[styles.priorityBadge, { backgroundColor: pStyle.bg }]}>
+                        <Text style={[styles.priorityBadgeText, { color: pStyle.text }]}>{task.priority}</Text>
+                      </View>
+                    </View>
+
+                    {/* Due Date & Overdue Tag */}
+                    <View style={{ width: 100 }}>
+                      <Text style={[styles.tdDate, isOverdue && styles.overdueText]}>
+                        {task.dueDate || 'N/A'}
+                      </Text>
+                      {isOverdue && (
+                        <View style={styles.overdueBadge}>
+                          <Text style={styles.overdueBadgeText}>OVERDUE</Text>
+                        </View>
+                      )}
+                    </View>
+
+                    {/* Status Toggle Buttons */}
+                    <View style={{ width: 210, flexDirection: 'row', gap: 4, alignItems: 'center' }}>
+                      {(['PENDING', 'IN_PROGRESS', 'COMPLETED'] as TaskStatus[]).map((st) => {
+                        const active = task.status === st;
+                        const badge = getStatusBadge(st);
+                        return (
+                          <TouchableOpacity
+                            key={st}
+                            style={[
+                              styles.statusChip,
+                              active && { backgroundColor: badge.bg, borderColor: badge.border },
+                            ]}
+                            onPress={() => updateTaskStatus(task.id, st)}
+                          >
+                            <Text style={[styles.statusChipText, active && { color: badge.text, fontWeight: '800' }]}>
+                              {st === 'IN_PROGRESS' ? 'IN PROG' : st}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+
+                    {/* Actions (RBAC: Delete only Super Admin & Admin) */}
+                    <View style={{ width: 95, justifyContent: 'center' }}>
+                      {isSuperAdminOrAdmin ? (
+                        <TouchableOpacity style={styles.deleteBtn} onPress={() => handleDelete(task.id)}>
+                          <Text style={styles.deleteBtnText}>Delete</Text>
+                        </TouchableOpacity>
+                      ) : (
+                        <Text style={styles.deleteDisabled}>🔒 Protected</Text>
+                      )}
+                    </View>
+                  </View>
+                );
+              })
+            )}
+          </View>
+        </ScrollView>
+      )}
     </View>
   );
 };
@@ -346,6 +478,11 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 12,
+  },
+  headerMobile: {
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    gap: 10,
   },
   title: {
     color: Colors.textLight,
@@ -388,6 +525,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 10,
     marginBottom: 10,
+  },
+  filterRowMobile: {
+    flexDirection: 'column',
+    alignItems: 'stretch',
+    gap: 8,
   },
   tabGroup: {
     flexDirection: 'row',
@@ -614,5 +756,57 @@ const styles = StyleSheet.create({
     fontSize: 12,
     textAlign: 'center',
     marginVertical: 12,
+  },
+  mobileCard: {
+    backgroundColor: Colors.cardBg,
+    borderRadius: Radius.lg,
+    borderWidth: 1,
+    borderColor: Colors.borderDark,
+    overflow: 'hidden',
+    ...Shadows.sm,
+  },
+  mobileCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: 8,
+    padding: Spacing.md,
+    backgroundColor: Colors.cardBg,
+  },
+  mobileCardTitle: {
+    color: Colors.accentTeal,
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  mobileCardSubtitle: {
+    color: Colors.textMuted,
+    fontSize: 12,
+    marginTop: 2,
+  },
+  mobileCardBody: {
+    padding: Spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: Colors.borderDark,
+    backgroundColor: Colors.inputBg,
+  },
+  mobileCardDetail: {
+    color: Colors.textMuted,
+    fontSize: 12,
+    marginBottom: 4,
+  },
+  mobileCardVal: {
+    color: Colors.textLight,
+    fontWeight: '700',
+  },
+  exportBtn: {
+    backgroundColor: Colors.secondary,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: Radius.sm,
+  },
+  exportBtnText: {
+    color: Colors.white,
+    fontSize: 12,
+    fontWeight: '700',
   },
 });

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, useWindowDimensions } from 'react-native';
 import { useERP } from '../../context/ERPContext';
 import { useAuth } from '../../context/AuthContext';
 import { Colors, StatusColors, Spacing, Radius, Shadows } from '../../theme';
@@ -12,6 +12,8 @@ interface TaskKPICardsProps {
 export const TaskKPICards: React.FC<TaskKPICardsProps> = ({ style }) => {
   const { tasks } = useERP();
   const { currentUser } = useAuth();
+  const { width } = useWindowDimensions();
+  const isMobile = width < 768;
 
   const [modalVisible, setModalVisible] = useState(false);
   const [activeTab, setActiveTab] = useState<'TOTAL' | 'DUE' | 'COMPLETED'>('TOTAL');
@@ -39,10 +41,10 @@ export const TaskKPICards: React.FC<TaskKPICardsProps> = ({ style }) => {
   };
 
   return (
-    <View style={[styles.container, style]}>
+    <View style={[styles.container, isMobile && styles.containerMobile, style]}>
       {/* 1. Total Tasks Card */}
       <TouchableOpacity
-        style={[styles.metricCard, { borderLeftColor: StatusColors.PENDING.bg }]}
+        style={[styles.metricCard, isMobile && styles.metricCardMobile, { borderLeftColor: StatusColors.PENDING.bg }]}
         onPress={() => handleOpenTab('TOTAL')}
         activeOpacity={0.8}
       >
@@ -58,7 +60,7 @@ export const TaskKPICards: React.FC<TaskKPICardsProps> = ({ style }) => {
 
       {/* 2. Due Tasks Card */}
       <TouchableOpacity
-        style={[styles.metricCard, { borderLeftColor: StatusColors.IN_PROGRESS.bg }]}
+        style={[styles.metricCard, isMobile && styles.metricCardMobile, { borderLeftColor: StatusColors.IN_PROGRESS.bg }]}
         onPress={() => handleOpenTab('DUE')}
         activeOpacity={0.8}
       >
@@ -74,7 +76,7 @@ export const TaskKPICards: React.FC<TaskKPICardsProps> = ({ style }) => {
 
       {/* 3. Tasks Completed Card */}
       <TouchableOpacity
-        style={[styles.metricCard, { borderLeftColor: StatusColors.COMPLETED.bg }]}
+        style={[styles.metricCard, isMobile && styles.metricCardMobile, { borderLeftColor: StatusColors.COMPLETED.bg }]}
         onPress={() => handleOpenTab('COMPLETED')}
         activeOpacity={0.8}
       >
@@ -105,6 +107,10 @@ const styles = StyleSheet.create({
     gap: Spacing.md,
     marginVertical: Spacing.sm,
   },
+  containerMobile: {
+    flexDirection: 'column',
+    gap: Spacing.xs,
+  },
   metricCard: {
     flex: 1,
     backgroundColor: Colors.cardBg,
@@ -117,6 +123,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Spacing.md,
     ...Shadows.sm,
+  },
+  metricCardMobile: {
+    flex: undefined,
+    width: '100%',
+    padding: Spacing.md,
   },
   metricIconBg: {
     width: 40,

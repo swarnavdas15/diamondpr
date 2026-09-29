@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, TextInput, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, TextInput, StyleSheet, useWindowDimensions } from 'react-native';
 import { useERP } from '../../context/ERPContext';
 import { DepartmentStatus, Order } from '../../types';
 import { Colors, StatusColors, Spacing, Radius, Shadows } from '../../theme';
@@ -7,9 +7,13 @@ import { TaskKPICards } from './TaskKPICards';
 import { OrderKPICards } from './OrderKPICards';
 import { QuantityProcessModal } from '../QuantityProcessModal';
 import { OrderQuantityTracker } from '../OrderQuantityTracker';
+import { ExportButton } from '../ui/ExportButton';
+import { ExportDataPayload } from '../../utils/exportUtils';
 
 export const PurchaseDashboard: React.FC = () => {
-  const { getMaskedOrders, updatePurchaseStage, setSelectedOrder } = useERP();
+  const { width } = useWindowDimensions();
+  const isMobile = width < 768;
+  const { getMaskedOrders, updatePurchaseStage, setSelectedOrder, vendors } = useERP();
   const maskedOrders = getMaskedOrders().filter((o) => o.purchaseRequired);
 
   const [selectedVendorMap, setSelectedVendorMap] = useState<{ [key: string]: string }>({});
@@ -17,13 +21,32 @@ export const PurchaseDashboard: React.FC = () => {
 
   const [processModalVisible, setProcessModalVisible] = useState(false);
   const [selectedProcessOrder, setSelectedProcessOrder] = useState<Order | null>(null);
+  const [activeTab, setActiveTab] = useState<'PENDING' | 'COMPLETED'>('PENDING');
 
-  const sampleVendors = [
-    'Jindal Stainless Steel Works',
-    'Global Steel Supply Inc.',
-    'Bharat Forgings Vendor Unit A',
-    'Apex Alloys & Tubes Ltd',
-  ];
+  const filteredOrders = maskedOrders.filter((o) =>
+    activeTab === 'PENDING' ? o.purchaseStatus !== 'COMPLETED' : o.purchaseStatus === 'COMPLETED'
+  );
+
+  const getPurchaseExportPayload = (): ExportDataPayload => {
+    return {
+      title: 'Purchase & Procurement Queue Report',
+      filename: 'Purchase_Orders_Report',
+      headers: ['Order No', 'PO Number', 'Material Spec', 'Required Qty', 'Procured Qty', 'Vendor Selected', 'Status'],
+      rows: maskedOrders.map((o) => [
+        o.orderNumber,
+        o.poNumber,
+        o.materialRequirements || 'SS316L Raw Bars',
+        o.requiredQuantity,
+        o.purchaseQuantity || 0,
+        o.vendorSelected || 'Pending Sourcing',
+        o.purchaseStatus,
+      ]),
+    };
+  };
+
+  const sampleVendors = vendors.length > 0
+    ? vendors.filter((v) => v.status === 'ACTIVE').map((v) => v.vendorName)
+    : ['Jindal Stainless Steel Works', 'Global Steel Supply Inc.', 'Bharat Forgings Vendor Unit A', 'Apex Alloys & Tubes Ltd'];
 
   const handleOpenProcessModal = (ord: Order) => {
     setSelectedProcessOrder(ord);
@@ -53,15 +76,16 @@ export const PurchaseDashboard: React.FC = () => {
   };
 
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+    <ScrollView style={styles.container} contentContainerStyle={isMobile ? { paddingBottom: 24 } : { paddingBottom: 32 }} showsVerticalScrollIndicator={false}>
       {/* Top Banner */}
-      <View style={styles.banner}>
+      <View style={[styles.banner, isMobile && { flexDirection: 'column', alignItems: 'flex-start', gap: 10 }]}>
         <View style={{ flex: 1 }}>
           <Text style={styles.bannerTitle}>Purchase & Material Procurement Queue</Text>
           <Text style={styles.bannerSub}>
             Track raw material requirements, select vendors, and verify stock receipt with quantity tracking.
           </Text>
         </View>
+        <ExportButton getData={getPurchaseExportPayload} buttonText="Export Purchase Data" />
       </View>
 
       {/* Row 1: Global Order KPI Cards */}
@@ -70,14 +94,36 @@ export const PurchaseDashboard: React.FC = () => {
       {/* Row 2: Global Task Metrics KPI Cards */}
       <TaskKPICards style={{ marginBottom: Spacing.lg }} />
 
+      {/* Tabs */}
+      <View style={styles.tabRow}>
+        <TouchableOpacity
+          style={[styles.tabBtn, activeTab === 'PENDING' && styles.tabBtnActive]}
+          onPress={() => setActiveTab('PENDING')}
+        >
+          <Text style={[styles.tabBtnText, activeTab === 'PENDING' && styles.tabBtnTextActive]}>
+            ⏳ Pending Purchase ({maskedOrders.filter((o) => o.purchaseStatus !== 'COMPLETED').length})
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tabBtn, activeTab === 'COMPLETED' && styles.tabBtnActive]}
+          onPress={() => setActiveTab('COMPLETED')}
+        >
+          <Text style={[styles.tabBtnText, activeTab === 'COMPLETED' && styles.tabBtnTextActive]}>
+            ✓ Purchase Completed ({maskedOrders.filter((o) => o.purchaseStatus === 'COMPLETED').length})
+          </Text>
+        </TouchableOpacity>
+      </View>
+
       {/* Procurement Order Queue */}
       <View style={styles.sectionCard}>
-        <Text style={styles.sectionTitle}>Procurement Work Orders</Text>
+        <Text style={styles.sectionTitle}>
+          {activeTab === 'PENDING' ? 'Pending Procurement Work Orders' : 'Completed Procurement Work Orders'}
+        </Text>
 
-        {maskedOrders.length === 0 ? (
-          <Text style={styles.emptyText}>No pending purchase orders required.</Text>
+        {filteredOrders.length === 0 ? (
+          <Text style={styles.emptyText}>No {activeTab.toLowerCase()} purchase orders.</Text>
         ) : (
-          maskedOrders.map((ord) => {
+          filteredOrders.map((ord) => {
             const purQty = ord.purchaseQuantity || 0;
             const badgeStyle = getStatusBadgeStyle(ord.purchaseStatus, purQty, ord.requiredQuantity);
 
@@ -99,8 +145,30 @@ export const PurchaseDashboard: React.FC = () => {
                   </View>
                 </View>
 
-                {/* Embedded Live Quantity Tracker */}
-                <OrderQuantityTracker order={ord} style={{ marginTop: Spacing.xs }} />
+                {/* Dynamic Content based on Status */}
+                {ord.purchaseStatus === 'COMPLETED' ? (
+                  <View style={styles.purchaseReportCard}>
+                    <Text style={styles.purchaseReportTitle}>✅ PURCHASE & SOURCING REPORT</Text>
+                    <View style={styles.purchaseReportRow}>
+                      <Text style={styles.purchaseReportLabel}>Item / Material:</Text>
+                      <Text style={styles.purchaseReportValue}>{ord.materialRequirements || 'Steel Billet'}</Text>
+                    </View>
+                    <View style={styles.purchaseReportRow}>
+                      <Text style={styles.purchaseReportLabel}>Vendor / Supplier:</Text>
+                      <Text style={styles.purchaseReportValueHighlight}>{ord.vendorSelected || 'Jindal Stainless Steel Works'}</Text>
+                    </View>
+                    <View style={styles.purchaseReportRow}>
+                      <Text style={styles.purchaseReportLabel}>Procurement Notes:</Text>
+                      <Text style={styles.purchaseReportValue}>{ord.procurementNotes || 'Material fully procured and verified.'}</Text>
+                    </View>
+                    <View style={styles.purchaseReportRow}>
+                      <Text style={styles.purchaseReportLabel}>Total Quantity Sourced:</Text>
+                      <Text style={styles.purchaseReportValue}>{ord.purchaseQuantity || ord.requiredQuantity} / {ord.requiredQuantity} pcs</Text>
+                    </View>
+                  </View>
+                ) : (
+                  <OrderQuantityTracker order={ord} style={{ marginTop: Spacing.xs }} />
+                )}
 
                 {/* Technical Spec & Raw Material Requirements */}
                 <View style={styles.specBox}>
@@ -111,50 +179,59 @@ export const PurchaseDashboard: React.FC = () => {
                   <Text style={styles.specVal}>Technical Specs: {ord.technicalRequirements || 'Standard Flange Spec'}</Text>
                 </View>
 
-                {/* Vendor Selection & Notes */}
-                <View style={styles.vendorBox}>
-                  <Text style={styles.inputLabel}>Select Material Vendor / Supplier:</Text>
-                  <View style={styles.vendorChips}>
-                    {sampleVendors.map((v) => {
-                      const isSel = (selectedVendorMap[ord.id] || ord.vendorSelected) === v;
-                      return (
-                        <TouchableOpacity
-                          key={v}
-                          style={[styles.vendorChip, isSel && styles.vendorChipActive]}
-                          onPress={() => setSelectedVendorMap({ ...selectedVendorMap, [ord.id]: v })}
-                        >
-                          <Text style={[styles.vendorChipText, isSel && styles.vendorChipTextActive]}>{v}</Text>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
+                {/* Vendor Selection & Notes (Only if Pending) */}
+                {ord.purchaseStatus !== 'COMPLETED' && (
+                  <>
+                    <View style={styles.vendorBox}>
+                      <Text style={styles.inputLabel}>Select Material Vendor / Supplier:</Text>
+                      <View style={styles.vendorChips}>
+                        {sampleVendors.map((v) => {
+                          const isSel = (selectedVendorMap[ord.id] || ord.vendorSelected) === v;
+                          return (
+                            <TouchableOpacity
+                              key={v}
+                              style={[styles.vendorChip, isSel && styles.vendorChipActive]}
+                              onPress={() => setSelectedVendorMap({ ...selectedVendorMap, [ord.id]: v })}
+                            >
+                              <Text style={[styles.vendorChipText, isSel && styles.vendorChipTextActive]}>{v}</Text>
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </View>
 
-                  <Text style={styles.inputLabel}>Procurement Remarks / Delivery Notes:</Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Enter warehouse gate receipt number or MTC ref..."
-                    placeholderTextColor="#94a3b8"
-                    value={notesMap[ord.id] !== undefined ? notesMap[ord.id] : ord.procurementNotes || ''}
-                    onChangeText={(txt) => setNotesMap({ ...notesMap, [ord.id]: txt })}
-                  />
-                </View>
+                      <Text style={styles.inputLabel}>Procurement Remarks / Delivery Notes:</Text>
+                      <TextInput
+                        style={styles.input}
+                        placeholder="Enter warehouse gate receipt number or MTC ref..."
+                        placeholderTextColor="#94a3b8"
+                        value={notesMap[ord.id] !== undefined ? notesMap[ord.id] : ord.procurementNotes || ''}
+                        onChangeText={(txt) => setNotesMap({ ...notesMap, [ord.id]: txt })}
+                      />
+                    </View>
 
-                {/* Action Buttons */}
-                <View style={styles.actionRow}>
-                  <TouchableOpacity
-                    style={[styles.actionBtn, styles.btnProg]}
-                    onPress={() => handleOpenProcessModal(ord)}
-                  >
-                    <Text style={styles.actionBtnText}>📦 Record Material Received (Batch)</Text>
-                  </TouchableOpacity>
+                    {/* Action Buttons */}
+                    <View style={styles.actionRow}>
+                      <TouchableOpacity
+                        style={[styles.actionBtn, styles.btnProg]}
+                        onPress={() => handleOpenProcessModal(ord)}
+                      >
+                        <Text style={styles.actionBtnText}>📦 Record Material Received (Batch)</Text>
+                      </TouchableOpacity>
 
-                  <TouchableOpacity
-                    style={[styles.actionBtn, styles.btnDone]}
-                    onPress={() => handleOpenProcessModal(ord)}
-                  >
-                    <Text style={styles.actionBtnText}>✓ Purchase Done</Text>
-                  </TouchableOpacity>
-                </View>
+                      <TouchableOpacity
+                        style={[styles.actionBtn, styles.btnDone]}
+                        onPress={() => {
+                          const vendor = selectedVendorMap[ord.id] || ord.vendorSelected || 'Jindal Stainless Steel Works';
+                          const notes = notesMap[ord.id] || ord.procurementNotes || 'Material fully procured and verified.';
+                          const remainingQty = Math.max(0, ord.requiredQuantity - (ord.purchaseQuantity || 0));
+                          updatePurchaseStage(ord.id, 'COMPLETED', vendor, notes, remainingQty);
+                        }}
+                      >
+                        <Text style={styles.actionBtnText}>✓ Purchase Done</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </>
+                )}
               </View>
             );
           })
@@ -386,5 +463,69 @@ const styles = StyleSheet.create({
     color: Colors.white,
     fontSize: 11,
     fontWeight: '800',
+  },
+  tabRow: {
+    flexDirection: 'row',
+    backgroundColor: Colors.bgDark,
+    borderRadius: Radius.md,
+    padding: 4,
+    marginBottom: Spacing.md,
+    borderWidth: 1,
+    borderColor: Colors.borderDark,
+  },
+  tabBtn: {
+    flex: 1,
+    paddingVertical: Spacing.md,
+    alignItems: 'center',
+    borderRadius: Radius.sm,
+  },
+  tabBtnActive: {
+    backgroundColor: Colors.accentTeal,
+  },
+  tabBtnText: {
+    color: Colors.textMuted,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  tabBtnTextActive: {
+    color: Colors.white,
+    fontWeight: '800',
+  },
+  purchaseReportCard: {
+    backgroundColor: '#0f172a',
+    borderRadius: Radius.md,
+    padding: Spacing.md,
+    marginTop: Spacing.sm,
+    borderWidth: 1,
+    borderColor: '#10b981',
+  },
+  purchaseReportTitle: {
+    color: '#10b981',
+    fontSize: 14,
+    fontWeight: '800',
+    marginBottom: Spacing.sm,
+  },
+  purchaseReportRow: {
+    flexDirection: 'row',
+    marginBottom: 6,
+    flexWrap: 'wrap',
+  },
+  purchaseReportLabel: {
+    color: Colors.textMuted,
+    fontSize: 12,
+    width: 150,
+    fontWeight: '700',
+  },
+  purchaseReportValue: {
+    color: Colors.textLight,
+    fontSize: 12,
+    fontWeight: '600',
+    flex: 1,
+  },
+  purchaseReportValueHighlight: {
+    color: Colors.accentTeal,
+    fontSize: 12,
+    fontWeight: '800',
+    flex: 1,
   },
 });

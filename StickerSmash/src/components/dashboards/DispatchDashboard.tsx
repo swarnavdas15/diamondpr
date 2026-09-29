@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, TextInput, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, TextInput, StyleSheet, useWindowDimensions } from 'react-native';
 import { useERP } from '../../context/ERPContext';
 import { DepartmentStatus, Order } from '../../types';
 import { Colors, StatusColors, Spacing, Radius, Shadows } from '../../theme';
@@ -7,21 +7,51 @@ import { TaskKPICards } from './TaskKPICards';
 import { OrderKPICards } from './OrderKPICards';
 import { QuantityProcessModal } from '../QuantityProcessModal';
 import { OrderQuantityTracker } from '../OrderQuantityTracker';
+import { ExportButton } from '../ui/ExportButton';
+import { ExportDataPayload } from '../../utils/exportUtils';
 
 export const DispatchDashboard: React.FC = () => {
+  const { width } = useWindowDimensions();
+  const isMobile = width < 768;
   const { getMaskedOrders, updateDispatchStage, setSelectedOrder } = useERP();
-  const maskedOrders = getMaskedOrders().filter(
-    (o) =>
-      o.dispatchRequired &&
-      (o.productionStatus === 'COMPLETED' || (o.productionQuantity || 0) > 0) &&
-      (!o.qualityTestingRequired || (o.qualityStatus === 'COMPLETED' && o.qcResult === 'PASSED'))
-  );
+  const [activeTab, setActiveTab] = useState<'PENDING' | 'COMPLETED'>('PENDING');
+
+  const pendingDispatch = getMaskedOrders().filter((o) => {
+    if (!o.dispatchRequired || o.dispatchStatus === 'COMPLETED') return false;
+    const passedQcQty = o.qualityTestingRequired
+      ? (o.qcPassedQuantity !== undefined ? o.qcPassedQuantity : (o.qcResult === 'PASSED' ? (o.qcQuantity || 0) : 0))
+      : (o.productionRequired ? (o.productionQuantity || 0) : o.requiredQuantity);
+    return passedQcQty > (o.dispatchQuantity || 0);
+  });
+
+  const completedDispatch = getMaskedOrders().filter((o) => {
+    return o.dispatchRequired && o.dispatchStatus === 'COMPLETED';
+  });
+
+  const maskedOrders = activeTab === 'PENDING' ? pendingDispatch : completedDispatch;
 
   const [transportRefMap, setTransportRefMap] = useState<{ [key: string]: string }>({});
   const [logisticsEntryMap, setLogisticsEntryMap] = useState<{ [key: string]: string }>({});
 
   const [processModalVisible, setProcessModalVisible] = useState(false);
   const [selectedProcessOrder, setSelectedProcessOrder] = useState<Order | null>(null);
+
+  const getDispatchExportPayload = (): ExportDataPayload => {
+    return {
+      title: 'Dispatch & Logistics Queue Report',
+      filename: 'Dispatch_Orders_Report',
+      headers: ['Order No', 'PO Number', 'Dispatched Qty', 'Required Qty', 'Transport Ref', 'Logistics Vehicle', 'Status'],
+      rows: maskedOrders.map((o) => [
+        o.orderNumber,
+        o.poNumber,
+        o.dispatchQuantity || 0,
+        o.requiredQuantity,
+        o.transportRef || 'Pending Transport',
+        o.logisticsEntry || 'Pending Logistics',
+        o.dispatchStatus,
+      ]),
+    };
+  };
 
   const handleOpenProcessModal = (ord: Order) => {
     setSelectedProcessOrder(ord);
@@ -35,12 +65,12 @@ export const DispatchDashboard: React.FC = () => {
     logisticsEntry?: string;
   }) => {
     if (!selectedProcessOrder) return;
-    const transportRef = data.transportRef || transportRefMap[selectedProcessOrder.id] || 'TRP-10-TON-CONTAINER-4491';
-    const logistics = data.logisticsEntry || logisticsEntryMap[selectedProcessOrder.id] || 'VRL Logistics Container Truck #MH-12-AB-9876';
+    const transportRef = data.transportRef || transportRefMap[selectedProcessOrder.id] || '';
+    const logistics = data.logisticsEntry || logisticsEntryMap[selectedProcessOrder.id] || '';
     const newDispQty = (selectedProcessOrder.dispatchQuantity || 0) + data.processedQty;
     const calcStatus: DepartmentStatus = newDispQty >= selectedProcessOrder.requiredQuantity ? 'COMPLETED' : 'IN_PROGRESS';
 
-    updateDispatchStage(selectedProcessOrder.id, calcStatus, logistics, transportRef, data.remarks || 'Shipment dispatched.', data.processedQty);
+    updateDispatchStage(selectedProcessOrder.id, calcStatus, logistics || 'Logistics TBD', transportRef || 'Transport TBD', data.remarks || 'Shipment dispatched.', data.processedQty);
     setProcessModalVisible(false);
     setSelectedProcessOrder(null);
   };
@@ -56,15 +86,16 @@ export const DispatchDashboard: React.FC = () => {
   };
 
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+    <ScrollView style={styles.container} contentContainerStyle={isMobile ? { paddingBottom: 24 } : { paddingBottom: 32 }} showsVerticalScrollIndicator={false}>
       {/* Top Banner */}
-      <View style={styles.banner}>
+      <View style={[styles.banner, isMobile && { flexDirection: 'column', alignItems: 'flex-start', gap: 10 }]}>
         <View style={{ flex: 1 }}>
           <Text style={styles.bannerTitle}>Dispatch & Logistics Dashboard</Text>
           <Text style={styles.bannerSub}>
             Manage ready-to-ship orders, logistics transport references, and E-Way bills with batch quantity tracking.
           </Text>
         </View>
+        <ExportButton getData={getDispatchExportPayload} buttonText="Export Dispatch Data" />
       </View>
 
       {/* Row 1: Global Order KPI Cards */}
@@ -73,17 +104,46 @@ export const DispatchDashboard: React.FC = () => {
       {/* Row 2: Global Task Metrics KPI Cards */}
       <TaskKPICards style={{ marginBottom: Spacing.lg }} />
 
+      {/* Unified Tab Switcher */}
+      <View style={styles.tabRow}>
+        <TouchableOpacity
+          style={[styles.tabBtn, activeTab === 'PENDING' && styles.tabBtnActive]}
+          onPress={() => setActiveTab('PENDING')}
+        >
+          <Text style={[styles.tabText, activeTab === 'PENDING' && styles.tabTextActive]}>
+            📦 Ready To Ship ({pendingDispatch.length})
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.tabBtn, activeTab === 'COMPLETED' && styles.tabBtnActive]}
+          onPress={() => setActiveTab('COMPLETED')}
+        >
+          <Text style={[styles.tabText, activeTab === 'COMPLETED' && styles.tabTextActive]}>
+            ✓ Dispatched ({completedDispatch.length})
+          </Text>
+        </TouchableOpacity>
+      </View>
+
       {/* Dispatch Queue */}
       <View style={styles.sectionCard}>
-        <Text style={styles.sectionTitle}>Ready To Ship Queue</Text>
+        <Text style={styles.sectionTitle}>{activeTab === 'PENDING' ? 'Ready To Ship Queue' : 'Dispatched Orders'}</Text>
 
         {maskedOrders.length === 0 ? (
           <Text style={styles.emptyText}>No orders currently in ready-to-ship queue.</Text>
         ) : (
           maskedOrders.map((ord) => {
-            const isQCBlocked = ord.qualityTestingRequired && (ord.qualityStatus !== 'COMPLETED' || ord.qcResult !== 'PASSED');
+            const passedQcQty = ord.qualityTestingRequired
+              ? (ord.qcPassedQuantity !== undefined
+                  ? ord.qcPassedQuantity
+                  : ord.qcResult === 'PASSED'
+                  ? (ord.qcQuantity || 0)
+                  : 0)
+              : (ord.productionRequired ? (ord.productionQuantity || 0) : ord.requiredQuantity);
+
+            const isQCBlocked = ord.qualityTestingRequired && passedQcQty === 0;
             const dispQty = ord.dispatchQuantity || 0;
-            const availableForDispatch = Math.max(0, (ord.qualityTestingRequired ? (ord.qcQuantity || 0) : (ord.productionQuantity || 0)) - dispQty);
+            const availableForDispatch = Math.max(0, passedQcQty - dispQty);
             const badgeStyle = getStatusBadgeStyle(ord.dispatchStatus, dispQty, ord.requiredQuantity);
 
             return (
@@ -118,6 +178,8 @@ export const DispatchDashboard: React.FC = () => {
                     <Text style={styles.bold}>
                       {!ord.qualityTestingRequired
                         ? '✓ Not Required (Direct Dispatch)'
+                        : ord.qcPassedQuantity !== undefined && ord.qcPassedQuantity > 0
+                        ? `✓ ${ord.qcPassedQuantity} PCS Passed QC${ord.qcFailedQuantity ? ` (${ord.qcFailedQuantity} PCS in Rework)` : ''}`
                         : ord.qualityStatus === 'COMPLETED' && ord.qcResult === 'PASSED'
                         ? '✓ Inspection Passed'
                         : ord.qcResult === 'FAILED'
@@ -132,7 +194,7 @@ export const DispatchDashboard: React.FC = () => {
                   <View style={styles.blockedAlertBox}>
                     <Text style={styles.blockedAlertTitle}>🔒 DISPATCH STRICTLY BLOCKED</Text>
                     <Text style={styles.blockedAlertText}>
-                      Quality Testing Required = YES, but QC status is {ord.qualityStatus} ({ord.qcResult}). Production/QC team must inspect and PASS this order before dispatch can proceed.
+                      Quality Testing Required = YES, but QC passed quantity is 0 (Status: {ord.qualityStatus}, Result: {ord.qcResult || 'PENDING'}). Production/QC team must inspect and PASS units before dispatch can proceed.
                     </Text>
                   </View>
                 )}
@@ -399,6 +461,36 @@ const styles = StyleSheet.create({
   actionBtnText: {
     color: Colors.white,
     fontSize: 11,
+    fontWeight: '800',
+  },
+  tabRow: {
+    flexDirection: 'row',
+    backgroundColor: Colors.cardBg,
+    borderRadius: Radius.md,
+    padding: 4,
+    marginBottom: Spacing.lg,
+    borderWidth: 1,
+    borderColor: Colors.borderDark,
+  },
+  tabBtn: {
+    flex: 1,
+    paddingVertical: Spacing.sm,
+    alignItems: 'center',
+    borderRadius: Radius.sm - 2,
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  tabBtnActive: {
+    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+    borderColor: '#10b981',
+  },
+  tabText: {
+    color: Colors.textMuted,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  tabTextActive: {
+    color: '#10b981',
     fontWeight: '800',
   },
 });

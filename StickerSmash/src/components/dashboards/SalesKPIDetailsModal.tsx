@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { View, Text, Modal, TouchableOpacity, ScrollView, TextInput, StyleSheet } from 'react-native';
+import { View, Text, Modal, TouchableOpacity, ScrollView, TextInput, StyleSheet, useWindowDimensions } from 'react-native';
 import { useERP } from '../../context/ERPContext';
 import { Quotation, QuotationStatus, LostReason } from '../../types';
 import { Colors, Spacing, Radius, Shadows } from '../../theme';
@@ -38,6 +38,8 @@ export const SalesKPIDetailsModal: React.FC<SalesKPIDetailsModalProps> = ({
   onClose,
   onSelectTab,
 }) => {
+  const { width } = useWindowDimensions();
+  const isMobile = width < 768;
   const { quotations } = useERP();
 
   // Filters State
@@ -218,8 +220,8 @@ export const SalesKPIDetailsModal: React.FC<SalesKPIDetailsModalProps> = ({
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={onClose}>
-        <TouchableOpacity activeOpacity={1} style={styles.modalContainer} onPress={(e) => e.stopPropagation()}>
+      <TouchableOpacity style={[styles.overlay, isMobile && { padding: 10 }]} activeOpacity={1} onPress={onClose}>
+        <TouchableOpacity activeOpacity={1} style={[styles.modalContainer, isMobile && { padding: 14, maxHeight: '95%' }]} onPress={(e) => e.stopPropagation()}>
           {/* Header */}
           <View style={styles.header}>
             <View>

@@ -60,6 +60,11 @@ export const StatusColors = {
     text: '#FFFFFF',
     border: '#DC2626',
   },
+  DELAYED: {
+    bg: '#F97316',
+    text: '#FFFFFF',
+    border: '#EA580C',
+  },
   PROGRESS_BAR: {
     completed: '#22C55E',
     active: '#FACC15',

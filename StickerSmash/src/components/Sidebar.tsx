@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, useWindowDimensions } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import { NavMenuItem } from '../types';
 import { Colors, Spacing, Radius, Shadows } from '../theme';
@@ -44,10 +44,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
   activeMenuItem,
   onSelectMenuItem,
   collapsed,
+  onToggleCollapse,
 }) => {
   const { currentUser, logout } = useAuth();
+  const { width } = useWindowDimensions();
+  const isMobile = width < 768;
 
   if (!currentUser) return null;
+
+  // On mobile, if collapsed, don't render anything
+  if (isMobile && collapsed) {
+    return null;
+  }
 
   const getRoleBadgeColor = (role: string) => {
     return (Colors.roles as any)[role] || Colors.accentTeal;
@@ -59,11 +67,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
         return [
           'Dashboard',
           'ClientDirectory',
+          'Orders',
           'Quotations',
           'Purchase',
           'Production',
           'Dispatch',
           'Users',
+          'Tasks',
           'Reports',
           'Settings',
           'Logout',
@@ -72,17 +82,23 @@ export const Sidebar: React.FC<SidebarProps> = ({
         return [
           'Dashboard',
           'ClientDirectory',
+          'Orders',
           'Quotations',
           'Purchase',
           'Production',
           'Dispatch',
+          'Vendors',
           'Users',
+          'Tasks',
+          'ActivityLogs',
+          'Settings',
           'Logout',
         ];
       case 'SALES':
         return [
           'Dashboard',
           'ClientDirectory',
+          'Orders',
           'Quotations',
           'Tasks',
           'Logout',
@@ -90,20 +106,29 @@ export const Sidebar: React.FC<SidebarProps> = ({
       case 'PURCHASE':
         return [
           'Dashboard',
+          'Purchase',
           'Vendors',
           'Tasks',
           'Logout',
         ];
       case 'PRODUCTION':
+        return [
+          'Dashboard',
+          'WorkOrders',
+          'Tasks',
+          'Logout',
+        ];
       case 'QUALITY_TESTING':
         return [
           'Dashboard',
+          'QualityControl',
           'Tasks',
           'Logout',
         ];
       case 'DISPATCH':
         return [
           'Dashboard',
+          'DispatchQueue',
           'Tasks',
           'Logout',
         ];
@@ -115,29 +140,39 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const allowedNavItems = getAllowedMenuItems(currentUser.role);
   const visibleMenuItems = MENU_ITEMS.filter((item) => allowedNavItems.includes(item.id));
 
-  return (
-    <View style={[styles.sidebarContainer, collapsed ? styles.sidebarCollapsed : styles.sidebarExpanded]}>
-      {/* Top Header: Company Logo */}
+  const content = (
+    <View
+      style={[
+        styles.sidebarContainer,
+        isMobile ? styles.mobileDrawer : collapsed ? styles.sidebarCollapsed : styles.sidebarExpanded,
+      ]}
+    >
+      {/* Top Header: Company Logo & Close Button for Mobile */}
       <View style={styles.brandHeader}>
         <View style={styles.logoRow}>
           <View style={styles.logoBadge}>
             <Text style={styles.logoSymbol}>❖</Text>
           </View>
-          {!collapsed && (
+          {(!collapsed || isMobile) && (
             <View style={styles.brandTitleContainer}>
               <Text style={styles.brandTitle}>DIAMOND FLANGE</Text>
               <Text style={styles.brandTag}>INDUSTRIAL ERP</Text>
             </View>
           )}
         </View>
+        {isMobile && (
+          <TouchableOpacity style={styles.closeDrawerBtn} onPress={onToggleCollapse}>
+            <Text style={styles.closeDrawerText}>✕</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       {/* User Profile Section */}
-      <View style={[styles.profileSection, collapsed && styles.profileSectionCollapsed]}>
+      <View style={[styles.profileSection, collapsed && !isMobile && styles.profileSectionCollapsed]}>
         <View style={[styles.avatarCircle, { backgroundColor: getRoleBadgeColor(currentUser.role) }]}>
           <Text style={styles.avatarText}>{currentUser.name.charAt(0)}</Text>
         </View>
-        {!collapsed && (
+        {(!collapsed || isMobile) && (
           <View style={styles.profileInfo}>
             <Text style={styles.profileName} numberOfLines={1}>
               {currentUser.name}
@@ -164,39 +199,54 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 styles.menuItemBtn,
                 isActive && styles.menuItemActive,
                 isLogout && styles.menuItemLogout,
-                collapsed && styles.menuItemCollapsed,
+                collapsed && !isMobile && styles.menuItemCollapsed,
               ]}
               onPress={() => {
                 if (isLogout) {
                   logout();
                 } else {
                   onSelectMenuItem(item.id);
+                  if (isMobile) {
+                    onToggleCollapse?.();
+                  }
                 }
               }}
               activeOpacity={0.7}
             >
               <Text style={[styles.menuItemIcon, isActive && styles.iconActive]}>{item.icon}</Text>
 
-              {!collapsed && (
+              {(!collapsed || isMobile) && (
                 <Text style={[styles.menuItemText, isActive && styles.menuItemTextActive, isLogout && styles.logoutText]}>
                   {item.label}
                 </Text>
               )}
 
-              {!collapsed && isActive && <View style={styles.activeIndicator} />}
+              {(!collapsed || isMobile) && isActive && <View style={styles.activeIndicator} />}
             </TouchableOpacity>
           );
         })}
       </ScrollView>
 
       {/* Sidebar Footer */}
-      {!collapsed && (
+      {(!collapsed || isMobile) && (
         <View style={styles.sidebarFooter}>
           <Text style={styles.versionText}>ERP v2.4 • Centralized Theme Edition</Text>
         </View>
       )}
     </View>
   );
+
+  if (isMobile) {
+    return (
+      <TouchableOpacity style={styles.backdropOverlay} activeOpacity={1} onPress={onToggleCollapse}>
+        <TouchableOpacity activeOpacity={1} onPress={(e) => e.stopPropagation()}>
+          {content}
+        </TouchableOpacity>
+      </TouchableOpacity>
+    );
+  }
+
+  return content;
 };
 
 const styles = StyleSheet.create({
@@ -381,5 +431,28 @@ const styles = StyleSheet.create({
     color: Colors.textSubtle,
     fontSize: 10,
     fontWeight: '600',
+  },
+  backdropOverlay: {
+    position: 'absolute' as any,
+    top: 0,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    zIndex: 2000,
+  },
+  mobileDrawer: {
+    width: 280,
+    height: '100%',
+    backgroundColor: Colors.cardBg,
+    ...Shadows.md,
+  },
+  closeDrawerBtn: {
+    padding: Spacing.xs,
+  },
+  closeDrawerText: {
+    color: Colors.textMuted,
+    fontSize: 18,
+    fontWeight: '700',
   },
 });

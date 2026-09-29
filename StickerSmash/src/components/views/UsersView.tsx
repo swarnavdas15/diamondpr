@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, TextInput, Modal, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, TextInput, Modal, StyleSheet, useWindowDimensions } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
 import { Role, User } from '../../types';
 import { Colors, Spacing, Radius, Shadows } from '../../theme';
@@ -20,6 +20,8 @@ const ROLE_DEPARTMENTS: Record<Role, { label: string; department: string }> = {
 
 export const UsersView: React.FC<UsersViewProps> = ({ onOpenCreateUser }) => {
   const { users, toggleUserStatus, updateUser, adminResetUserPassword, authAuditLogs, currentUser } = useAuth();
+  const { width } = useWindowDimensions();
+  const isMobile = width < 768;
 
   const isSuperAdmin = currentUser?.role === 'SUPER_ADMIN';
 
@@ -177,24 +179,28 @@ export const UsersView: React.FC<UsersViewProps> = ({ onOpenCreateUser }) => {
   };
 
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={{ paddingBottom: isMobile ? 84 : Spacing.xxl }}
+      showsVerticalScrollIndicator={false}
+    >
       {/* Top Banner */}
-      <View style={styles.topBanner}>
-        <View style={{ flex: 1, paddingRight: Spacing.md }}>
+      <View style={[styles.topBanner, isMobile && styles.topBannerMobile]}>
+        <View style={{ flex: 1, paddingRight: isMobile ? 0 : Spacing.md, marginBottom: isMobile ? 10 : 0 }}>
           <Text style={styles.title}>User Directory & Role Access Management (RBAC)</Text>
           <Text style={styles.subTitle}>
             Manage system user accounts, department security roles, account activations, and password resets.
           </Text>
         </View>
         {onOpenCreateUser && isSuperAdmin && (
-          <TouchableOpacity style={styles.btnPurple} onPress={onOpenCreateUser}>
+          <TouchableOpacity style={[styles.btnPurple, isMobile && { width: '100%', alignItems: 'center' }]} onPress={onOpenCreateUser}>
             <Text style={styles.btnText}>+ Create New User</Text>
           </TouchableOpacity>
         )}
       </View>
 
       {/* Search & Filters Card */}
-      <View style={styles.card}>
+      <View style={[styles.card, isMobile && { padding: Spacing.md }]}>
         <View style={styles.filterRow}>
           {/* Search Box */}
           <TextInput
@@ -206,7 +212,7 @@ export const UsersView: React.FC<UsersViewProps> = ({ onOpenCreateUser }) => {
           />
 
           {/* Status Filter */}
-          <View style={styles.filterGroup}>
+          <View style={[styles.filterGroup, isMobile && { width: '100%', marginTop: 8 }]}>
             <Text style={styles.filterLabel}>Status:</Text>
             {(['ALL', 'ACTIVE', 'INACTIVE'] as const).map((st) => (
               <TouchableOpacity
@@ -243,20 +249,95 @@ export const UsersView: React.FC<UsersViewProps> = ({ onOpenCreateUser }) => {
           ))}
         </View>
 
-        {/* User Table */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: Spacing.md }}>
-          <View style={styles.table}>
-            {/* Header */}
-            <View style={styles.thRow}>
-              <Text style={[styles.th, { width: 160 }]}>Full Name</Text>
-              <Text style={[styles.th, { width: 130 }]}>Username</Text>
-              <Text style={[styles.th, { width: 180 }]}>Email Address</Text>
-              <Text style={[styles.th, { width: 160 }]}>Department & Role</Text>
-              <Text style={[styles.th, { width: 100 }]}>Account Status</Text>
-              <Text style={[styles.th, { width: 140 }]}>Last Login</Text>
-              <Text style={[styles.th, { width: 110 }]}>Created Date</Text>
-              <Text style={[styles.th, { width: 220 }]}>Actions</Text>
-            </View>
+        {/* User List: Mobile Cards or Desktop Table */}
+        {isMobile ? (
+          <View style={styles.mobileCardList}>
+            {filteredUsers.length === 0 ? (
+              <View style={styles.emptyContainer}>
+                <Text style={styles.emptyText}>No users found matching search criteria.</Text>
+              </View>
+            ) : (
+              filteredUsers.map((u) => {
+                const deptInfo = ROLE_DEPARTMENTS[u.role] || { label: u.role, department: 'General' };
+                const createdStr = u.createdAt ? new Date(u.createdAt).toLocaleDateString() : '2026-01-15';
+                const lastLoginStr = getLastLogin(u);
+
+                return (
+                  <View key={u.id} style={styles.userCard}>
+                    <View style={styles.userCardHeader}>
+                      <View style={{ flex: 1, paddingRight: 8 }}>
+                        <Text style={styles.userCardName}>{u.name}</Text>
+                        <Text style={styles.userCardUsername}>
+                          @{u.username} {u.employeeId ? `• ID: ${u.employeeId}` : ''}
+                        </Text>
+                      </View>
+                      <View style={[styles.roleBadge, { backgroundColor: getRoleBadgeColor(u.role) }]}>
+                        <Text style={styles.roleBadgeText}>{u.role.replace('_', ' ')}</Text>
+                      </View>
+                    </View>
+
+                    <View style={styles.userCardBody}>
+                      <Text style={styles.userCardEmail}>✉️ {u.email}</Text>
+                      <View style={styles.userCardMetaRow}>
+                        <Text style={styles.userCardMeta}>🏢 {deptInfo.department}</Text>
+                        <Text style={[styles.statusText, u.isActive ? styles.activeText : styles.inactiveText]}>
+                          {u.isActive ? '● Active' : '○ Deactivated'}
+                        </Text>
+                      </View>
+                      <View style={styles.userCardMetaRow}>
+                        <Text style={styles.userCardSubMeta}>Last Login: {lastLoginStr}</Text>
+                        <Text style={styles.userCardSubMeta}>Created: {createdStr}</Text>
+                      </View>
+                    </View>
+
+                    {/* Actions */}
+                    <View style={styles.userCardActions}>
+                      <TouchableOpacity style={styles.actionBtnViewMobile} onPress={() => setViewUser(u)}>
+                        <Text style={styles.actionBtnText}>👁 View</Text>
+                      </TouchableOpacity>
+
+                      {isSuperAdmin && (
+                        <TouchableOpacity style={styles.actionBtnEditMobile} onPress={() => handleOpenEdit(u)}>
+                          <Text style={styles.actionBtnText}>✏️ Edit</Text>
+                        </TouchableOpacity>
+                      )}
+
+                      {isSuperAdmin && u.username !== 'superadmin' && (
+                        <TouchableOpacity
+                          style={[styles.actionBtnToggleMobile, u.isActive ? styles.deactBg : styles.actBg]}
+                          onPress={() => toggleUserStatus(u.id)}
+                        >
+                          <Text style={[styles.actionBtnText, u.isActive ? styles.deactText : styles.actText]}>
+                            {u.isActive ? 'Deactivate' : 'Activate'}
+                          </Text>
+                        </TouchableOpacity>
+                      )}
+
+                      {isSuperAdmin && (
+                        <TouchableOpacity style={styles.actionBtnResetMobile} onPress={() => handleOpenResetPass(u)}>
+                          <Text style={styles.actionBtnText}>🔑 Reset</Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  </View>
+                );
+              })
+            )}
+          </View>
+        ) : (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: Spacing.md }}>
+            <View style={styles.table}>
+              {/* Header */}
+              <View style={styles.thRow}>
+                <Text style={[styles.th, { width: 160 }]}>Full Name</Text>
+                <Text style={[styles.th, { width: 130 }]}>Username</Text>
+                <Text style={[styles.th, { width: 180 }]}>Email Address</Text>
+                <Text style={[styles.th, { width: 160 }]}>Department & Role</Text>
+                <Text style={[styles.th, { width: 100 }]}>Account Status</Text>
+                <Text style={[styles.th, { width: 140 }]}>Last Login</Text>
+                <Text style={[styles.th, { width: 110 }]}>Created Date</Text>
+                <Text style={[styles.th, { width: 220 }]}>Actions</Text>
+              </View>
 
             {/* Table Body */}
             {filteredUsers.length === 0 ? (
@@ -345,6 +426,7 @@ export const UsersView: React.FC<UsersViewProps> = ({ onOpenCreateUser }) => {
             )}
           </View>
         </ScrollView>
+        )}
       </View>
 
       {/* MODAL 1: VIEW USER DETAILS */}
@@ -791,6 +873,7 @@ const styles = StyleSheet.create({
     padding: Spacing.xl,
   },
   modalCard: {
+    maxHeight: '90%',
     width: '100%',
     maxWidth: 540,
     backgroundColor: Colors.cardBg,
@@ -945,5 +1028,113 @@ const styles = StyleSheet.create({
     color: Colors.successBright,
     fontSize: 12,
     fontWeight: '700',
+  },
+  topBannerMobile: {
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    gap: Spacing.sm,
+    padding: Spacing.md,
+  },
+  mobileCardList: {
+    marginTop: Spacing.md,
+    gap: Spacing.md,
+  },
+  userCard: {
+    backgroundColor: Colors.cardBg,
+    borderRadius: Radius.lg,
+    borderWidth: 1,
+    borderColor: Colors.borderDark,
+    padding: Spacing.md,
+    ...Shadows.sm,
+  },
+  userCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: Spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.borderDark,
+    paddingBottom: Spacing.xs,
+  },
+  userCardName: {
+    color: Colors.textLight,
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  userCardUsername: {
+    color: Colors.accentTeal,
+    fontSize: 12,
+    fontWeight: '700',
+    marginTop: 2,
+  },
+  userCardBody: {
+    gap: 4,
+    marginBottom: Spacing.sm,
+  },
+  userCardEmail: {
+    color: Colors.textMuted,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  userCardMetaRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 2,
+  },
+  userCardMeta: {
+    color: Colors.textSubtle,
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  userCardSubMeta: {
+    color: Colors.textSubtle,
+    fontSize: 10,
+  },
+  userCardActions: {
+    flexDirection: 'row',
+    gap: 6,
+    flexWrap: 'wrap',
+    borderTopWidth: 1,
+    borderTopColor: Colors.borderDark,
+    paddingTop: Spacing.sm,
+  },
+  actionBtnViewMobile: {
+    backgroundColor: 'rgba(56, 189, 248, 0.15)',
+    borderWidth: 1,
+    borderColor: Colors.accentTeal,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 6,
+    borderRadius: Radius.sm,
+    flex: 1,
+    alignItems: 'center',
+  },
+  actionBtnEditMobile: {
+    backgroundColor: 'rgba(234, 179, 8, 0.15)',
+    borderWidth: 1,
+    borderColor: '#eab308',
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 6,
+    borderRadius: Radius.sm,
+    flex: 1,
+    alignItems: 'center',
+  },
+  actionBtnToggleMobile: {
+    borderWidth: 1,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 6,
+    borderRadius: Radius.sm,
+    flex: 1,
+    alignItems: 'center',
+  },
+  actionBtnResetMobile: {
+    backgroundColor: 'rgba(168, 85, 247, 0.15)',
+    borderWidth: 1,
+    borderColor: '#a855f7',
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 6,
+    borderRadius: Radius.sm,
+    flex: 1,
+    alignItems: 'center',
   },
 });

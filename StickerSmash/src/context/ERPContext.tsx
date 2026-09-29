@@ -24,6 +24,8 @@ import {
   QuotationFollowUp,
   CompanyContact,
   CompanyImportantDate,
+  CustomStage,
+  PurchaseBatch,
 } from '../types';
 import { useAuth } from './AuthContext';
 
@@ -76,6 +78,11 @@ interface ERPContextType {
       technicalRequirements?: string;
       materialRequirements?: string;
       requiredQuantity?: number;
+      purchaseRequired?: boolean;
+      productionRequired?: boolean;
+      qualityTestingRequired?: boolean;
+      dispatchRequired?: boolean;
+      customStages?: Omit<CustomStage, 'id' | 'createdAt' | 'status'>[];
       items?: Array<{ itemName: string; size: string; quantity: number; unitPrice?: number }>;
     }
   ) => Order;
@@ -116,6 +123,7 @@ interface ERPContextType {
     productionRequired: boolean;
     qualityTestingRequired: boolean;
     dispatchRequired: boolean;
+    customStages?: CustomStage[];
     items?: Array<{ itemName: string; size: string; quantity: number; unitPrice?: number }>;
   }) => Order;
 
@@ -135,8 +143,9 @@ interface ERPContextType {
   deleteOrderDrawing: (orderId: string, drawingId: string) => void;
 
   updatePurchaseStage: (orderId: string, status: DepartmentStatus, vendorSelected?: string, procurementNotes?: string, processedQty?: number) => void;
-  updateProductionStage: (orderId: string, status: DepartmentStatus, shopFloorNotes?: string, processedQty?: number) => void;
-  updateQualityStage: (orderId: string, status: DepartmentStatus, qcResult?: QCResult, qcRemarks?: string, processedQty?: number) => void;
+  addPurchaseBatch: (orderId: string, batch: Omit<PurchaseBatch, 'id' | 'orderId' | 'createdByName' | 'createdAt'>) => PurchaseBatch;
+  updateProductionStage: (orderId: string, status: DepartmentStatus, shopFloorNotes?: string, processedQty?: number, isRework?: boolean) => void;
+  updateQualityStage: (orderId: string, status: DepartmentStatus, qcResult?: QCResult, qcRemarks?: string, processedQty?: number, passedQty?: number, failedQty?: number) => void;
   updateDispatchStage: (orderId: string, status: DepartmentStatus, logisticsEntry?: string, transportRef?: string, dispatchNotes?: string, processedQty?: number) => void;
   verifyAndCloseOrder: (orderId: string, remarks?: string) => void;
 
@@ -772,7 +781,7 @@ const INITIAL_COMPANY_IMPORTANT_DATES: CompanyImportantDate[] = [
 const ERPContext = createContext<ERPContextType | undefined>(undefined);
 
 export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { currentUser } = useAuth();
+  const { currentUser, users } = useAuth();
   const [orders, setOrders] = useState<Order[]>(INITIAL_ORDERS);
   const [clients, setClients] = useState<Client[]>(INITIAL_CLIENTS);
   const [companyContacts, setCompanyContacts] = useState<CompanyContact[]>(INITIAL_COMPANY_CONTACTS);
@@ -945,11 +954,25 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     productionRequired: boolean;
     qualityTestingRequired: boolean;
     dispatchRequired: boolean;
+    clientObj?: any; // To pass newly created client before state updates
+    customStages?: CustomStage[];
     items?: Array<{ itemName: string; size: string; quantity: number; unitPrice?: number }>;
   }) => {
-    const client = clients.find((c) => c.id === data.clientId) || clients[0];
-    const count = orders.length;
-    const orderNumber = `ORD-2026-${String(count + 1).padStart(3, '0')}`;
+    const client = data.clientObj || clients.find((c) => c.id === data.clientId);
+    if (!client) {
+      throw new Error(`Client with ID "${data.clientId}" not found.`);
+    }
+
+    const maxNum = orders.reduce((max, o) => {
+      const match = o.orderNumber.match(/ORD-2026-(\d+)/);
+      return match ? Math.max(max, parseInt(match[1], 10)) : max;
+    }, 0);
+    const orderNumber = `ORD-2026-${String(maxNum + 1).padStart(3, '0')}`;
+
+    const hasStage = data.purchaseRequired || data.productionRequired || data.qualityTestingRequired || data.dispatchRequired;
+    if (!hasStage) {
+      throw new Error('At least one workflow pipeline stage must be enabled.');
+    }
 
     // Determine initial stage & department assignment
     let initialStage: any = 'PURCHASE';
@@ -1001,6 +1024,7 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       productionRequired: data.productionRequired,
       qualityTestingRequired: data.qualityTestingRequired,
       dispatchRequired: data.dispatchRequired,
+      customStages: data.customStages || [],
 
       salesWorkflowStage: 'REQUIREMENT_RECEIVED',
 
@@ -1010,6 +1034,15 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       qcResult: 'PENDING',
       dispatchStatus: data.dispatchRequired ? 'PENDING' : 'COMPLETED',
       salesVerification: 'PENDING',
+
+      purchaseQuantity: 0,
+      productionQuantity: 0,
+      qcQuantity: 0,
+      qcPassedQuantity: 0,
+      qcFailedQuantity: 0,
+      reworkQuantity: 0,
+      dispatchQuantity: 0,
+      quantityLogs: [],
 
       items: data.items
         ? data.items.map((i, idx) => ({ id: `item-${Date.now()}-${idx}`, ...i }))
@@ -1030,7 +1063,7 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           department: 'SALES',
           action: 'Order Initiated with Custom Pipeline',
           currentStatus: 'REQUIREMENT_RECEIVED',
-          remarks: `Selected Pipelines: Purchase(${data.purchaseRequired ? 'Yes' : 'No'}), Production(${data.productionRequired ? 'Yes' : 'No'}), QC(${data.qualityTestingRequired ? 'Yes' : 'No'}), Dispatch(${data.dispatchRequired ? 'Yes' : 'No'})`,
+          remarks: `Selected Pipelines: Purchase(${data.purchaseRequired ? 'Yes' : 'No'}), Production(${data.productionRequired ? 'Yes' : 'No'}), QC(${data.qualityTestingRequired ? 'Yes' : 'No'}), Dispatch(${data.dispatchRequired ? 'Yes' : 'No'})${data.customStages?.length ? `, Custom Stages(${data.customStages.length})` : ''}`,
           changedByName: currentUser?.name || 'System',
           changedByRole: currentUser?.role || 'SUPER_ADMIN',
           createdAt: new Date().toISOString(),
@@ -1039,6 +1072,35 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
+
+    // Auto-generate Tasks for Custom Pipeline Stages assigned to users
+    if (data.customStages && data.customStages.length > 0) {
+      data.customStages.forEach((cStage) => {
+        if (cStage.assignedUserIds && cStage.assignedUserIds.length > 0) {
+          cStage.assignedUserIds.forEach((uId) => {
+            const assignedUser = users.find((u) => u.id === uId);
+            const newTask: Task = {
+              id: `tsk-cs-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+              orderId: newOrder.id,
+              orderNumber: newOrder.orderNumber,
+              title: `[Custom Stage] ${cStage.stageName} (Order #${newOrder.orderNumber})`,
+              description: cStage.description || `Custom stage task for department: ${cStage.department}`,
+              priority: 'HIGH',
+              status: 'PENDING',
+              assignedToDepartment: (cStage.department as Role) || 'PRODUCTION',
+              assignedToUserId: uId,
+              assignedToName: assignedUser?.name || 'Assigned User',
+              createdByName: currentUser?.name || 'Super Admin',
+              createdByRole: currentUser?.role || 'SUPER_ADMIN',
+              createdByUserId: currentUser?.id,
+              dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+              createdAt: new Date().toISOString(),
+            };
+            setTasks((prev) => [newTask, ...prev]);
+          });
+        }
+      });
+    }
 
     setOrders((prev) => [newOrder, ...prev]);
     return newOrder;
@@ -1180,6 +1242,9 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     procurementNotes?: string,
     processedQty?: number
   ) => {
+    if (!currentUser || !['PURCHASE', 'ADMIN', 'SUPER_ADMIN'].includes(currentUser.role)) {
+      throw new Error('Permission Denied: Only Purchase personnel can update Purchase stage.');
+    }
     setOrders((prev) =>
       prev.map((o) => {
         if (o.id === orderId) {
@@ -1259,18 +1324,131 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     );
   };
 
+  const addPurchaseBatch = (
+    orderId: string,
+    batchData: Omit<PurchaseBatch, 'id' | 'orderId' | 'createdByName' | 'createdAt'>
+  ): PurchaseBatch => {
+    if (!currentUser || !['PURCHASE', 'ADMIN', 'SUPER_ADMIN'].includes(currentUser.role)) {
+      throw new Error('Permission Denied: Only Purchase personnel can add purchase batches.');
+    }
+    let createdBatch: PurchaseBatch | undefined;
+
+    setOrders((prev) =>
+      prev.map((o) => {
+        if (o.id === orderId) {
+          const newBatch: PurchaseBatch = {
+            ...batchData,
+            id: `pb-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+            orderId,
+            createdByName: currentUser?.name || 'System',
+            createdAt: new Date().toISOString(),
+          };
+          createdBatch = newBatch;
+
+          // Also update total purchase quantity
+          const newPurchaseQty = (o.purchaseQuantity || 0) + batchData.quantityReceived;
+          const calcStatus: DepartmentStatus =
+            newPurchaseQty >= o.requiredQuantity ? 'COMPLETED' : newPurchaseQty > 0 ? 'IN_PROGRESS' : o.purchaseStatus;
+
+          const log = addStageLog(
+            o,
+            'PURCHASE',
+            `Purchase Batch Added → ${batchData.quantityReceived} PCS from ${batchData.vendorName}`,
+            calcStatus,
+            batchData.remarks || `Vendor: ${batchData.vendorName}`
+          );
+
+          const qLog: QuantityLog = {
+            id: `ql-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+            orderId,
+            stage: 'PURCHASE',
+            processedQty: batchData.quantityReceived,
+            accumulatedQty: newPurchaseQty,
+            remainingQty: Math.max(0, o.requiredQuantity - newPurchaseQty),
+            totalQty: o.requiredQuantity,
+            actionLabel: `Received ${batchData.quantityReceived} PCS Batch`,
+            remarks: batchData.remarks || `Vendor: ${batchData.vendorName}`,
+            changedByName: currentUser?.name || 'System Admin',
+            changedByRole: currentUser?.role || 'PURCHASE',
+            createdAt: new Date().toISOString(),
+          };
+
+          const isCompleted = calcStatus === 'COMPLETED';
+          let currentStageVal: any = o.currentStage || 'PURCHASE';
+          let assignedDeptVal: any = o.assignedDepartment || 'PURCHASE';
+          let nextStageVal: any = o.nextStage || 'PRODUCTION';
+          let prodStatusVal = o.productionStatus;
+
+          const extraLogs: StageLog[] = [];
+
+          if (isCompleted) {
+            if (o.productionRequired) {
+              currentStageVal = 'PRODUCTION';
+              assignedDeptVal = 'PRODUCTION';
+              nextStageVal = o.qualityTestingRequired ? 'QUALITY_TESTING' : 'DISPATCH';
+              extraLogs.push(addStageLog(o, 'PURCHASE', 'Purchase Completed -> Moved to Production Department', 'PRODUCTION_PENDING'));
+            } else if (o.qualityTestingRequired) {
+              currentStageVal = 'QUALITY_TESTING';
+              assignedDeptVal = 'QUALITY_TESTING';
+              nextStageVal = 'DISPATCH';
+              extraLogs.push(addStageLog(o, 'PURCHASE', 'Purchase Completed -> Moved to Quality Testing', 'QC_PENDING'));
+            } else {
+              currentStageVal = 'DISPATCH';
+              assignedDeptVal = 'DISPATCH';
+              nextStageVal = 'COMPLETED';
+              extraLogs.push(addStageLog(o, 'PURCHASE', 'Purchase Completed -> Moved to Dispatch', 'READY_FOR_DISPATCH'));
+            }
+          }
+
+          return {
+            ...o,
+            purchaseQuantity: newPurchaseQty,
+            purchaseStatus: calcStatus,
+            productionStatus: prodStatusVal,
+            currentStage: currentStageVal,
+            assignedDepartment: assignedDeptVal,
+            nextStage: nextStageVal,
+            purchaseBatches: [...(o.purchaseBatches || []), newBatch],
+            vendorSelected: batchData.vendorName,
+            quantityLogs: [qLog, ...(o.quantityLogs || [])],
+            stageLogs: [...extraLogs, log, ...o.stageLogs],
+            updatedAt: new Date().toISOString(),
+          };
+        }
+        return o;
+      })
+    );
+
+    return createdBatch!;
+  };
+
+
   const updateProductionStage = (
     orderId: string,
     status: DepartmentStatus,
     shopFloorNotes?: string,
-    processedQty?: number
+    processedQty?: number,
+    isRework?: boolean
   ) => {
+    if (!currentUser || !['PRODUCTION', 'ADMIN', 'SUPER_ADMIN'].includes(currentUser.role)) {
+      throw new Error('Permission Denied: Only Production personnel can update Production stage.');
+    }
     setOrders((prev) =>
       prev.map((o) => {
         if (o.id === orderId) {
           const added = processedQty !== undefined ? processedQty : (status === 'COMPLETED' ? Math.max(0, o.requiredQuantity - (o.productionQuantity || 0)) : 0);
-          const newProdQty = (o.productionQuantity || 0) + added;
-          const calcStatus: DepartmentStatus = newProdQty >= o.requiredQuantity ? 'COMPLETED' : (newProdQty > 0 ? 'IN_PROGRESS' : status);
+          
+          if (isRework) {
+            if (added > (o.reworkQuantity || 0)) {
+              throw new Error(`Rework quantity cannot exceed available rework quantity (${o.reworkQuantity || 0} PCS).`);
+            }
+          } else if (o.purchaseRequired && (o.productionQuantity || 0) + added > (o.purchaseQuantity || 0)) {
+            throw new Error(`Production quantity cannot exceed total received purchase quantity (${o.purchaseQuantity || 0} PCS).`);
+          }
+
+          const newProdQty = isRework ? (o.productionQuantity || 0) : (o.productionQuantity || 0) + added;
+          const newReworkQty = isRework ? (o.reworkQuantity || 0) - added : (o.reworkQuantity || 0);
+          const calcStatus: DepartmentStatus = newProdQty >= o.requiredQuantity && newReworkQty === 0 ? 'COMPLETED' : (newProdQty > 0 || isRework ? 'IN_PROGRESS' : status);
 
           const qLog: QuantityLog = {
             id: `ql-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
@@ -1280,7 +1458,7 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             accumulatedQty: newProdQty,
             remainingQty: Math.max(0, o.requiredQuantity - newProdQty),
             totalQty: o.requiredQuantity,
-            actionLabel: `Produced ${added} PCS Finished Goods`,
+            actionLabel: isRework ? `Reworked ${added} PCS` : `Produced ${added} PCS Finished Goods`,
             remarks: shopFloorNotes || 'Shop floor machining updated',
             changedByName: currentUser?.name || 'System Admin',
             changedByRole: currentUser?.role || 'PRODUCTION',
@@ -1290,15 +1468,16 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           const log = addStageLog(
             o,
             'PRODUCTION',
-            `Produced -> ${added} PCS (Total: ${newProdQty}/${o.requiredQuantity} PCS)`,
+            isRework ? `Reworked -> ${added} PCS (Sent to QC)` : `Produced -> ${added} PCS (Total: ${newProdQty}/${o.requiredQuantity} PCS)`,
             calcStatus,
             shopFloorNotes || 'Shop floor progress updated'
           );
 
           // Automatic Stage Movement Check
           const isCompleted = calcStatus === 'COMPLETED';
-          let currentStageVal: any = o.currentStage || 'PRODUCTION';
-          let assignedDeptVal: any = o.assignedDepartment || 'PRODUCTION';
+          // If rework, it goes straight to Quality Testing
+          let currentStageVal: any = isRework ? 'QUALITY_TESTING' : (o.currentStage || 'PRODUCTION');
+          let assignedDeptVal: any = isRework ? 'QUALITY_TESTING' : (o.assignedDepartment || 'PRODUCTION');
           let nextStageVal: any = o.nextStage || 'QUALITY_TESTING';
           let qualStatusVal = o.qualityStatus;
           let qcResultVal = o.qcResult;
@@ -1338,9 +1517,10 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           return {
             ...o,
             productionQuantity: newProdQty,
+            reworkQuantity: newReworkQty,
             productionStatus: calcStatus,
-            qualityStatus: qualStatusVal,
-            qcResult: qcResultVal,
+            qualityStatus: isRework ? 'IN_PROGRESS' : qualStatusVal,
+            qcResult: isRework ? 'PENDING' : qcResultVal,
             dispatchStatus: dispStatusVal,
             currentStage: currentStageVal,
             assignedDepartment: assignedDeptVal,
@@ -1361,14 +1541,38 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     status: DepartmentStatus,
     qcResult?: QCResult,
     qcRemarks?: string,
-    processedQty?: number
+    processedQty?: number,
+    passedQty?: number,
+    failedQty?: number
   ) => {
+    if (!currentUser || !['QUALITY_TESTING', 'ADMIN', 'SUPER_ADMIN'].includes(currentUser.role)) {
+      throw new Error('Permission Denied: Only Quality Testing personnel can update Quality stage.');
+    }
     setOrders((prev) =>
       prev.map((o) => {
         if (o.id === orderId) {
           const added = processedQty !== undefined ? processedQty : (status === 'COMPLETED' ? Math.max(0, (o.productionQuantity || 0) - (o.qcQuantity || 0)) : 0);
+          
+          if ((o.qcQuantity || 0) + added > (o.productionQuantity || 0)) {
+            throw new Error(`QC quantity cannot exceed total produced quantity (${o.productionQuantity || 0} PCS).`);
+          }
+
           const newQcQty = (o.qcQuantity || 0) + added;
-          const calcStatus: DepartmentStatus = newQcQty >= o.requiredQuantity ? 'COMPLETED' : (newQcQty > 0 ? 'IN_PROGRESS' : status);
+
+          // Partial QC support: track passed and failed separately
+          const newPassedQty = passedQty !== undefined
+            ? (o.qcPassedQuantity || 0) + passedQty
+            : qcResult === 'PASSED' ? (o.qcPassedQuantity || 0) + added : (o.qcPassedQuantity || 0);
+          const newFailedQty = failedQty !== undefined
+            ? (o.qcFailedQuantity || 0) + failedQty
+            : qcResult === 'FAILED' ? (o.qcFailedQuantity || 0) + added : (o.qcFailedQuantity || 0);
+          const newReworkQty = failedQty !== undefined
+            ? (o.reworkQuantity || 0) + failedQty
+            : qcResult === 'FAILED' ? (o.reworkQuantity || 0) + added : (o.reworkQuantity || 0);
+
+          // Effective QC for status calc — use passed qty if partial
+          const effectiveQcQty = passedQty !== undefined ? newPassedQty : newQcQty;
+          const calcStatus: DepartmentStatus = effectiveQcQty >= o.requiredQuantity ? 'COMPLETED' : (newQcQty > 0 ? 'IN_PROGRESS' : status);
 
           const qLog: QuantityLog = {
             id: `ql-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
@@ -1378,7 +1582,9 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             accumulatedQty: newQcQty,
             remainingQty: Math.max(0, (o.productionQuantity || 0) - newQcQty),
             totalQty: o.requiredQuantity,
-            actionLabel: `QC Inspected ${added} PCS (${qcResult || 'PASSED'})`,
+            actionLabel: passedQty !== undefined && failedQty !== undefined
+              ? `QC Batch: ${passedQty} PCS PASSED, ${failedQty} PCS FAILED (Rework)`
+              : `QC Inspected ${added} PCS (${qcResult || 'PASSED'})`,
             remarks: qcRemarks || 'Quality inspection record updated',
             changedByName: currentUser?.name || 'System Admin',
             changedByRole: currentUser?.role || 'QUALITY_TESTING',
@@ -1388,14 +1594,20 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           const log = addStageLog(
             o,
             'QUALITY_TESTING',
-            `QC Tested -> ${added} PCS (${qcResult || 'PASSED'}) (${newQcQty}/${o.productionQuantity || o.requiredQuantity} PCS)`,
+            passedQty !== undefined && failedQty !== undefined
+              ? `Partial QC → ${passedQty} PCS Passed / ${failedQty} PCS Failed (Rework)`
+              : `QC Tested → ${added} PCS (${qcResult || 'PASSED'}) (${newQcQty}/${o.productionQuantity || o.requiredQuantity} PCS)`,
             calcStatus,
             qcRemarks || 'QC inspection record updated'
           );
 
           // Automatic Stage Movement Check
-          const isFailed = qcResult === 'FAILED';
-          const isCompleted = calcStatus === 'COMPLETED' || qcResult === 'PASSED';
+          // isFailed = ALL qty failed, or explicit FAILED result with no passedQty
+          const isPartialQC = passedQty !== undefined && failedQty !== undefined;
+          const isFailed = (!isPartialQC && qcResult === 'FAILED') || (isPartialQC && passedQty === 0 && failedQty! > 0);
+          
+          // isCompleted = total passed >= required
+          const isCompleted = newPassedQty >= o.requiredQuantity;
 
           let currentStageVal: any = o.currentStage || 'QUALITY_TESTING';
           let assignedDeptVal: any = o.assignedDepartment || 'QUALITY_TESTING';
@@ -1406,19 +1618,40 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           const extraLogs: StageLog[] = [];
 
           if (isFailed) {
+            // Full failure: return entire order to production rework
             currentStageVal = 'PRODUCTION';
             assignedDeptVal = 'PRODUCTION';
             nextStageVal = 'QUALITY_TESTING';
             prodStatusVal = 'IN_PROGRESS';
             qualStatusVal = 'REJECTED';
-            extraLogs.push(addStageLog(o, 'QUALITY_TESTING', 'Quality Inspection Failed -> Returned to Production for Rework', 'QC_FAILED', qcRemarks || 'Quality inspection failed. Order returned to Production for rework.'));
+            extraLogs.push(addStageLog(o, 'QUALITY_TESTING', 'Quality Inspection Failed → Returned to Production for Rework', 'QC_FAILED', qcRemarks || 'Quality inspection failed. Order returned to Production for rework.'));
 
             // Auto-create Rework Task
             setTimeout(() => {
               createTask({
                 title: `Rework Required: ${o.orderNumber}`,
-                description: `QC Failed: ${qcRemarks || 'Defects found during quality inspection'}. Production rework needed.`,
+                description: `QC Failed: ${qcRemarks || 'Defects found during quality inspection'}. Production rework needed for ${added} PCS.`,
                 priority: 'URGENT',
+                assignedToDepartment: 'PRODUCTION',
+                orderId: o.id,
+              });
+            }, 100);
+          } else if (isPartialQC && failedQty! > 0) {
+            // Partial failure: failed qty sent to rework, passed qty continues to dispatch
+            extraLogs.push(addStageLog(
+              o,
+              'QUALITY_TESTING',
+              `Partial QC: ${passedQty} PCS → Dispatch Eligible | ${failedQty} PCS → Rework (Production)`,
+              'IN_PROGRESS',
+              qcRemarks || `${passedQty} PCS passed QC and eligible for dispatch. ${failedQty} PCS failed and returned for rework.`
+            ));
+
+            // Auto-create Rework Task for failed qty
+            setTimeout(() => {
+              createTask({
+                title: `Partial Rework: ${o.orderNumber} (${failedQty} PCS)`,
+                description: `Partial QC Failure: ${failedQty} PCS failed inspection. ${qcRemarks || 'Defects found.'}. Rework required.`,
+                priority: 'HIGH',
                 assignedToDepartment: 'PRODUCTION',
                 orderId: o.id,
               });
@@ -1428,15 +1661,18 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             assignedDeptVal = 'DISPATCH';
             nextStageVal = 'COMPLETED';
             qualStatusVal = 'COMPLETED';
-            extraLogs.push(addStageLog(o, 'QUALITY_TESTING', 'Quality Inspection Passed -> Moved to Dispatch Queue', 'READY_FOR_DISPATCH', qcRemarks || 'Quality testing passed. Order automatically moved to Dispatch Queue.'));
+            extraLogs.push(addStageLog(o, 'QUALITY_TESTING', 'Quality Inspection Passed → Moved to Dispatch Queue', 'READY_FOR_DISPATCH', qcRemarks || 'Quality testing passed. Order automatically moved to Dispatch Queue.'));
           }
 
           return {
             ...o,
             qcQuantity: newQcQty,
+            qcPassedQuantity: newPassedQty,
+            qcFailedQuantity: newFailedQty,
+            reworkQuantity: newReworkQty,
             qualityStatus: qualStatusVal,
             productionStatus: prodStatusVal,
-            qcResult: qcResult || o.qcResult,
+            qcResult: qcResult || (isPartialQC ? (failedQty! > 0 ? 'FAILED' : 'PASSED') : (o.qcResult)),
             qcRemarks: qcRemarks || o.qcRemarks,
             currentStage: currentStageVal,
             assignedDepartment: assignedDeptVal,
@@ -1451,6 +1687,7 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     );
   };
 
+
   const updateDispatchStage = (
     orderId: string,
     status: DepartmentStatus,
@@ -1459,13 +1696,25 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     dispatchNotes?: string,
     processedQty?: number
   ) => {
+    if (!currentUser || !['DISPATCH', 'ADMIN', 'SUPER_ADMIN'].includes(currentUser.role)) {
+      throw new Error('Permission Denied: Only Dispatch personnel can update Dispatch stage.');
+    }
     setOrders((prev) =>
       prev.map((o) => {
         if (o.id === orderId) {
           const added = processedQty !== undefined ? processedQty : (status === 'COMPLETED' ? Math.max(0, o.requiredQuantity - (o.dispatchQuantity || 0)) : 0);
+          
+          const availableForDispatch = o.qualityTestingRequired 
+            ? (o.qcPassedQuantity !== undefined ? o.qcPassedQuantity : (o.qcResult === 'PASSED' ? (o.qcQuantity || 0) : 0))
+            : (o.productionRequired ? (o.productionQuantity || 0) : o.requiredQuantity);
+            
+          if ((o.dispatchQuantity || 0) + added > availableForDispatch) {
+            throw new Error(`Dispatch quantity cannot exceed available approved quantity (${availableForDispatch} PCS).`);
+          }
+
           const newDispQty = (o.dispatchQuantity || 0) + added;
           const calcStatus: DepartmentStatus = newDispQty >= o.requiredQuantity ? 'COMPLETED' : (newDispQty > 0 ? 'IN_PROGRESS' : status);
-          const overallStatus: DepartmentStatus = newDispQty >= o.requiredQuantity ? 'COMPLETED' : 'IN_PROGRESS';
+          const overallStatus = o.status; // Keep it unchanged. verifyAndCloseOrder will mark it COMPLETED.
 
           const qLog: QuantityLog = {
             id: `ql-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
@@ -1502,7 +1751,7 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             currentStageVal = 'COMPLETED';
             assignedDeptVal = 'COMPLETED';
             nextStageVal = 'COMPLETED';
-            extraLogs.push(addStageLog(o, 'DISPATCH', 'Dispatch Completed -> Order Closed & Completed', 'ORDER_COMPLETED', dispatchNotes || 'Shipment dispatched successfully. Order closed.'));
+            extraLogs.push(addStageLog(o, 'DISPATCH', 'Dispatch Completed -> Awaiting Sales Verification', 'AWAITING_VERIFICATION', dispatchNotes || 'Shipment dispatched successfully. Pending final sales closure.'));
           }
 
           return {
@@ -1764,12 +2013,20 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       technicalRequirements?: string;
       materialRequirements?: string;
       requiredQuantity?: number;
+      purchaseRequired?: boolean;
+      productionRequired?: boolean;
+      qualityTestingRequired?: boolean;
+      dispatchRequired?: boolean;
+      customStages?: Omit<CustomStage, 'id' | 'createdAt' | 'status'>[];
       items?: Array<{ itemName: string; size: string; quantity: number; unitPrice?: number }>;
     }
   ): Order => {
     const targetQuotation = quotations.find((q) => q.id === quotationId);
     if (!targetQuotation) {
       throw new Error('Quotation not found.');
+    }
+    if (targetQuotation.status === 'FULLY_CONVERTED' || targetQuotation.status === 'LOST') {
+      throw new Error('Cannot convert a quotation that is already fully converted or lost.');
     }
 
     let targetClient = clients.find(
@@ -1786,27 +2043,35 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       });
     }
 
-    const convertedVal = Number(data.convertedOrderValue) || targetQuotation.quotationAmount;
-    const lostVal = Math.max(0, targetQuotation.quotationAmount - convertedVal);
-    const nextStatus: QuotationStatus = convertedVal >= targetQuotation.quotationAmount ? 'FULLY_CONVERTED' : 'PARTIALLY_CONVERTED';
+    const additionalConvertedVal = Number(data.convertedOrderValue) || targetQuotation.quotationAmount;
+    const totalConvertedVal = (targetQuotation.convertedOrderValue || 0) + additionalConvertedVal;
+    const lostVal = Math.max(0, targetQuotation.quotationAmount - totalConvertedVal);
+    const nextStatus: QuotationStatus = totalConvertedVal >= targetQuotation.quotationAmount ? 'FULLY_CONVERTED' : 'PARTIALLY_CONVERTED';
 
     const newOrder = createOrder({
       poNumber: data.poNumber ? data.poNumber.trim() : `PO-QT-${targetQuotation.quotationNumber.replace('QT-', '')}`,
       clientId: targetClient.id,
-      budget: convertedVal,
+      clientObj: targetClient,
+      budget: additionalConvertedVal,
       technicalRequirements: data.technicalRequirements ? data.technicalRequirements.trim() : (targetQuotation.remarks || `Converted from Quotation ${targetQuotation.quotationNumber}`),
       materialRequirements: data.materialRequirements ? data.materialRequirements.trim() : 'Standard Forged Flange Spec',
       requiredQuantity: data.requiredQuantity || 1,
-      purchaseRequired: true,
-      productionRequired: true,
-      qualityTestingRequired: true,
-      dispatchRequired: true,
+      purchaseRequired: data.purchaseRequired ?? true,
+      productionRequired: data.productionRequired ?? true,
+      qualityTestingRequired: data.qualityTestingRequired ?? true,
+      dispatchRequired: data.dispatchRequired ?? true,
+      customStages: data.customStages?.map((cs, idx) => ({
+        ...cs,
+        id: `cs-${Date.now()}-${idx}`,
+        status: 'PENDING',
+        createdAt: new Date().toISOString()
+      })) || [],
       items: data.items && data.items.length > 0 ? data.items : [
         {
           itemName: `Flange Assembly Batch (${targetQuotation.quotationNumber})`,
           size: 'Standard Rating',
           quantity: data.requiredQuantity || 1,
-          unitPrice: Math.round(convertedVal / (data.requiredQuantity || 1)),
+          unitPrice: Math.round(additionalConvertedVal / (data.requiredQuantity || 1)),
         },
       ],
     });
@@ -1815,14 +2080,14 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       prev.map((q) =>
         q.id === quotationId
           ? {
-              ...q,
-              status: nextStatus,
-              convertedOrderValue: convertedVal,
-              lostValue: lostVal,
-              convertedOrderId: newOrder.id,
-              convertedOrderNumber: newOrder.orderNumber,
-              updatedAt: new Date().toISOString(),
-            }
+            ...q,
+            status: nextStatus,
+            convertedOrderValue: totalConvertedVal,
+            lostValue: lostVal,
+            convertedOrderId: q.convertedOrderId ? `${q.convertedOrderId},${newOrder.id}` : newOrder.id,
+            convertedOrderNumber: q.convertedOrderNumber ? `${q.convertedOrderNumber},${newOrder.orderNumber}` : newOrder.orderNumber,
+            updatedAt: new Date().toISOString(),
+          }
           : q
       )
     );
@@ -1896,6 +2161,7 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         deleteOrderDrawing,
 
         updatePurchaseStage,
+        addPurchaseBatch,
         updateProductionStage,
         updateQualityStage,
         updateDispatchStage,

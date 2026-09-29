@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, useWindowDimensions } from 'react-native';
 import { useERP } from '../../context/ERPContext';
 import { Colors, StatusColors, Spacing, Radius, Shadows } from '../../theme';
 import { OrderKPIDetailsModal } from './OrderKPIDetailsModal';
@@ -11,6 +11,8 @@ interface OrderKPICardsProps {
 export const OrderKPICards: React.FC<OrderKPICardsProps> = ({ style }) => {
   const { getMaskedOrders } = useERP();
   const orders = getMaskedOrders();
+  const { width } = useWindowDimensions();
+  const isMobile = width < 768;
 
   const [modalVisible, setModalVisible] = useState(false);
   const [activeTab, setActiveTab] = useState<
@@ -21,8 +23,16 @@ export const OrderKPICards: React.FC<OrderKPICardsProps> = ({ style }) => {
   const activeOrders = orders.filter((o) => o.status === 'IN_PROGRESS').length;
   const completedOrders = orders.filter((o) => o.status === 'COMPLETED').length;
   const completionRate = totalOrders > 0 ? Math.round((completedOrders / totalOrders) * 100) : 0;
+  // Bottleneck: orders stuck mid-pipeline (QC failed, or production blocked waiting for rework)
+  // NOT freshly created orders that just have PENDING purchase status
   const delayedOrders = orders.filter(
-    (o) => o.status === 'IN_PROGRESS' && (o.purchaseStatus === 'PENDING' || o.qcResult === 'FAILED')
+    (o) =>
+      o.status === 'IN_PROGRESS' &&
+      (
+        o.qcResult === 'FAILED' ||  // QC failed → rework needed
+        (o.productionStatus === 'IN_PROGRESS' && o.qualityStatus === 'REJECTED') || // rework loop
+        (o.purchaseStatus === 'IN_PROGRESS' && (o.purchaseQuantity || 0) > 0 && o.currentStage === 'PURCHASE') // partial purchase stuck
+      )
   ).length;
 
   const handleOpenTab = (
@@ -33,10 +43,10 @@ export const OrderKPICards: React.FC<OrderKPICardsProps> = ({ style }) => {
   };
 
   return (
-    <View style={[styles.container, style]}>
+    <View style={[styles.container, isMobile && styles.containerMobile, style]}>
       {/* 1. Total Order Pipeline */}
       <TouchableOpacity
-        style={styles.widgetCard}
+        style={[styles.widgetCard, isMobile && styles.widgetCardMobile]}
         onPress={() => handleOpenTab('TOTAL_PIPELINE')}
         activeOpacity={0.8}
       >
@@ -49,7 +59,7 @@ export const OrderKPICards: React.FC<OrderKPICardsProps> = ({ style }) => {
 
       {/* 2. Active Work Orders */}
       <TouchableOpacity
-        style={styles.widgetCard}
+        style={[styles.widgetCard, isMobile && styles.widgetCardMobile]}
         onPress={() => handleOpenTab('ACTIVE_WORK_ORDERS')}
         activeOpacity={0.8}
       >
@@ -71,7 +81,7 @@ export const OrderKPICards: React.FC<OrderKPICardsProps> = ({ style }) => {
 
       {/* 3. Overall Completion Rate */}
       <TouchableOpacity
-        style={styles.widgetCard}
+        style={[styles.widgetCard, isMobile && styles.widgetCardMobile]}
         onPress={() => handleOpenTab('COMPLETION_RATE')}
         activeOpacity={0.8}
       >
@@ -93,7 +103,7 @@ export const OrderKPICards: React.FC<OrderKPICardsProps> = ({ style }) => {
 
       {/* 4. Workflow Bottlenecks */}
       <TouchableOpacity
-        style={styles.widgetCard}
+        style={[styles.widgetCard, isMobile && styles.widgetCardMobile]}
         onPress={() => handleOpenTab('BOTTLENECKS')}
         activeOpacity={0.8}
       >
@@ -109,7 +119,9 @@ export const OrderKPICards: React.FC<OrderKPICardsProps> = ({ style }) => {
             },
           ]}
         >
-          <Text style={[styles.widgetBadgeText, { color: StatusColors.FAILED.text }]}>Material Delayed</Text>
+          <Text style={[styles.widgetBadgeText, { color: StatusColors.FAILED.text }]}>
+            {delayedOrders === 0 ? 'All Clear' : 'QC / Rework / Stuck'}
+          </Text>
         </View>
       </TouchableOpacity>
 
@@ -129,6 +141,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: Spacing.md,
   },
+  containerMobile: {
+    flexWrap: 'wrap',
+    gap: Spacing.xs,
+  },
   widgetCard: {
     flex: 1,
     backgroundColor: Colors.cardBg,
@@ -137,6 +153,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.borderDark,
     ...Shadows.sm,
+  },
+  widgetCardMobile: {
+    flex: undefined,
+    width: '48%',
+    padding: Spacing.md,
   },
   widgetVal: {
     color: Colors.textLight,

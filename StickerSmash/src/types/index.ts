@@ -195,6 +195,24 @@ export interface OrderItem {
   unitPrice?: number;
 }
 
+export interface PurchaseBatch {
+  id: string;
+  orderId: string;
+  vendorId?: string;
+  vendorName: string;
+  vendorCode?: string;
+  materialSpec?: string;
+  quantityOrdered: number;
+  quantityReceived: number;
+  batchNumber?: string;
+  deliveryDate?: string;
+  invoiceRef?: string;
+  remarks?: string;
+  status: 'ORDERED' | 'PARTIALLY_RECEIVED' | 'FULLY_RECEIVED';
+  createdByName: string;
+  createdAt: string;
+}
+
 export interface StageLog {
   id: string;
   department: string;
@@ -244,6 +262,17 @@ export interface OrderDrawing {
   reviewRemarks?: string;
 }
 
+export interface CustomStage {
+  id: string;
+  stageName: string;
+  description?: string;
+  department: string;
+  assignedUserIds: string[];
+  assignedUserNames: string[];
+  status: DepartmentStatus;
+  createdAt: string;
+}
+
 export type WorkflowStageName = 'PURCHASE' | 'PRODUCTION' | 'QUALITY_TESTING' | 'DISPATCH' | 'COMPLETED';
 
 export interface Order {
@@ -269,12 +298,21 @@ export interface Order {
   nextStage?: WorkflowStageName;
   assignedDepartment?: Role | WorkflowStageName;
 
+  // Custom Workflow Stages
+  customStages?: CustomStage[];
+
   // Partial Quantity Tracking Properties
   purchaseQuantity?: number;
   productionQuantity?: number;
   qcQuantity?: number;
+  qcPassedQuantity?: number;      // Qty that passed QC (eligible for dispatch)
+  qcFailedQuantity?: number;      // Qty that failed QC (sent for rework)
+  reworkQuantity?: number;         // Qty currently in rework at production
   dispatchQuantity?: number;
   quantityLogs?: QuantityLog[];
+
+  // Multi-Vendor Purchase Batches
+  purchaseBatches?: PurchaseBatch[];
 
   // Drawing Upload Feature
   drawings?: OrderDrawing[];

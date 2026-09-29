@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, Modal, TouchableOpacity, TextInput, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, Modal, TouchableOpacity, TextInput, StyleSheet, ScrollView, useWindowDimensions } from 'react-native';
 import { useERP } from '../context/ERPContext';
 import { useAuth } from '../context/AuthContext';
 import { Role, Priority, User } from '../types';
@@ -13,6 +13,8 @@ interface CreateTaskModalProps {
 }
 
 export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ visible, onClose }) => {
+  const { width } = useWindowDimensions();
+  const isMobile = width < 768;
   const { orders, createTask } = useERP();
   const { users } = useAuth();
 
@@ -76,8 +78,8 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ visible, onClo
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={handleClose}>
-      <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={handleClose}>
-        <TouchableOpacity activeOpacity={1} style={styles.card} onPress={(e) => e.stopPropagation()}>
+      <TouchableOpacity style={[styles.backdrop, isMobile && { padding: 10 }]} activeOpacity={1} onPress={handleClose}>
+        <TouchableOpacity activeOpacity={1} style={[styles.card, isMobile && { padding: 14, maxHeight: '95%' }]} onPress={(e) => e.stopPropagation()}>
           <View style={styles.header}>
             <Text style={styles.title}>Task Assignment & Delegation</Text>
             <TouchableOpacity onPress={handleClose}>

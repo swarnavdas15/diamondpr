@@ -1,10 +1,12 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, useWindowDimensions } from 'react-native';
 import { useERP } from '../../context/ERPContext';
 import { useAuth } from '../../context/AuthContext';
 import { Colors, StatusColors, Spacing, Radius, Shadows } from '../../theme';
 import { TaskKPICards } from './TaskKPICards';
 import { OrderKPICards } from './OrderKPICards';
+import { ExportButton } from '../ui/ExportButton';
+import { ExportDataPayload } from '../../utils/exportUtils';
 
 interface AdminDashboardProps {
   onOpenCreateUser?: () => void;
@@ -12,11 +14,33 @@ interface AdminDashboardProps {
 }
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isSuperAdmin = false }) => {
-  const { orders, setSelectedOrder } = useERP();
+  const { getMaskedOrders, setSelectedOrder } = useERP();
+  const orders = getMaskedOrders();
   const { authAuditLogs, currentUser } = useAuth();
+  const { width } = useWindowDimensions();
+  const isMobile = width < 768;
 
   // If currentUser is SUPER_ADMIN, enforce isSuperAdmin = true
   const effectiveSuperAdmin = isSuperAdmin || currentUser?.role === 'SUPER_ADMIN';
+
+  const getAdminExportPayload = (): ExportDataPayload => {
+    return {
+      title: 'Global ERP Orders & Operations Report',
+      filename: 'Admin_Global_Orders_Report',
+      headers: ['Order No', 'PO Number', 'Client Code', 'Status', 'Purchase', 'Production', 'QC Result', 'Dispatch', 'Required Qty'],
+      rows: orders.map((o) => [
+        o.orderNumber,
+        o.poNumber,
+        o.clientCode,
+        o.status,
+        o.purchaseStatus,
+        o.productionStatus,
+        o.qcResult,
+        o.dispatchStatus,
+        o.requiredQuantity,
+      ]),
+    };
+  };
 
   const getPillStyle = (status: string) => {
     if (status === 'COMPLETED' || status === 'APPROVED' || status === 'PASSED') {
@@ -32,10 +56,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isSuperAdmin = f
   };
 
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+    <ScrollView 
+      style={styles.container} 
+      showsVerticalScrollIndicator={false}
+      contentContainerStyle={{ paddingBottom: isMobile ? 84 : 24 }}
+    >
       {/* Top Banner */}
-      <View style={styles.topBanner}>
-        <View>
+      <View style={[styles.topBanner, isMobile && styles.topBannerMobile]}>
+        <View style={{ flex: 1 }}>
           <Text style={styles.bannerTitle}>
             {effectiveSuperAdmin ? 'Super Admin Executive Dashboard' : 'Admin Operations & Workflow Dashboard'}
           </Text>
@@ -44,6 +72,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isSuperAdmin = f
               ? 'Full system access, global ERP performance overview, workflow monitoring, and security audit logs.'
               : 'Organization-wide workflow monitoring, department tracking, task management, and productivity reports.'}
           </Text>
+        </View>
+        <View style={isMobile && { marginTop: 8, width: '100%' }}>
+          <ExportButton getData={getAdminExportPayload} buttonText="Export Global Data" />
         </View>
       </View>
 
@@ -164,6 +195,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.borderDark,
     ...Shadows.sm,
+  },
+  topBannerMobile: {
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    gap: Spacing.sm,
+    padding: Spacing.md,
   },
   bannerTitle: {
     color: Colors.textLight,

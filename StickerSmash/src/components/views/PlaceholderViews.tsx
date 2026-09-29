@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, TextInput, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, TextInput, StyleSheet, Platform, useWindowDimensions } from 'react-native';
 import { useERP } from '../../context/ERPContext';
 import { useAuth } from '../../context/AuthContext';
 import { Colors, Spacing, Radius, Shadows } from '../../theme';
+import { ExportButton } from '../ui/ExportButton';
+import { ExportDataPayload } from '../../utils/exportUtils';
 
 interface PlaceholderProps {
   onOpenCreateClient?: () => void;
@@ -19,6 +21,25 @@ import { Client } from '../../types';
 export const ClientDirectoryView: React.FC<PlaceholderProps> = ({ onOpenCreateClient, onOpenCreateOrder }) => {
   const { clients, orders, setSelectedOrder } = useERP();
   const [selectedClientForModal, setSelectedClientForModal] = useState<Client | null>(null);
+  const { width } = useWindowDimensions();
+  const isMobile = width < 768;
+
+  const getClientExportPayload = (): ExportDataPayload => {
+    return {
+      title: 'Client Directory & Company Records Report',
+      filename: 'Client_Directory_Report',
+      headers: ['Client Code', 'Company Name', 'Contact Name', 'Contact No', 'Email', 'GST Number', 'Industry'],
+      rows: clients.map((c) => [
+        c.clientCode,
+        c.companyName,
+        c.contactName || 'N/A',
+        c.contactNo,
+        c.email || 'N/A',
+        c.gstNumber || 'N/A',
+        c.industry || 'Manufacturing',
+      ]),
+    };
+  };
 
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
@@ -29,12 +50,13 @@ export const ClientDirectoryView: React.FC<PlaceholderProps> = ({ onOpenCreateCl
         onClose={() => setSelectedClientForModal(null)}
       />
 
-      <View style={styles.topBanner}>
-        <View>
+      <View style={[styles.topBanner, isMobile && styles.topBannerMobile]}>
+        <View style={{ flex: 1 }}>
           <Text style={styles.title}>Client Directory & Organization Hierarchy</Text>
           <Text style={styles.subTitle}>Manage customer directories, sales leads, company contacts, and interactive organization charts.</Text>
         </View>
-        <View style={styles.btnGroup}>
+        <View style={[styles.btnGroup, isMobile && styles.btnGroupMobile]}>
+          <ExportButton getData={getClientExportPayload} buttonText="Export Clients" />
           {onOpenCreateClient && (
             <TouchableOpacity style={styles.btnBlue} onPress={onOpenCreateClient}>
               <Text style={styles.btnText}>+ Register Client</Text>
@@ -198,6 +220,23 @@ export const VendorsView: React.FC = () => {
     }
   };
 
+  const getVendorExportPayload = (): ExportDataPayload => {
+    return {
+      title: 'Vendors & Material Suppliers Directory Report',
+      filename: 'Vendors_Directory_Report',
+      headers: ['Vendor Code', 'Vendor Name', 'Contact Person', 'Mobile', 'Email', 'Material Supplied', 'Status'],
+      rows: vendors.map((v) => [
+        v.vendorCode,
+        v.vendorName,
+        v.contactPerson,
+        v.mobileNumber,
+        v.email,
+        v.materialSupplied,
+        v.status,
+      ]),
+    };
+  };
+
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
       {/* Modals */}
@@ -213,45 +252,173 @@ export const VendorsView: React.FC = () => {
       {/* Vendor Details View Modal */}
       {vendorToView && (
         <View style={styles.viewModalOverlay}>
+          <TouchableOpacity style={styles.modalBackdropTouch} activeOpacity={1} onPress={() => setVendorToView(null)} />
           <View style={styles.viewModalCard}>
+            {/* Clean, Unclipped Header */}
             <View style={styles.viewModalHeader}>
-              <Text style={styles.viewModalTitle}>Supplier Vendor Record: {vendorToView.vendorCode}</Text>
-              <TouchableOpacity onPress={() => setVendorToView(null)}>
-                <Text style={styles.closeBtn}>✕</Text>
+              <View style={styles.viewModalHeaderTitleRow}>
+                <Text style={styles.viewModalIcon}>🏭</Text>
+                <View>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <Text style={styles.viewModalTitle}>Supplier Vendor Details</Text>
+                    <View style={styles.codeBadge}>
+                      <Text style={styles.codeBadgeText}>{vendorToView.vendorCode}</Text>
+                    </View>
+                  </View>
+                  <Text style={styles.viewModalSub}>Approved ERP Raw Material & Service Provider</Text>
+                </View>
+              </View>
+
+              <TouchableOpacity style={styles.iconCloseBtn} onPress={() => setVendorToView(null)}>
+                <Text style={styles.iconCloseText}>✕</Text>
               </TouchableOpacity>
             </View>
 
-            <ScrollView style={{ maxHeight: 420 }}>
-              <Text style={styles.viewLabel}>Vendor Name: <Text style={styles.viewVal}>{vendorToView.vendorName}</Text></Text>
-              <Text style={styles.viewLabel}>Company Name: <Text style={styles.viewVal}>{vendorToView.companyName || 'N/A'}</Text></Text>
-              <Text style={styles.viewLabel}>GST Number: <Text style={styles.viewVal}>{vendorToView.gstNumber || 'N/A'}</Text></Text>
-              <Text style={styles.viewLabel}>PAN Number: <Text style={styles.viewVal}>{vendorToView.panNumber || 'N/A'}</Text></Text>
+            {/* Scrollable Organised Detail Cards */}
+            <ScrollView style={{ maxHeight: 460 }} showsVerticalScrollIndicator={true} nestedScrollEnabled={true}>
+              {/* Card 1: Identity & Tax Credentials */}
+              <View style={styles.detailSectionCard}>
+                <View style={styles.sectionHeaderRow}>
+                  <Text style={styles.sectionCardTitle}>🏢 Supplier Identity & Tax Info</Text>
+                  <View
+                    style={[
+                      styles.statusPill,
+                      {
+                        backgroundColor: vendorToView.status === 'ACTIVE' ? 'rgba(34, 197, 94, 0.12)' : 'rgba(239, 68, 68, 0.12)',
+                        borderColor: vendorToView.status === 'ACTIVE' ? Colors.successBright : '#ef4444',
+                      },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.statusPillText,
+                        { color: vendorToView.status === 'ACTIVE' ? Colors.successBright : '#ef4444' },
+                      ]}
+                    >
+                      ● {vendorToView.status}
+                    </Text>
+                  </View>
+                </View>
 
-              <View style={styles.modalDivider} />
+                <Text style={styles.vendorMainName}>{vendorToView.vendorName}</Text>
+                {vendorToView.companyName ? (
+                  <Text style={styles.vendorSubCompany}>Legal Entity: {vendorToView.companyName}</Text>
+                ) : null}
 
-              <Text style={styles.viewLabel}>Contact Person: <Text style={styles.viewVal}>{vendorToView.contactPerson}</Text></Text>
-              <Text style={styles.viewLabel}>Mobile Number: <Text style={styles.viewVal}>{vendorToView.mobileNumber}</Text></Text>
-              <Text style={styles.viewLabel}>Alternate Mobile: <Text style={styles.viewVal}>{vendorToView.alternateMobile || 'N/A'}</Text></Text>
-              <Text style={styles.viewLabel}>Email Address: <Text style={styles.viewVal}>{vendorToView.email}</Text></Text>
-              <Text style={styles.viewLabel}>Website: <Text style={styles.viewVal}>{vendorToView.website || 'N/A'}</Text></Text>
+                <View style={styles.infoGridTwoCol}>
+                  <View style={styles.infoBoxItem}>
+                    <Text style={styles.infoBoxLabel}>GST Identification No.</Text>
+                    <Text style={styles.infoBoxValCode}>{vendorToView.gstNumber || 'N/A'}</Text>
+                  </View>
 
-              <View style={styles.modalDivider} />
+                  <View style={styles.infoBoxItem}>
+                    <Text style={styles.infoBoxLabel}>PAN Card Number</Text>
+                    <Text style={styles.infoBoxValCode}>{vendorToView.panNumber || 'N/A'}</Text>
+                  </View>
+                </View>
+              </View>
 
-              <Text style={styles.viewLabel}>Material Supplied: <Text style={styles.viewValBold}>{vendorToView.materialSupplied}</Text></Text>
-              <Text style={styles.viewLabel}>Category: <Text style={styles.viewVal}>{vendorToView.vendorCategory || 'General'}</Text></Text>
-              <Text style={styles.viewLabel}>Payment Terms: <Text style={styles.viewVal}>{vendorToView.paymentTerms || 'Net 30'}</Text></Text>
-              <Text style={styles.viewLabel}>Lead Time: <Text style={styles.viewVal}>{vendorToView.leadTime || '7 Days'}</Text></Text>
-              <Text style={styles.viewLabel}>Status: <Text style={[styles.viewVal, { color: vendorToView.status === 'ACTIVE' ? Colors.successBright : '#ef4444' }]}>{vendorToView.status}</Text></Text>
+              {/* Card 2: Contact & Communication */}
+              <View style={styles.detailSectionCard}>
+                <Text style={styles.sectionCardTitle}>📞 Key Contact Person & Communication</Text>
 
-              <View style={styles.modalDivider} />
+                <View style={styles.infoGridTwoCol}>
+                  <View style={styles.infoItemRow}>
+                    <Text style={styles.infoFieldLabel}>Contact Person:</Text>
+                    <Text style={styles.infoFieldValBold}>{vendorToView.contactPerson || 'N/A'}</Text>
+                  </View>
 
-              <Text style={styles.viewLabel}>Address: <Text style={styles.viewVal}>{[vendorToView.addressLine1, vendorToView.city, vendorToView.state, vendorToView.pinCode].filter(Boolean).join(', ') || 'N/A'}</Text></Text>
-              <Text style={styles.viewLabel}>Remarks: <Text style={styles.viewVal}>{vendorToView.remarks || 'None'}</Text></Text>
+                  <View style={styles.infoItemRow}>
+                    <Text style={styles.infoFieldLabel}>Mobile Number:</Text>
+                    <Text style={styles.infoFieldValTeal}>{vendorToView.mobileNumber || 'N/A'}</Text>
+                  </View>
+
+                  <View style={styles.infoItemRow}>
+                    <Text style={styles.infoFieldLabel}>Alt. Phone:</Text>
+                    <Text style={styles.infoFieldVal}>{vendorToView.alternateMobile || 'N/A'}</Text>
+                  </View>
+
+                  <View style={styles.infoItemRow}>
+                    <Text style={styles.infoFieldLabel}>Email Address:</Text>
+                    <Text style={styles.infoFieldVal}>{vendorToView.email || 'N/A'}</Text>
+                  </View>
+                </View>
+
+                {vendorToView.website ? (
+                  <View style={[styles.infoItemRow, { marginTop: 6 }]}>
+                    <Text style={styles.infoFieldLabel}>Official Website:</Text>
+                    <Text style={[styles.infoFieldVal, { color: '#0284c7' }]}>{vendorToView.website}</Text>
+                  </View>
+                ) : null}
+              </View>
+
+              {/* Card 3: Material Sourcing & Commercials */}
+              <View style={styles.detailSectionCard}>
+                <Text style={styles.sectionCardTitle}>📦 Material Sourcing & Commercial Terms</Text>
+
+                <View style={styles.materialBanner}>
+                  <Text style={styles.materialBannerLabel}>Primary Material Supplied:</Text>
+                  <Text style={styles.materialBannerVal}>{vendorToView.materialSupplied || 'N/A'}</Text>
+                </View>
+
+                <View style={styles.infoGridThreeCol}>
+                  <View style={styles.infoBoxItem}>
+                    <Text style={styles.infoBoxLabel}>Category</Text>
+                    <Text style={styles.infoBoxValText}>{vendorToView.vendorCategory || 'General'}</Text>
+                  </View>
+
+                  <View style={styles.infoBoxItem}>
+                    <Text style={styles.infoBoxLabel}>Payment Terms</Text>
+                    <Text style={styles.infoBoxValText}>{vendorToView.paymentTerms || 'Net 30'}</Text>
+                  </View>
+
+                  <View style={styles.infoBoxItem}>
+                    <Text style={styles.infoBoxLabel}>Lead Time</Text>
+                    <Text style={styles.infoBoxValText}>{vendorToView.leadTime || '7 Days'}</Text>
+                  </View>
+                </View>
+              </View>
+
+              {/* Card 4: Factory Address & Remarks */}
+              <View style={styles.detailSectionCard}>
+                <Text style={styles.sectionCardTitle}>📍 Registered Factory Address & Remarks</Text>
+
+                <View style={{ gap: 6, marginTop: 4 }}>
+                  <Text style={styles.infoFieldLabel}>Address:</Text>
+                  <Text style={styles.addressTextVal}>
+                    {[vendorToView.addressLine1, vendorToView.addressLine2, vendorToView.city, vendorToView.state, vendorToView.pinCode, vendorToView.country]
+                      .filter(Boolean)
+                      .join(', ') || 'No address registered.'}
+                  </Text>
+
+                  {vendorToView.remarks ? (
+                    <View style={{ marginTop: 6 }}>
+                      <Text style={styles.infoFieldLabel}>Operational Remarks:</Text>
+                      <Text style={styles.remarksTextVal}>{vendorToView.remarks}</Text>
+                    </View>
+                  ) : null}
+                </View>
+              </View>
             </ScrollView>
 
-            <TouchableOpacity style={styles.closeModalBtn} onPress={() => setVendorToView(null)}>
-              <Text style={styles.closeModalBtnText}>Close Record View</Text>
-            </TouchableOpacity>
+            {/* Footer Action Buttons */}
+            <View style={styles.viewModalFooterRow}>
+              <TouchableOpacity
+                style={styles.editModalBtn}
+                onPress={() => {
+                  const targetVendor = vendorToView;
+                  setVendorToView(null);
+                  setVendorToEdit(targetVendor);
+                  setCreateModalVisible(true);
+                }}
+              >
+                <Text style={styles.editModalBtnText}>✏️ Edit Vendor</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity style={styles.closeModalBtnNew} onPress={() => setVendorToView(null)}>
+                <Text style={styles.closeModalBtnTextNew}>Close</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       )}
@@ -262,15 +429,18 @@ export const VendorsView: React.FC = () => {
           <Text style={styles.title}>Vendors & Material Supply Directory</Text>
           <Text style={styles.subTitle}>Manage approved raw material suppliers, forge foundries, and vendor contracts.</Text>
         </View>
-        <TouchableOpacity
-          style={styles.btnGreen}
-          onPress={() => {
-            setVendorToEdit(null);
-            setCreateModalVisible(true);
-          }}
-        >
-          <Text style={styles.btnText}>+ Add Vendor</Text>
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+          <ExportButton getData={getVendorExportPayload} buttonText="Export Vendors" />
+          <TouchableOpacity
+            style={styles.btnGreen}
+            onPress={() => {
+              setVendorToEdit(null);
+              setCreateModalVisible(true);
+            }}
+          >
+            <Text style={styles.btnText}>+ Add Vendor</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {error ? (
@@ -479,6 +649,12 @@ const styles = StyleSheet.create({
     borderColor: Colors.borderDark,
     ...Shadows.sm,
   },
+  topBannerMobile: {
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    gap: 10,
+    padding: 12,
+  },
   title: {
     color: Colors.textLight,
     fontSize: 18,
@@ -492,6 +668,11 @@ const styles = StyleSheet.create({
   btnGroup: {
     flexDirection: 'row',
     gap: 8,
+  },
+  btnGroupMobile: {
+    flexWrap: 'wrap',
+    width: '100%',
+    marginTop: 6,
   },
   btnBlue: {
     backgroundColor: Colors.accentTeal,
@@ -715,75 +896,261 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   // Vendor Management Styles
+  modalBackdropTouch: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
   viewModalOverlay: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: Colors.overlay,
+    backgroundColor: 'rgba(15, 23, 42, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
-    zIndex: 999,
-    padding: 20,
+    zIndex: 9999,
+    padding: 16,
   },
   viewModalCard: {
     width: '100%',
-    maxWidth: 540,
-    backgroundColor: Colors.cardBg,
+    maxWidth: 580,
+    maxHeight: '90%',
+    backgroundColor: '#ffffff',
     borderRadius: Radius.xl,
     padding: 20,
     borderWidth: 1,
-    borderColor: Colors.borderDark,
+    borderColor: '#e2e8f0',
     ...Shadows.md,
   },
   viewModalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
+    alignItems: 'flex-start',
+    marginBottom: 14,
+    paddingBottom: 12,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.borderDark,
-    paddingBottom: 8,
+    borderBottomColor: '#e2e8f0',
+  },
+  viewModalHeaderTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1,
+  },
+  viewModalIcon: {
+    fontSize: 24,
   },
   viewModalTitle: {
-    color: Colors.textLight,
+    color: '#0f172a',
     fontSize: 16,
     fontWeight: '800',
+    lineHeight: 22,
   },
-  closeBtn: {
+  viewModalSub: {
+    color: '#64748b',
+    fontSize: 11,
+    marginTop: 2,
+  },
+  codeBadge: {
+    backgroundColor: 'rgba(41, 88, 92, 0.1)',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: Colors.accentTeal,
+  },
+  codeBadgeText: {
     color: Colors.accentTeal,
-    fontSize: 16,
+    fontSize: 11,
     fontWeight: '800',
   },
-  viewLabel: {
+  iconCloseBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: '#f1f5f9',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#cbd5e1',
+  },
+  iconCloseText: {
+    color: '#475569',
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  detailSectionCard: {
+    backgroundColor: '#f8fafc',
+    borderRadius: Radius.lg,
+    padding: Spacing.md,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  sectionCardTitle: {
     color: Colors.accentTeal,
     fontSize: 12,
-    fontWeight: '700',
-    marginBottom: 4,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
-  viewVal: {
-    color: Colors.textLight,
-    fontWeight: '500',
+  statusPill: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: Radius.xs,
+    borderWidth: 1,
   },
-  viewValBold: {
-    color: Colors.textLight,
+  statusPillText: {
+    fontSize: 10,
     fontWeight: '800',
   },
-  modalDivider: {
-    height: 1,
-    backgroundColor: Colors.borderDark,
-    marginVertical: 8,
+  vendorMainName: {
+    color: '#0f172a',
+    fontSize: 16,
+    fontWeight: '900',
   },
-  closeModalBtn: {
-    backgroundColor: Colors.accentTeal,
-    paddingVertical: 10,
-    borderRadius: 8,
+  vendorSubCompany: {
+    color: '#64748b',
+    fontSize: 12,
+    marginTop: 2,
+    marginBottom: 8,
+  },
+  infoGridTwoCol: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginTop: 6,
+  },
+  infoGridThreeCol: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 8,
+  },
+  infoBoxItem: {
+    flex: 1,
+    minWidth: 130,
+    backgroundColor: '#ffffff',
+    padding: 8,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  infoBoxLabel: {
+    color: '#64748b',
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  infoBoxValCode: {
+    color: '#0f172a',
+    fontSize: 12,
+    fontWeight: '800',
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    marginTop: 2,
+  },
+  infoBoxValText: {
+    color: '#0f172a',
+    fontSize: 12,
+    fontWeight: '700',
+    marginTop: 2,
+  },
+  infoItemRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 12,
+    gap: 6,
+    minWidth: 200,
+    flex: 1,
   },
-  closeModalBtnText: {
-    color: Colors.white,
+  infoFieldLabel: {
+    color: '#64748b',
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  infoFieldVal: {
+    color: '#0f172a',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  infoFieldValBold: {
+    color: '#0f172a',
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  infoFieldValTeal: {
+    color: Colors.accentTeal,
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  materialBanner: {
+    backgroundColor: 'rgba(41, 88, 92, 0.08)',
+    padding: 10,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    borderColor: 'rgba(41, 88, 92, 0.2)',
+    marginVertical: 4,
+  },
+  materialBannerLabel: {
+    color: Colors.accentTeal,
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  materialBannerVal: {
+    color: '#0f172a',
+    fontSize: 13,
+    fontWeight: '900',
+    marginTop: 2,
+  },
+  addressTextVal: {
+    color: '#334155',
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  remarksTextVal: {
+    color: '#475569',
+    fontSize: 12,
+    fontStyle: 'italic',
+  },
+  viewModalFooterRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    gap: 10,
+    marginTop: 14,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#e2e8f0',
+  },
+  editModalBtn: {
+    backgroundColor: Colors.industrialOrange,
+    paddingHorizontal: 16,
+    paddingVertical: 9,
+    borderRadius: Radius.md,
+  },
+  editModalBtnText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  closeModalBtnNew: {
+    backgroundColor: '#f1f5f9',
+    paddingHorizontal: 18,
+    paddingVertical: 9,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    borderColor: '#cbd5e1',
+  },
+  closeModalBtnTextNew: {
+    color: '#334155',
     fontSize: 12,
     fontWeight: '800',
   },

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, Modal, TouchableOpacity, TextInput, ScrollView, StyleSheet } from 'react-native';
+import { View, Text, Modal, TouchableOpacity, TextInput, ScrollView, StyleSheet, useWindowDimensions } from 'react-native';
 import { CompanyContact } from '../../types';
 import { Colors, Spacing, Radius, Shadows } from '../../theme';
 import { SearchableDropdown } from '../ui/SearchableDropdown';
@@ -32,6 +32,8 @@ export const ContactFormModal: React.FC<ContactFormModalProps> = ({
   onClose,
   onSubmit,
 }) => {
+  const { width } = useWindowDimensions();
+  const isMobile = width < 768;
   const [fullName, setFullName] = useState('');
   const [designation, setDesignation] = useState('');
   const [department, setDepartment] = useState(DEPARTMENTS[0]);
@@ -41,21 +43,6 @@ export const ContactFormModal: React.FC<ContactFormModalProps> = ({
   const [reportsToId, setReportsToId] = useState<string>('');
   const [notes, setNotes] = useState('');
   const [error, setError] = useState('');
-
-  useEffect(() => {
-    if (contactToEdit) {
-      setFullName(contactToEdit.fullName);
-      setDesignation(contactToEdit.designation);
-      setDepartment(contactToEdit.department || DEPARTMENTS[0]);
-      setEmail(contactToEdit.email || '');
-      setMobile(contactToEdit.mobile || '');
-      setWhatsapp(contactToEdit.whatsapp || '');
-      setReportsToId(contactToEdit.reportsToId || '');
-      setNotes(contactToEdit.notes || '');
-    } else {
-      resetForm();
-    }
-  }, [contactToEdit, visible]);
 
   const resetForm = () => {
     setFullName('');
@@ -68,6 +55,22 @@ export const ContactFormModal: React.FC<ContactFormModalProps> = ({
     setNotes('');
     setError('');
   };
+
+  useEffect(() => {
+    if (contactToEdit) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setFullName(contactToEdit.fullName);
+      setDesignation(contactToEdit.designation);
+      setDepartment(contactToEdit.department || DEPARTMENTS[0]);
+      setEmail(contactToEdit.email || '');
+      setMobile(contactToEdit.mobile || '');
+      setWhatsapp(contactToEdit.whatsapp || '');
+      setReportsToId(contactToEdit.reportsToId || '');
+      setNotes(contactToEdit.notes || '');
+    } else {
+      resetForm();
+    }
+  }, [contactToEdit, visible]);
 
   const handleSubmit = () => {
     setError('');
@@ -112,8 +115,8 @@ export const ContactFormModal: React.FC<ContactFormModalProps> = ({
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={handleClose}>
-      <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={handleClose}>
-        <TouchableOpacity activeOpacity={1} style={styles.card} onPress={(e) => e.stopPropagation()}>
+      <TouchableOpacity style={[styles.backdrop, isMobile && { padding: 10 }]} activeOpacity={1} onPress={handleClose}>
+        <TouchableOpacity activeOpacity={1} style={[styles.card, isMobile && { padding: 14, maxHeight: '95%' }]} onPress={(e) => e.stopPropagation()}>
           <View style={styles.header}>
             <Text style={styles.title}>
               {contactToEdit ? '✏ Edit Contact Person' : '👤 Add Contact Person & Reporting Manager'}

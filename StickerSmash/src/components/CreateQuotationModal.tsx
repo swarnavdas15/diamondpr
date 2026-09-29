@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, Modal, TouchableOpacity, TextInput, ScrollView, StyleSheet } from 'react-native';
+import { View, Text, Modal, TouchableOpacity, TextInput, ScrollView, StyleSheet, useWindowDimensions } from 'react-native';
 import { useERP } from '../context/ERPContext';
 import { useAuth } from '../context/AuthContext';
 import { QuotationStatus, Client } from '../types';
@@ -16,6 +16,8 @@ interface CreateQuotationModalProps {
 export const CreateQuotationModal: React.FC<CreateQuotationModalProps> = ({ visible, onClose }) => {
   const { clients, quotations, createQuotation } = useERP();
   const { currentUser } = useAuth();
+  const { width } = useWindowDimensions();
+  const isMobile = width < 768;
 
   const [createClientVisible, setCreateClientVisible] = useState(false);
   const [selectedClientId, setSelectedClientId] = useState<string>('');
@@ -146,8 +148,8 @@ export const CreateQuotationModal: React.FC<CreateQuotationModalProps> = ({ visi
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={handleReset}>
-      <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={handleReset}>
-        <TouchableOpacity activeOpacity={1} style={styles.modalCard} onPress={(e) => e.stopPropagation()}>
+      <TouchableOpacity style={[styles.backdrop, isMobile && { padding: 10 }]} activeOpacity={1} onPress={handleReset}>
+        <TouchableOpacity activeOpacity={1} style={[styles.modalCard, isMobile && { padding: 14, maxHeight: '95%' }]} onPress={(e) => e.stopPropagation()}>
           <View style={styles.header}>
             <View>
               <Text style={styles.title}>Create Sales Quotation</Text>
@@ -428,7 +430,8 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.inputBg,
     borderRadius: Radius.md,
     paddingHorizontal: Spacing.md,
-    paddingVertical: 9,
+    paddingVertical: 10,
+    minHeight: 44,
     color: Colors.textLight,
     fontSize: 13,
     borderWidth: 1,

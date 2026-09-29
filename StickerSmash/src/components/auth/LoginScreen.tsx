@@ -13,18 +13,24 @@ export const LoginScreen: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [forgotPasswordVisible, setForgotPasswordVisible] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleLogin = () => {
+  const handleLogin = async () => {
+    if (isLoading) return;
     setErrorMsg('');
     if (!username.trim() || !password.trim()) {
       setErrorMsg('User ID and Password are required.');
       return;
     }
 
+    setIsLoading(true);
     try {
+      // Simulate network delay for double-submit protection
+      await new Promise(resolve => setTimeout(resolve, 800));
       login(username, password);
     } catch (err: any) {
       setErrorMsg(err.message || 'Authentication failed');
+      setIsLoading(false);
     }
   };
 
@@ -81,8 +87,15 @@ export const LoginScreen: React.FC = () => {
               </TouchableOpacity>
             </View>
 
-            <TouchableOpacity style={styles.loginBtn} onPress={handleLogin} activeOpacity={0.8}>
-              <Text style={styles.loginBtnText}>SIGN IN TO ERP SYSTEM</Text>
+            <TouchableOpacity 
+              style={[styles.loginBtn, isLoading && { opacity: 0.7 }]} 
+              onPress={handleLogin} 
+              activeOpacity={0.8}
+              disabled={isLoading}
+            >
+              <Text style={styles.loginBtnText}>
+                {isLoading ? 'AUTHENTICATING...' : 'SIGN IN TO ERP SYSTEM'}
+              </Text>
             </TouchableOpacity>
           </View>
 

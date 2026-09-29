@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, Modal, TouchableOpacity, ScrollView, TextInput, StyleSheet } from 'react-native';
+import { View, Text, Modal, TouchableOpacity, ScrollView, TextInput, StyleSheet, useWindowDimensions } from 'react-native';
 import { Order, QCResult } from '../types';
 import { Colors, StatusColors, Spacing, Radius, Shadows } from '../theme';
+import { useERP } from '../context/ERPContext';
 
 interface QuantityProcessModalProps {
   visible: boolean;
@@ -13,9 +14,12 @@ interface QuantityProcessModalProps {
     remarks?: string;
     vendorSelected?: string;
     qcResult?: QCResult;
+    passedQty?: number;
+    failedQty?: number;
     transportRef?: string;
     logisticsEntry?: string;
   }) => void;
+  isRework?: boolean;
 }
 
 export const QuantityProcessModal: React.FC<QuantityProcessModalProps> = ({
@@ -24,33 +28,44 @@ export const QuantityProcessModal: React.FC<QuantityProcessModalProps> = ({
   stage,
   onClose,
   onSubmit,
+  isRework,
 }) => {
+  const { width } = useWindowDimensions();
+  const isMobile = width < 768;
+  const { vendors } = useERP();
   const [inputQty, setInputQty] = useState('');
   const [remarks, setRemarks] = useState('');
   const [vendorSelected, setVendorSelected] = useState('');
   const [qcResult, setQcResult] = useState<QCResult>('PASSED');
   const [transportRef, setTransportRef] = useState('');
   const [logisticsEntry, setLogisticsEntry] = useState('');
+  const [passedQty, setPassedQty] = useState('');
+  const [failedQty, setFailedQty] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
 
-  const sampleVendors = [
-    'Jindal Stainless Steel Works',
-    'Global Steel Supply Inc.',
-    'Bharat Forgings Vendor Unit A',
-    'Apex Alloys & Tubes Ltd',
-  ];
+  // Use real vendors from context; fall back to defaults if none exist
+  const vendorList = vendors.length > 0
+    ? vendors.filter((v) => v.status === 'ACTIVE').map((v) => v.vendorName)
+    : ['Jindal Stainless Steel Works', 'Global Steel Supply Inc.', 'Bharat Forgings Vendor Unit A', 'Apex Alloys & Tubes Ltd'];
+
+  const defaultVendor = vendorList[0] || 'Jindal Stainless Steel Works';
 
   useEffect(() => {
     if (order) {
       setInputQty('');
       setRemarks('');
-      setVendorSelected(order.vendorSelected || 'Jindal Stainless Steel Works');
+      setVendorSelected(order.vendorSelected || defaultVendor);
       setQcResult('PASSED');
-      setTransportRef('TRP-10-TON-CONTAINER-4491');
-      setLogisticsEntry('VRL Logistics Container Truck #MH-12-AB-9876');
+      setQcResult('PASSED');
+      setPassedQty('');
+      setFailedQty('');
+      setTransportRef('');
+      setLogisticsEntry('');
       setErrorMsg('');
     }
   }, [order, stage, visible]);
+
+
 
   if (!visible || !order) return null;
 
@@ -63,18 +78,18 @@ export const QuantityProcessModal: React.FC<QuantityProcessModalProps> = ({
   let maxAvailable = 0;
 
   if (stage === 'PURCHASE') {
-    stageTitle = 'Purchase & Material Receipt Progress';
-    questionPrompt = 'How many items/material units have been received?';
+    stageTitle = 'Material Item & Vendor Procurement Report';
+    questionPrompt = 'How many material item units have been purchased & received?';
     alreadyProcessed = order.purchaseQuantity || 0;
     maxAvailable = Math.max(0, totalQty - alreadyProcessed);
   } else if (stage === 'PRODUCTION') {
-    stageTitle = 'Production & Manufacturing Output Update';
-    questionPrompt = 'How many finished items have been produced?';
-    alreadyProcessed = order.productionQuantity || 0;
-    maxAvailable = Math.max(0, totalQty - alreadyProcessed);
+    stageTitle = isRework ? 'Production Rework Update' : 'Production & Manufacturing Output Update';
+    questionPrompt = isRework ? 'How many reworked items have been fixed?' : 'How many finished items have been produced?';
+    alreadyProcessed = isRework ? 0 : (order.productionQuantity || 0);
+    maxAvailable = isRework ? (order.reworkQuantity || 0) : Math.max(0, totalQty - alreadyProcessed);
   } else if (stage === 'QUALITY_TESTING') {
     stageTitle = 'Quality Testing & Inspection Result Log';
-    questionPrompt = 'How many produced items have been quality inspected?';
+    questionPrompt = 'Enter the number of passed and failed items.';
     alreadyProcessed = order.qcQuantity || 0;
     const producedAvailable = order.productionQuantity || 0;
     maxAvailable = Math.max(0, producedAvailable - alreadyProcessed);
@@ -82,7 +97,13 @@ export const QuantityProcessModal: React.FC<QuantityProcessModalProps> = ({
     stageTitle = 'Dispatch & Logistics Shipment Process';
     questionPrompt = 'How many items are being dispatched in this shipment?';
     alreadyProcessed = order.dispatchQuantity || 0;
-    const passedQc = order.qualityTestingRequired ? (order.qcQuantity || 0) : (order.productionQuantity || 0);
+    const passedQc = order.qualityTestingRequired
+      ? (order.qcPassedQuantity !== undefined
+          ? order.qcPassedQuantity
+          : order.qcResult === 'PASSED'
+          ? (order.qcQuantity || 0)
+          : 0)
+      : (order.productionQuantity || 0);
     maxAvailable = Math.max(0, passedQc - alreadyProcessed);
   }
 
@@ -90,6 +111,34 @@ export const QuantityProcessModal: React.FC<QuantityProcessModalProps> = ({
 
   const handleSubmit = () => {
     setErrorMsg('');
+
+    if (stage === 'QUALITY_TESTING') {
+      const pQty = Number(passedQty);
+      const fQty = Number(failedQty);
+
+      if (passedQty.trim() === '' && failedQty.trim() === '') {
+        setErrorMsg('Please enter either passed or failed quantity.');
+        return;
+      }
+      if (isNaN(pQty) || isNaN(fQty) || pQty < 0 || fQty < 0 || (pQty === 0 && fQty === 0)) {
+        setErrorMsg('Please enter valid quantities.');
+        return;
+      }
+      if (pQty + fQty > maxAvailable) {
+        setErrorMsg(`Total QC quantity cannot exceed available uninspected quantity (${maxAvailable} PCS).`);
+        return;
+      }
+      
+      onSubmit({
+        processedQty: pQty + fQty,
+        passedQty: pQty,
+        failedQty: fQty,
+        remarks: remarks.trim() || undefined,
+        qcResult: fQty > 0 ? (pQty > 0 ? undefined : 'FAILED') : 'PASSED',
+      });
+      return;
+    }
+
     const val = Number(inputQty);
 
     if (!inputQty.trim() || isNaN(val) || val <= 0) {
@@ -100,7 +149,7 @@ export const QuantityProcessModal: React.FC<QuantityProcessModalProps> = ({
       setErrorMsg(`Quantity cannot exceed remaining quantity available for this stage (${maxAvailable} PCS).`);
       return;
     }
-    if (alreadyProcessed + val > totalQty) {
+    if (!isRework && alreadyProcessed + val > totalQty) {
       setErrorMsg(`Total processed quantity cannot exceed total order quantity (${totalQty} PCS).`);
       return;
     }
@@ -109,7 +158,6 @@ export const QuantityProcessModal: React.FC<QuantityProcessModalProps> = ({
       processedQty: val,
       remarks: remarks.trim() || undefined,
       vendorSelected: stage === 'PURCHASE' ? vendorSelected : undefined,
-      qcResult: stage === 'QUALITY_TESTING' ? qcResult : undefined,
       transportRef: stage === 'DISPATCH' ? transportRef : undefined,
       logisticsEntry: stage === 'DISPATCH' ? logisticsEntry : undefined,
     });
@@ -117,8 +165,8 @@ export const QuantityProcessModal: React.FC<QuantityProcessModalProps> = ({
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={onClose}>
-        <TouchableOpacity activeOpacity={1} style={styles.modalCard} onPress={(e) => e.stopPropagation()}>
+      <TouchableOpacity style={[styles.overlay, isMobile && { padding: 10 }]} activeOpacity={1} onPress={onClose}>
+        <TouchableOpacity activeOpacity={1} style={[styles.modalCard, isMobile && { padding: 14, maxHeight: '95%' }]} onPress={(e) => e.stopPropagation()}>
           {/* Header */}
           <View style={styles.header}>
             <View>
@@ -136,6 +184,54 @@ export const QuantityProcessModal: React.FC<QuantityProcessModalProps> = ({
                 <Text style={styles.errorText}>⚠️ {errorMsg}</Text>
               </View>
             ) : null}
+
+            {/* Item Sourcing & Vendor Procurement Report Card for PURCHASE stage */}
+            {stage === 'PURCHASE' && (
+              <View style={styles.procurementReportCard}>
+                <View style={styles.procurementReportHeader}>
+                  <Text style={styles.procurementReportTitle}>📊 Item & Vendor Sourcing Report</Text>
+                  <View style={[
+                    styles.vendorStatusBadge,
+                    { backgroundColor: alreadyProcessed >= totalQty ? 'rgba(16, 185, 129, 0.15)' : 'rgba(217, 119, 6, 0.15)', borderColor: alreadyProcessed >= totalQty ? '#10b981' : '#d97706' }
+                  ]}>
+                    <Text style={[
+                      styles.vendorStatusBadgeText,
+                      { color: alreadyProcessed >= totalQty ? '#10b981' : '#d97706' }
+                    ]}>
+                      {alreadyProcessed >= totalQty ? '✓ FULLY PURCHASED' : '⏳ SOURCING IN PROGRESS'}
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={styles.procurementReportGrid}>
+                  <View style={styles.procurementReportItem}>
+                    <Text style={styles.procurementReportLabel}>📦 Purchased Item / Material Spec:</Text>
+                    <Text style={styles.procurementReportValBold}>{order.materialRequirements || 'SS316L Raw Flange Billets'}</Text>
+                  </View>
+
+                  <View style={styles.procurementReportItem}>
+                    <Text style={styles.procurementReportLabel}>🏢 Purchased From (Vendor):</Text>
+                    <Text style={[styles.procurementReportValBold, { color: Colors.accentTeal }]}>
+                      {vendorSelected || order.vendorSelected || 'Jindal Stainless Steel Works'}
+                    </Text>
+                  </View>
+
+                  <View style={styles.procurementReportItem}>
+                    <Text style={styles.procurementReportLabel}>🔢 Order Quantity Sourced:</Text>
+                    <Text style={styles.procurementReportVal}>
+                      <Text style={{ fontWeight: '800', color: Colors.textLight }}>{alreadyProcessed}</Text> / {totalQty} PCS ({remainingQty} PCS Remaining)
+                    </Text>
+                  </View>
+
+                  {order.poNumber ? (
+                    <View style={styles.procurementReportItem}>
+                      <Text style={styles.procurementReportLabel}>📜 PO Reference Number:</Text>
+                      <Text style={styles.procurementReportVal}>{order.poNumber}</Text>
+                    </View>
+                  ) : null}
+                </View>
+              </View>
+            )}
 
             {/* Quantity Metrics Card */}
             <View style={styles.metricsCard}>
@@ -161,23 +257,27 @@ export const QuantityProcessModal: React.FC<QuantityProcessModalProps> = ({
             <Text style={styles.promptText}>{questionPrompt}</Text>
 
             {/* Input Field: Quantity to Process */}
-            <Text style={styles.inputLabel}>Quantity to Process (PCS) *</Text>
-            <TextInput
-              style={[styles.input, { fontSize: 16, fontWeight: '800', color: Colors.accentTeal }]}
-              placeholder={`Enter quantity (Max: ${maxAvailable} PCS)`}
-              placeholderTextColor="#94a3b8"
-              value={inputQty}
-              onChangeText={setInputQty}
-              keyboardType="numeric"
-              autoFocus
-            />
+            {stage !== 'QUALITY_TESTING' ? (
+              <>
+                <Text style={styles.inputLabel}>Quantity to Process (PCS) *</Text>
+                <TextInput
+                  style={[styles.input, { fontSize: 16, fontWeight: '800', color: Colors.accentTeal }]}
+                  placeholder={`Enter quantity (Max: ${maxAvailable} PCS)`}
+                  placeholderTextColor="#94a3b8"
+                  value={inputQty}
+                  onChangeText={setInputQty}
+                  keyboardType="numeric"
+                  autoFocus
+                />
+              </>
+            ) : null}
 
             {/* Stage-Specific Fields */}
             {stage === 'PURCHASE' && (
               <View style={{ marginTop: Spacing.sm }}>
                 <Text style={styles.inputLabel}>Material Vendor / Supplier:</Text>
                 <View style={styles.vendorChips}>
-                  {sampleVendors.map((v) => (
+                  {vendorList.map((v) => (
                     <TouchableOpacity
                       key={v}
                       style={[styles.chip, vendorSelected === v && styles.chipActive]}
@@ -191,21 +291,28 @@ export const QuantityProcessModal: React.FC<QuantityProcessModalProps> = ({
             )}
 
             {stage === 'QUALITY_TESTING' && (
-              <View style={{ marginTop: Spacing.sm }}>
-                <Text style={styles.inputLabel}>Quality Inspection Result *</Text>
-                <View style={{ flexDirection: 'row', gap: Spacing.sm }}>
-                  <TouchableOpacity
-                    style={[styles.qcBtn, qcResult === 'PASSED' && styles.qcBtnPassed]}
-                    onPress={() => setQcResult('PASSED')}
-                  >
-                    <Text style={[styles.qcBtnText, qcResult === 'PASSED' && styles.qcBtnTextPassed]}>✓ QC PASSED</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.qcBtn, qcResult === 'FAILED' && styles.qcBtnFailed]}
-                    onPress={() => setQcResult('FAILED')}
-                  >
-                    <Text style={[styles.qcBtnText, qcResult === 'FAILED' && styles.qcBtnTextFailed]}>✕ QC FAILED</Text>
-                  </TouchableOpacity>
+              <View style={{ marginTop: Spacing.sm, flexDirection: 'row', gap: Spacing.md }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.inputLabel, { color: StatusColors.COMPLETED.text }]}>✓ Passed Qty (PCS)</Text>
+                  <TextInput
+                    style={[styles.input, { fontSize: 16, fontWeight: '800', color: StatusColors.COMPLETED.text, borderColor: StatusColors.COMPLETED.text }]}
+                    placeholder="e.g. 90"
+                    placeholderTextColor="#94a3b8"
+                    value={passedQty}
+                    onChangeText={setPassedQty}
+                    keyboardType="numeric"
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.inputLabel, { color: StatusColors.FAILED.text }]}>✕ Failed/Rework Qty</Text>
+                  <TextInput
+                    style={[styles.input, { fontSize: 16, fontWeight: '800', color: StatusColors.FAILED.text, borderColor: StatusColors.FAILED.text }]}
+                    placeholder="e.g. 10"
+                    placeholderTextColor="#94a3b8"
+                    value={failedQty}
+                    onChangeText={setFailedQty}
+                    keyboardType="numeric"
+                  />
                 </View>
               </View>
             )}
@@ -262,6 +369,7 @@ const styles = StyleSheet.create({
     padding: Spacing.md,
   },
   modalCard: {
+    maxHeight: '90%',
     backgroundColor: Colors.cardBg,
     borderRadius: Radius.xl,
     width: '100%',
@@ -431,5 +539,60 @@ const styles = StyleSheet.create({
     color: Colors.industrialOrange,
     fontSize: 11,
     fontWeight: '700',
+  },
+  procurementReportCard: {
+    backgroundColor: Colors.inputBg,
+    borderRadius: Radius.lg,
+    padding: Spacing.md,
+    borderWidth: 1,
+    borderColor: Colors.borderDark,
+    marginBottom: Spacing.md,
+  },
+  procurementReportHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: Spacing.xs,
+    paddingBottom: Spacing.xs,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.borderDark,
+  },
+  procurementReportTitle: {
+    color: Colors.textLight,
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  vendorStatusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: Radius.xs,
+    borderWidth: 1,
+  },
+  vendorStatusBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  procurementReportGrid: {
+    gap: 6,
+    marginTop: 4,
+  },
+  procurementReportItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  procurementReportLabel: {
+    color: Colors.textSubtle,
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  procurementReportValBold: {
+    color: Colors.textLight,
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  procurementReportVal: {
+    color: Colors.textMuted,
+    fontSize: 11,
   },
 });
