@@ -19,7 +19,7 @@ const ROLE_DEPARTMENTS: Record<Role, { label: string; department: string }> = {
 };
 
 export const UsersView: React.FC<UsersViewProps> = ({ onOpenCreateUser }) => {
-  const { users, toggleUserStatus, updateUser, adminResetUserPassword, authAuditLogs, currentUser } = useAuth();
+  const { users, toggleUserStatus, updateUser, adminResetUserPassword, deleteUser, authAuditLogs, currentUser } = useAuth();
   const { width } = useWindowDimensions();
   const isMobile = width < 768;
 
@@ -34,6 +34,7 @@ export const UsersView: React.FC<UsersViewProps> = ({ onOpenCreateUser }) => {
   const [viewUser, setViewUser] = useState<User | null>(null);
   const [editUser, setEditUser] = useState<User | null>(null);
   const [resetPassUser, setResetPassUser] = useState<User | null>(null);
+  const [userToDelete, setUserToDelete] = useState<User | null>(null);
 
   // Edit User Form State
   const [editName, setEditName] = useState('');
@@ -55,8 +56,8 @@ export const UsersView: React.FC<UsersViewProps> = ({ onOpenCreateUser }) => {
     const userLog = authAuditLogs.find(
       (log) =>
         log.event === 'LOGIN_SUCCESS' &&
-        (log.username?.toLowerCase() === user.username.toLowerCase() ||
-          log.email?.toLowerCase() === user.email.toLowerCase())
+        ((log.username && user.username && log.username.toLowerCase() === user.username.toLowerCase()) ||
+          (log.email && user.email && log.email.toLowerCase() === user.email.toLowerCase()))
     );
     if (userLog) {
       return new Date(userLog.timestamp).toLocaleString('en-US', {
@@ -82,9 +83,9 @@ export const UsersView: React.FC<UsersViewProps> = ({ onOpenCreateUser }) => {
       const deptName = ROLE_DEPARTMENTS[u.role]?.department.toLowerCase() || '';
       const roleLabel = ROLE_DEPARTMENTS[u.role]?.label.toLowerCase() || '';
       return (
-        u.name.toLowerCase().includes(q) ||
-        u.username.toLowerCase().includes(q) ||
-        u.email.toLowerCase().includes(q) ||
+        (u.name && u.name.toLowerCase().includes(q)) ||
+        (u.username && u.username.toLowerCase().includes(q)) ||
+        (u.email && u.email.toLowerCase().includes(q)) ||
         (u.employeeId && u.employeeId.toLowerCase().includes(q)) ||
         deptName.includes(q) ||
         roleLabel.includes(q)
@@ -106,7 +107,7 @@ export const UsersView: React.FC<UsersViewProps> = ({ onOpenCreateUser }) => {
   };
 
   // Submit Edit User
-  const handleSaveEdit = () => {
+  const handleSaveEdit = async () => {
     if (!editUser) return;
     setEditError('');
     setEditSuccess('');
@@ -121,7 +122,7 @@ export const UsersView: React.FC<UsersViewProps> = ({ onOpenCreateUser }) => {
     }
 
     try {
-      updateUser(editUser.id, {
+      await updateUser(editUser.id, {
         name: editName.trim(),
         email: editEmail.trim(),
         mobileNumber: editMobile.trim() || undefined,
@@ -148,7 +149,7 @@ export const UsersView: React.FC<UsersViewProps> = ({ onOpenCreateUser }) => {
   };
 
   // Submit Password Reset
-  const handleSaveResetPass = () => {
+  const handleSaveResetPass = async () => {
     if (!resetPassUser) return;
     setPassError('');
     setPassSuccess('');
@@ -163,8 +164,8 @@ export const UsersView: React.FC<UsersViewProps> = ({ onOpenCreateUser }) => {
     }
 
     try {
-      adminResetUserPassword(resetPassUser.id, newPass);
-      setPassSuccess(`Password reset successfully for ${resetPassUser.username}.`);
+      await adminResetUserPassword(resetPassUser.id, newPass);
+      setPassSuccess(`Password reset successfully for ${resetPassUser.email || resetPassUser.name}.`);
       setTimeout(() => {
         setResetPassUser(null);
         setPassSuccess('');
@@ -302,15 +303,26 @@ export const UsersView: React.FC<UsersViewProps> = ({ onOpenCreateUser }) => {
                         </TouchableOpacity>
                       )}
 
-                      {isSuperAdmin && u.username !== 'superadmin' && (
-                        <TouchableOpacity
-                          style={[styles.actionBtnToggleMobile, u.isActive ? styles.deactBg : styles.actBg]}
-                          onPress={() => toggleUserStatus(u.id)}
-                        >
-                          <Text style={[styles.actionBtnText, u.isActive ? styles.deactText : styles.actText]}>
-                            {u.isActive ? 'Deactivate' : 'Activate'}
-                          </Text>
-                        </TouchableOpacity>
+                      {isSuperAdmin && u.role !== 'SUPER_ADMIN' && (
+                        <>
+                          <TouchableOpacity
+                            style={[styles.actionBtnToggleMobile, u.isActive ? styles.deactBg : styles.actBg]}
+                            onPress={() => toggleUserStatus(u.id)}
+                          >
+                            <Text style={[styles.actionBtnText, u.isActive ? styles.deactText : styles.actText]}>
+                              {u.isActive ? 'Deactivate' : 'Activate'}
+                            </Text>
+                          </TouchableOpacity>
+
+                          <TouchableOpacity
+                            style={[styles.actionBtnToggleMobile, { backgroundColor: '#fee2e2', borderColor: '#f87171' }]}
+                            onPress={() => setUserToDelete(u)}
+                          >
+                            <Text style={[styles.actionBtnText, { color: '#dc2626' }]}>
+                              Delete
+                            </Text>
+                          </TouchableOpacity>
+                        </>
                       )}
 
                       {isSuperAdmin && (
@@ -402,15 +414,26 @@ export const UsersView: React.FC<UsersViewProps> = ({ onOpenCreateUser }) => {
                       )}
 
                       {/* Toggle Status (Super Admin) */}
-                      {isSuperAdmin && u.username !== 'superadmin' && (
-                        <TouchableOpacity
-                          style={[styles.actionBtnToggle, u.isActive ? styles.deactBg : styles.actBg]}
-                          onPress={() => toggleUserStatus(u.id)}
-                        >
-                          <Text style={[styles.actionBtnText, u.isActive ? styles.deactText : styles.actText]}>
-                            {u.isActive ? 'Deactivate' : 'Activate'}
-                          </Text>
-                        </TouchableOpacity>
+                      {isSuperAdmin && u.role !== 'SUPER_ADMIN' && (
+                        <>
+                          <TouchableOpacity
+                            style={[styles.actionBtnToggle, u.isActive ? styles.deactBg : styles.actBg]}
+                            onPress={() => toggleUserStatus(u.id)}
+                          >
+                            <Text style={[styles.actionBtnText, u.isActive ? styles.deactText : styles.actText]}>
+                              {u.isActive ? 'Deactivate' : 'Activate'}
+                            </Text>
+                          </TouchableOpacity>
+
+                          <TouchableOpacity
+                            style={[styles.actionBtnToggle, { backgroundColor: '#fee2e2', borderColor: '#f87171' }]}
+                            onPress={() => setUserToDelete(u)}
+                          >
+                            <Text style={[styles.actionBtnText, { color: '#dc2626' }]}>
+                              Delete
+                            </Text>
+                          </TouchableOpacity>
+                        </>
                       )}
 
                       {/* Reset Password (Super Admin) */}
@@ -614,6 +637,58 @@ export const UsersView: React.FC<UsersViewProps> = ({ onOpenCreateUser }) => {
                 <TouchableOpacity style={styles.saveBtn} onPress={handleSaveResetPass}>
                   <Text style={styles.saveBtnText}>🔑 Assign New Password</Text>
                 </TouchableOpacity>
+              </View>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </Modal>
+      )}
+      {/* MODAL 4: DELETE CONFIRMATION */}
+      {userToDelete && (
+        <Modal visible={!!userToDelete} transparent animationType="fade" onRequestClose={() => setUserToDelete(null)}>
+          <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setUserToDelete(null)}>
+            <TouchableOpacity activeOpacity={1} style={styles.modalCard} onPress={(e) => e.stopPropagation()}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Confirm Deletion</Text>
+                <TouchableOpacity onPress={() => setUserToDelete(null)}>
+                  <Text style={styles.closeBtnText}>×</Text>
+                </TouchableOpacity>
+              </View>
+
+              <View style={{ gap: Spacing.md, paddingBottom: Spacing.sm }}>
+                <View style={{ backgroundColor: '#fee2e2', padding: Spacing.md, borderRadius: Radius.md, alignItems: 'center' }}>
+                  <Text style={{ fontSize: 32, marginBottom: 8 }}>⚠️</Text>
+                  <Text style={{ color: '#991b1b', fontWeight: 'bold', fontSize: 16, textAlign: 'center', marginBottom: 4 }}>
+                    Danger Zone
+                  </Text>
+                  <Text style={{ color: '#7f1d1d', textAlign: 'center', fontSize: 14 }}>
+                    Are you absolutely sure you want to delete <Text style={{fontWeight: 'bold'}}>{userToDelete.name}</Text> (<Text style={{fontStyle: 'italic'}}>{userToDelete.email}</Text>)?
+                  </Text>
+                  <Text style={{ color: '#7f1d1d', textAlign: 'center', fontSize: 13, marginTop: 8, opacity: 0.8 }}>
+                    This action cannot be undone.
+                  </Text>
+                </View>
+
+                <View style={{ flexDirection: 'row', gap: Spacing.md, marginTop: Spacing.sm }}>
+                  <TouchableOpacity 
+                    style={{ flex: 1, padding: Spacing.md, borderRadius: Radius.md, borderWidth: 1, borderColor: Colors.borderDark, alignItems: 'center' }}
+                    onPress={() => setUserToDelete(null)}
+                  >
+                    <Text style={{ color: '#64748b', fontWeight: 'bold' }}>Cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    style={{ flex: 1, padding: Spacing.md, borderRadius: Radius.md, backgroundColor: '#dc2626', alignItems: 'center' }}
+                    onPress={async () => {
+                      try {
+                        await deleteUser(userToDelete.id);
+                        setUserToDelete(null);
+                      } catch (err: any) {
+                        alert(err.message || 'Failed to delete');
+                      }
+                    }}
+                  >
+                    <Text style={{ color: '#fff', fontWeight: 'bold' }}>Yes, Delete</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
             </TouchableOpacity>
           </TouchableOpacity>

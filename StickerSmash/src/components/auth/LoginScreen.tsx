@@ -27,7 +27,7 @@ export const LoginScreen: React.FC = () => {
     try {
       // Simulate network delay for double-submit protection
       await new Promise(resolve => setTimeout(resolve, 800));
-      login(username, password);
+      await login(username, password);
     } catch (err: any) {
       setErrorMsg(err.message || 'Authentication failed');
       setIsLoading(false);
@@ -56,10 +56,10 @@ export const LoginScreen: React.FC = () => {
 
           {/* Login Form Fields */}
           <View style={styles.formGroup}>
-            <Text style={styles.label}>User ID / Username</Text>
+            <Text style={styles.label}>Registered Email Address</Text>
             <TextInput
               style={styles.input}
-              placeholder="Enter User ID (e.g. admin)"
+              placeholder="Enter your email"
               placeholderTextColor={Colors.textSubtle}
               autoCapitalize="none"
               value={username}

@@ -127,8 +127,12 @@
                 "value": "PRODUCTION"
               },
               {
-                "name": "TESTING",
-                "value": "TESTING"
+                "name": "QUALITY_TESTING",
+                "value": "QUALITY_TESTING"
+              },
+              {
+                "name": "DISPATCH",
+                "value": "DISPATCH"
               }
             ]
           },
@@ -174,6 +178,13 @@
                   "kind": "scalar"
                 }
               },
+              "contactName": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
               "contactNo": {
                 "nullable": false,
                 "type": {
@@ -189,7 +200,7 @@
                 }
               },
               "createdById": {
-                "nullable": false,
+                "nullable": true,
                 "type": {
                   "codecId": "sql/char@1",
                   "kind": "scalar",
@@ -221,12 +232,40 @@
                     "length": 36
                   }
                 }
+              },
+              "industry": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "isDeleted": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              },
+              "profileImage": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "remarks": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
               }
             },
             "relations": {
               "createdBy": {
                 "cardinality": "N:1",
-                "nullable": false,
+                "nullable": true,
                 "on": {
                   "localFields": [
                     "createdById"
@@ -267,6 +306,9 @@
                 "companyName": {
                   "column": "companyName"
                 },
+                "contactName": {
+                  "column": "contactName"
+                },
                 "contactNo": {
                   "column": "contactNo"
                 },
@@ -284,6 +326,18 @@
                 },
                 "id": {
                   "column": "id"
+                },
+                "industry": {
+                  "column": "industry"
+                },
+                "isDeleted": {
+                  "column": "isDeleted"
+                },
+                "profileImage": {
+                  "column": "profileImage"
+                },
+                "remarks": {
+                  "column": "remarks"
                 }
               },
               "namespaceId": "public",
@@ -334,7 +388,7 @@
                 }
               },
               "uploadedById": {
-                "nullable": false,
+                "nullable": true,
                 "type": {
                   "codecId": "sql/char@1",
                   "kind": "scalar",
@@ -363,7 +417,7 @@
               },
               "uploadedBy": {
                 "cardinality": "N:1",
-                "nullable": false,
+                "nullable": true,
                 "on": {
                   "localFields": [
                     "uploadedById"
@@ -440,7 +494,7 @@
                 }
               },
               "userId": {
-                "nullable": false,
+                "nullable": true,
                 "type": {
                   "codecId": "sql/char@1",
                   "kind": "scalar",
@@ -469,7 +523,7 @@
               },
               "user": {
                 "cardinality": "N:1",
-                "nullable": false,
+                "nullable": true,
                 "on": {
                   "localFields": [
                     "userId"
@@ -533,7 +587,7 @@
                 }
               },
               "createdById": {
-                "nullable": false,
+                "nullable": true,
                 "type": {
                   "codecId": "sql/char@1",
                   "kind": "scalar",
@@ -580,14 +634,7 @@
                 }
               },
               "requirements": {
-                "nullable": false,
-                "type": {
-                  "codecId": "pg/text@1",
-                  "kind": "scalar"
-                }
-              },
-              "stageSequence": {
-                "nullable": false,
+                "nullable": true,
                 "type": {
                   "codecId": "pg/text@1",
                   "kind": "scalar"
@@ -620,7 +667,7 @@
               },
               "createdBy": {
                 "cardinality": "N:1",
-                "nullable": false,
+                "nullable": true,
                 "on": {
                   "localFields": [
                     "createdById"
@@ -739,9 +786,6 @@
                 "requirements": {
                   "column": "requirements"
                 },
-                "stageSequence": {
-                  "column": "stageSequence"
-                },
                 "updatedAt": {
                   "column": "updatedAt"
                 }
@@ -847,7 +891,7 @@
           "StageLog": {
             "fields": {
               "changedById": {
-                "nullable": false,
+                "nullable": true,
                 "type": {
                   "codecId": "sql/char@1",
                   "kind": "scalar",
@@ -900,7 +944,7 @@
             "relations": {
               "changedBy": {
                 "cardinality": "N:1",
-                "nullable": false,
+                "nullable": true,
                 "on": {
                   "localFields": [
                     "changedById"
@@ -956,7 +1000,7 @@
           "Task": {
             "fields": {
               "assignedToId": {
-                "nullable": false,
+                "nullable": true,
                 "type": {
                   "codecId": "sql/char@1",
                   "kind": "scalar",
@@ -973,7 +1017,7 @@
                 }
               },
               "createdById": {
-                "nullable": false,
+                "nullable": true,
                 "type": {
                   "codecId": "sql/char@1",
                   "kind": "scalar",
@@ -1006,8 +1050,15 @@
                   }
                 }
               },
-              "orderId": {
+              "isDeleted": {
                 "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              },
+              "orderId": {
+                "nullable": true,
                 "type": {
                   "codecId": "sql/char@1",
                   "kind": "scalar",
@@ -1053,7 +1104,7 @@
             "relations": {
               "assignedTo": {
                 "cardinality": "N:1",
-                "nullable": false,
+                "nullable": true,
                 "on": {
                   "localFields": [
                     "assignedToId"
@@ -1069,7 +1120,7 @@
               },
               "createdBy": {
                 "cardinality": "N:1",
-                "nullable": false,
+                "nullable": true,
                 "on": {
                   "localFields": [
                     "createdById"
@@ -1085,7 +1136,7 @@
               },
               "order": {
                 "cardinality": "N:1",
-                "nullable": false,
+                "nullable": true,
                 "on": {
                   "localFields": [
                     "orderId"
@@ -1120,6 +1171,9 @@
                 "id": {
                   "column": "id"
                 },
+                "isDeleted": {
+                  "column": "isDeleted"
+                },
                 "orderId": {
                   "column": "orderId"
                 },
@@ -1153,6 +1207,13 @@
                   "kind": "scalar"
                 }
               },
+              "employeeId": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
               "fcmToken": {
                 "nullable": true,
                 "type": {
@@ -1170,10 +1231,24 @@
                   }
                 }
               },
+              "isActive": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/bool@1",
+                  "kind": "scalar"
+                }
+              },
               "isDeleted": {
                 "nullable": false,
                 "type": {
                   "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              },
+              "mobileNumber": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
                   "kind": "scalar"
                 }
               },
@@ -1215,6 +1290,13 @@
                 "nullable": false,
                 "type": {
                   "codecId": "pg/timestamptz-string@1",
+                  "kind": "scalar"
+                }
+              },
+              "username": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
                   "kind": "scalar"
                 }
               }
@@ -1334,14 +1416,23 @@
                 "email": {
                   "column": "email"
                 },
+                "employeeId": {
+                  "column": "employeeId"
+                },
                 "fcmToken": {
                   "column": "fcmToken"
                 },
                 "id": {
                   "column": "id"
                 },
+                "isActive": {
+                  "column": "isActive"
+                },
                 "isDeleted": {
                   "column": "isDeleted"
+                },
+                "mobileNumber": {
+                  "column": "mobileNumber"
                 },
                 "name": {
                   "column": "name"
@@ -1357,6 +1448,9 @@
                 },
                 "updatedAt": {
                   "column": "updatedAt"
+                },
+                "username": {
+                  "column": "username"
                 }
               },
               "namespaceId": "public",
@@ -1389,6 +1483,11 @@
                   "nativeType": "text",
                   "nullable": false
                 },
+                "contactName": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
+                },
                 "contactNo": {
                   "codecId": "pg/text@1",
                   "nativeType": "text",
@@ -1406,7 +1505,7 @@
                 "createdById": {
                   "codecId": "sql/char@1",
                   "nativeType": "character",
-                  "nullable": false,
+                  "nullable": true,
                   "typeParams": {
                     "length": 36
                   }
@@ -1428,6 +1527,30 @@
                   "typeParams": {
                     "length": 36
                   }
+                },
+                "industry": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
+                },
+                "isDeleted": {
+                  "codecId": "pg/int4@1",
+                  "default": {
+                    "kind": "literal",
+                    "value": 0
+                  },
+                  "nativeType": "int4",
+                  "nullable": false
+                },
+                "profileImage": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
+                },
+                "remarks": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
                 }
               },
               "foreignKeys": [],
@@ -1485,7 +1608,7 @@
                 "uploadedById": {
                   "codecId": "sql/char@1",
                   "nativeType": "character",
-                  "nullable": false,
+                  "nullable": true,
                   "typeParams": {
                     "length": 36
                   }
@@ -1535,7 +1658,7 @@
                 "userId": {
                   "codecId": "sql/char@1",
                   "nativeType": "character",
-                  "nullable": false,
+                  "nullable": true,
                   "typeParams": {
                     "length": 36
                   }
@@ -1584,7 +1707,7 @@
                 "createdById": {
                   "codecId": "sql/char@1",
                   "nativeType": "character",
-                  "nullable": false,
+                  "nullable": true,
                   "typeParams": {
                     "length": 36
                   }
@@ -1629,12 +1752,7 @@
                 "requirements": {
                   "codecId": "pg/text@1",
                   "nativeType": "text",
-                  "nullable": false
-                },
-                "stageSequence": {
-                  "codecId": "pg/text@1",
-                  "nativeType": "text",
-                  "nullable": false
+                  "nullable": true
                 },
                 "updatedAt": {
                   "codecId": "pg/timestamptz-string@1",
@@ -1717,7 +1835,7 @@
                 "changedById": {
                   "codecId": "sql/char@1",
                   "nativeType": "character",
-                  "nullable": false,
+                  "nullable": true,
                   "typeParams": {
                     "length": 36
                   }
@@ -1785,7 +1903,7 @@
                 "assignedToId": {
                   "codecId": "sql/char@1",
                   "nativeType": "character",
-                  "nullable": false,
+                  "nullable": true,
                   "typeParams": {
                     "length": 36
                   }
@@ -1802,7 +1920,7 @@
                 "createdById": {
                   "codecId": "sql/char@1",
                   "nativeType": "character",
-                  "nullable": false,
+                  "nullable": true,
                   "typeParams": {
                     "length": 36
                   }
@@ -1825,10 +1943,19 @@
                     "length": 36
                   }
                 },
+                "isDeleted": {
+                  "codecId": "pg/int4@1",
+                  "default": {
+                    "kind": "literal",
+                    "value": 0
+                  },
+                  "nativeType": "int4",
+                  "nullable": false
+                },
                 "orderId": {
                   "codecId": "sql/char@1",
                   "nativeType": "character",
-                  "nullable": false,
+                  "nullable": true,
                   "typeParams": {
                     "length": 36
                   }
@@ -1881,8 +2008,8 @@
             "User": {
               "checks": [
                 {
-                  "expression": "\"role\" IN ('SUPER_ADMIN', 'ADMIN', 'SALES', 'PURCHASE', 'PRODUCTION', 'TESTING')",
-                  "name": "User_role_check_e8e723fa",
+                  "expression": "\"role\" IN ('SUPER_ADMIN', 'ADMIN', 'SALES', 'PURCHASE', 'PRODUCTION', 'QUALITY_TESTING', 'DISPATCH')",
+                  "name": "User_role_check_0a4f4b6e",
                   "prefix": "User_role_check"
                 }
               ],
@@ -1901,6 +2028,11 @@
                   "nativeType": "text",
                   "nullable": false
                 },
+                "employeeId": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
+                },
                 "fcmToken": {
                   "codecId": "pg/text@1",
                   "nativeType": "text",
@@ -1914,6 +2046,15 @@
                     "length": 36
                   }
                 },
+                "isActive": {
+                  "codecId": "pg/bool@1",
+                  "default": {
+                    "kind": "literal",
+                    "value": true
+                  },
+                  "nativeType": "bool",
+                  "nullable": false
+                },
                 "isDeleted": {
                   "codecId": "pg/int4@1",
                   "default": {
@@ -1922,6 +2063,11 @@
                   },
                   "nativeType": "int4",
                   "nullable": false
+                },
+                "mobileNumber": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
                 },
                 "name": {
                   "codecId": "pg/text@1",
@@ -1957,6 +2103,11 @@
                   "codecId": "pg/timestamptz-string@1",
                   "nativeType": "timestamptz",
                   "nullable": false
+                },
+                "username": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
                 }
               },
               "foreignKeys": [],
@@ -1967,6 +2118,11 @@
                 ]
               },
               "uniques": [
+                {
+                  "columns": [
+                    "username"
+                  ]
+                },
                 {
                   "columns": [
                     "email"
@@ -2007,7 +2163,8 @@
                 "SALES",
                 "PURCHASE",
                 "PRODUCTION",
-                "TESTING"
+                "QUALITY_TESTING",
+                "DISPATCH"
               ]
             },
             "TaskStatus": {
@@ -2024,7 +2181,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "1cb54b33e795052a5770ed0911c0a9d083ab64b711df2c10c49ecd5e3902f5da"
+    "storageHash": "1f43df35d5008aab9af6708542bcb1bb09cf2e9e5b9f34db1d1491a9182e8852"
   },
   "execution": {
     "executionHash": "cb98dcda337d25d34194fe72d84ecaf72aa7572ad7ba8d6956c409e0379dd9fa",

@@ -15,7 +15,8 @@
     "contract:emit": "prisma contract emit",
     "start": "tsx src/server.ts",
     "dev": "tsx watch src/server.ts",
-    "build": "tsc"
+    "build": "tsc",
+    "postinstall": "prisma skills sync || exit 0"
   },
   "prisma": {
     "seed": "ts-node prisma/seed.ts"
@@ -43,8 +44,9 @@
     "cloudinary": "^2.11.0",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
-    "express": "^5.2.1",
     "exceljs": "^4.4.0",
+    "express": "^5.2.1",
+    "ioredis": "^6.0.0",
     "jsonwebtoken": "^9.0.3",
     "multer": "^2.4.0",
     "nodemailer": "^10.0.10",

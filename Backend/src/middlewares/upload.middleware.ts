@@ -25,11 +25,28 @@ const drawingFileFilter = (req: any, file: Express.Multer.File, cb: multer.FileF
   }
 };
 
+// File filter for Images (Profile pics)
+const imageFileFilter = (req: any, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
+  const allowedExts = ['.png', '.jpg', '.jpeg', '.webp'];
+  const ext = path.extname(file.originalname).toLowerCase();
+  if (allowedExts.includes(ext)) {
+    cb(null, true);
+  } else {
+    cb(new Error('Unsupported image format. Allowed: PNG, JPG, JPEG, WEBP'));
+  }
+};
+
 // Exported Multer Upload Instances (Max 10MB per file)
 export const uploadExcel = multer({
   storage: memoryStorage,
   limits: { fileSize: 10 * 1024 * 1024 },
   fileFilter: excelFileFilter
+});
+
+export const uploadImage = multer({
+  storage: memoryStorage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+  fileFilter: imageFileFilter
 });
 
 export const uploadDrawing = multer({

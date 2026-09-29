@@ -34,7 +34,7 @@ import type {
 } from '@prisma/orm-postgres/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'1f43df35d5008aab9af6708542bcb1bb09cf2e9e5b9f34db1d1491a9182e8852'>;
+  StorageHashBase<'e45c766706e8e7480fb3a6504e0ea4a59de2cdfb4f56cbab8cac1ef8e43b7714'>;
 export type ExecutionHash =
   ExecutionHashBase<'cb98dcda337d25d34194fe72d84ecaf72aa7572ad7ba8d6956c409e0379dd9fa'>;
 export type ProfileHash =
@@ -250,10 +250,6 @@ export type FieldOutputTypes = {
       readonly contactNo: CodecTypes['pg/text@1']['output'];
       readonly email: CodecTypes['pg/text@1']['output'] | null;
       readonly address: CodecTypes['pg/text@1']['output'] | null;
-      readonly gstNumber: CodecTypes['pg/text@1']['output'] | null;
-      readonly industry: CodecTypes['pg/text@1']['output'] | null;
-      readonly remarks: CodecTypes['pg/text@1']['output'] | null;
-      readonly profileImage: CodecTypes['pg/text@1']['output'] | null;
       readonly createdById: Char<36> | null;
       readonly isDeleted: CodecTypes['pg/int4@1']['output'];
       readonly createdAt: CodecTypes['pg/timestamptz-string@1']['output'];
@@ -366,10 +362,6 @@ export type FieldInputTypes = {
       readonly contactNo: CodecTypes['pg/text@1']['input'];
       readonly email: CodecTypes['pg/text@1']['input'] | null;
       readonly address: CodecTypes['pg/text@1']['input'] | null;
-      readonly gstNumber: CodecTypes['pg/text@1']['input'] | null;
-      readonly industry: CodecTypes['pg/text@1']['input'] | null;
-      readonly remarks: CodecTypes['pg/text@1']['input'] | null;
-      readonly profileImage: CodecTypes['pg/text@1']['input'] | null;
       readonly createdById: CodecTypes['sql/char@1']['input'] | null;
       readonly isDeleted: CodecTypes['pg/int4@1']['input'];
       readonly createdAt: CodecTypes['pg/timestamptz-string@1']['input'];
@@ -483,12 +475,8 @@ export type StorageColumnTypes = {
       readonly createdAt: CodecTypes['pg/timestamptz-string@1']['output'];
       readonly createdById: Char<36> | null;
       readonly email: CodecTypes['pg/text@1']['output'] | null;
-      readonly gstNumber: CodecTypes['pg/text@1']['output'] | null;
       readonly id: Char<36>;
-      readonly industry: CodecTypes['pg/text@1']['output'] | null;
       readonly isDeleted: CodecTypes['pg/int4@1']['output'];
-      readonly profileImage: CodecTypes['pg/text@1']['output'] | null;
-      readonly remarks: CodecTypes['pg/text@1']['output'] | null;
     };
     readonly Drawing: {
       readonly createdAt: CodecTypes['pg/timestamptz-string@1']['output'];
@@ -599,12 +587,8 @@ export type StorageColumnInputTypes = {
       readonly createdAt: CodecTypes['pg/timestamptz-string@1']['input'];
       readonly createdById: CodecTypes['sql/char@1']['input'] | null;
       readonly email: CodecTypes['pg/text@1']['input'] | null;
-      readonly gstNumber: CodecTypes['pg/text@1']['input'] | null;
       readonly id: CodecTypes['sql/char@1']['input'];
-      readonly industry: CodecTypes['pg/text@1']['input'] | null;
       readonly isDeleted: CodecTypes['pg/int4@1']['input'];
-      readonly profileImage: CodecTypes['pg/text@1']['input'] | null;
-      readonly remarks: CodecTypes['pg/text@1']['input'] | null;
     };
     readonly Drawing: {
       readonly createdAt: CodecTypes['pg/timestamptz-string@1']['input'];
@@ -752,10 +736,6 @@ export namespace Models {
     contactNo: CodecTypes['pg/text@1']['output'];
     email: CodecTypes['pg/text@1']['output'] | null;
     address: CodecTypes['pg/text@1']['output'] | null;
-    gstNumber: CodecTypes['pg/text@1']['output'] | null;
-    industry: CodecTypes['pg/text@1']['output'] | null;
-    remarks: CodecTypes['pg/text@1']['output'] | null;
-    profileImage: CodecTypes['pg/text@1']['output'] | null;
     createdById: Char<36> | null;
     isDeleted: CodecTypes['pg/int4@1']['output'];
     createdAt: CodecTypes['pg/timestamptz-string@1']['output'];
@@ -927,26 +907,6 @@ type ContractBase = Omit<
                   readonly nullable: true;
                 };
                 readonly address: {
-                  readonly nativeType: 'text';
-                  readonly codecId: 'pg/text@1';
-                  readonly nullable: true;
-                };
-                readonly gstNumber: {
-                  readonly nativeType: 'text';
-                  readonly codecId: 'pg/text@1';
-                  readonly nullable: true;
-                };
-                readonly industry: {
-                  readonly nativeType: 'text';
-                  readonly codecId: 'pg/text@1';
-                  readonly nullable: true;
-                };
-                readonly remarks: {
-                  readonly nativeType: 'text';
-                  readonly codecId: 'pg/text@1';
-                  readonly nullable: true;
-                };
-                readonly profileImage: {
                   readonly nativeType: 'text';
                   readonly codecId: 'pg/text@1';
                   readonly nullable: true;
@@ -1473,22 +1433,6 @@ type ContractBase = Omit<
                 readonly nullable: true;
                 readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
               };
-              readonly gstNumber: {
-                readonly nullable: true;
-                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
-              };
-              readonly industry: {
-                readonly nullable: true;
-                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
-              };
-              readonly remarks: {
-                readonly nullable: true;
-                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
-              };
-              readonly profileImage: {
-                readonly nullable: true;
-                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
-              };
               readonly createdById: {
                 readonly nullable: true;
                 readonly type: {
@@ -1542,10 +1486,6 @@ type ContractBase = Omit<
                 readonly contactNo: { readonly column: 'contactNo' };
                 readonly email: { readonly column: 'email' };
                 readonly address: { readonly column: 'address' };
-                readonly gstNumber: { readonly column: 'gstNumber' };
-                readonly industry: { readonly column: 'industry' };
-                readonly remarks: { readonly column: 'remarks' };
-                readonly profileImage: { readonly column: 'profileImage' };
                 readonly createdById: { readonly column: 'createdById' };
                 readonly isDeleted: { readonly column: 'isDeleted' };
                 readonly createdAt: { readonly column: 'createdAt' };

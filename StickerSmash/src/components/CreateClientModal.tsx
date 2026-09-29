@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, Modal, TouchableOpacity, TextInput, StyleSheet, ScrollView, useWindowDimensions } from 'react-native';
+import { View, Text, Modal, TouchableOpacity, TextInput, StyleSheet, ScrollView, useWindowDimensions, Image } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { useERP } from '../context/ERPContext';
 import { Colors, Spacing, Radius, Shadows } from '../theme';
 
@@ -14,7 +15,7 @@ interface CreateClientModalProps {
 export const CreateClientModal: React.FC<CreateClientModalProps> = ({ visible, onClose, onClientCreated }) => {
   const { width } = useWindowDimensions();
   const isMobile = width < 768;
-  const { clients, createClient } = useERP();
+  const { clients, createClient, uploadClientProfileImage } = useERP();
 
   const [clientCode, setClientCode] = useState('');
   const [companyName, setCompanyName] = useState('');
@@ -27,8 +28,22 @@ export const CreateClientModal: React.FC<CreateClientModalProps> = ({ visible, o
   const [remarks, setRemarks] = useState('');
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+  const [profileImageUri, setProfileImageUri] = useState<string | null>(null);
 
-  const handleSubmit = () => {
+  
+  const pickImage = async () => {
+    let result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    });
+    if (!result.canceled) {
+      setProfileImageUri(result.assets[0].uri);
+    }
+  };
+
+  const handleSubmit = async () => {
     setError('');
     setSuccessMsg('');
 
@@ -48,7 +63,7 @@ export const CreateClientModal: React.FC<CreateClientModalProps> = ({ visible, o
 
     // Uniqueness validation
     const isDuplicate = clients.some(
-      (c) => c.clientCode.trim().toLowerCase() === trimmedCode.toLowerCase()
+      (c) => (c.clientCode || c.clientcode || '').trim().toLowerCase() === trimmedCode.toLowerCase()
     );
 
     if (isDuplicate) {
@@ -57,7 +72,7 @@ export const CreateClientModal: React.FC<CreateClientModalProps> = ({ visible, o
     }
 
     try {
-      const newClient = createClient({
+      const newClient = await createClient({
         clientCode: trimmedCode,
         companyName: trimmedCompany,
         contactName: contactName.trim(),
@@ -68,6 +83,15 @@ export const CreateClientModal: React.FC<CreateClientModalProps> = ({ visible, o
         industry: industry.trim(),
         remarks: remarks.trim(),
       });
+
+      if (profileImageUri) {
+        setSuccessMsg('Uploading profile image...');
+        const filename = profileImageUri.split('/').pop() || 'profile.jpg';
+        // Infer type from extension
+        const match = /\.(\w+)$/.exec(filename);
+        const type = match ? `image/${match[1]}` : `image/jpeg`;
+        await uploadClientProfileImage(newClient.id, profileImageUri, filename, type);
+      }
 
       if (onClientCreated) {
         onClientCreated(newClient);
@@ -94,6 +118,7 @@ export const CreateClientModal: React.FC<CreateClientModalProps> = ({ visible, o
     setRemarks('');
     setError('');
     setSuccessMsg('');
+    setProfileImageUri(null);
     onClose();
   };
 
@@ -131,6 +156,16 @@ export const CreateClientModal: React.FC<CreateClientModalProps> = ({ visible, o
                 value={companyName}
                 onChangeText={setCompanyName}
               />
+
+              
+              <Text style={styles.label}>Contact Profile Image</Text>
+              <TouchableOpacity style={styles.imagePickerBtn} onPress={pickImage}>
+                {profileImageUri ? (
+                  <Image source={{ uri: profileImageUri }} style={styles.previewImage} />
+                ) : (
+                  <Text style={styles.imagePickerText}>+ Select Image</Text>
+                )}
+              </TouchableOpacity>
 
               <Text style={styles.label}>Contact Person Name</Text>
               <TextInput
@@ -270,6 +305,32 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.borderDark,
   },
+
+  imagePickerBtn: {
+    backgroundColor: Colors.inputBg,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: Colors.borderDark,
+    borderStyle: 'dashed',
+    height: 100,
+    width: 100,
+    justifyContent: 'center',
+    alignItems: 'center',
+    overflow: 'hidden',
+    marginBottom: 8,
+  },
+  previewImage: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
+  imagePickerText: {
+    color: Colors.accentTeal,
+    fontSize: 12,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+
   submitBtn: {
     backgroundColor: Colors.industrialOrange,
     borderRadius: 8,

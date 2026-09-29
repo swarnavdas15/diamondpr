@@ -83,7 +83,7 @@ export const ClientDirectoryView: React.FC<PlaceholderProps> = ({ onOpenCreateCl
             <View style={styles.thRow}>
               <Text style={[styles.th, { width: 110 }]}>Client Code</Text>
               <Text style={[styles.th, { width: 220 }]}>Company Name</Text>
-              <Text style={[styles.th, { width: 140 }]}>Contact Person</Text>
+              <Text style={[styles.th, { width: 170 }]}>Contact Person</Text>
               <Text style={[styles.th, { width: 130 }]}>Phone</Text>
               <Text style={[styles.th, { width: 180 }]}>Email</Text>
               <Text style={[styles.th, { width: 140 }]}>GST Number</Text>
@@ -99,7 +99,18 @@ export const ClientDirectoryView: React.FC<PlaceholderProps> = ({ onOpenCreateCl
               >
                 <Text style={[styles.tdHighlight, { width: 110 }]}>{c.clientCode}</Text>
                 <Text style={[styles.tdBold, { width: 220 }]}>{c.companyName}</Text>
-                <Text style={[styles.td, { width: 140 }]}>{c.contactName || 'N/A'}</Text>
+                
+                <View style={{ width: 170, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12 }}>
+                  {c.profileImage ? (
+                    <Image source={{ uri: c.profileImage }} style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: Colors.borderDark }} />
+                  ) : (
+                    <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: Colors.borderDark, justifyContent: 'center', alignItems: 'center' }}>
+                      <Text style={{ color: Colors.white, fontSize: 10, fontWeight: '700' }}>{c.contactName ? c.contactName[0].toUpperCase() : '?'}</Text>
+                    </View>
+                  )}
+                  <Text style={[styles.td, { width: '100%', paddingHorizontal: 0 }]} numberOfLines={1}>{c.contactName || 'N/A'}</Text>
+                </View>
+
                 <Text style={[styles.td, { width: 130 }]}>{c.contactNo}</Text>
                 <Text style={[styles.td, { width: 180 }]}>{c.email || 'N/A'}</Text>
                 <Text style={[styles.td, { width: 140 }]}>{c.gstNumber || 'N/A'}</Text>

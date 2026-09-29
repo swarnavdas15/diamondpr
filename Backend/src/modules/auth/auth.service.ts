@@ -22,12 +22,16 @@ export const loginUser = async (identifier: string, pass: string) => {
     .first();
 
   if (!user) {
-    throw new Error('Invalid credentials');
+    throw new Error('Invalid User ID or Password. Please try again.');
   }
 
   const isMatch = await bcrypt.compare(pass, user.password);
   if (!isMatch) {
-    throw new Error('Invalid credentials');
+    throw new Error('Invalid User ID or Password. Please try again.');
+  }
+
+  if (user.isActive === false) {
+    throw new Error('Your account has been deactivated. Please contact the administrator.');
   }
 
   const token = jwt.sign(
@@ -43,7 +47,7 @@ export const loginUser = async (identifier: string, pass: string) => {
       username: user.email,
       email: user.email,
       role: user.role,
-      isActive: true,
+      isActive: user.isActive,
     },
     token,
   };

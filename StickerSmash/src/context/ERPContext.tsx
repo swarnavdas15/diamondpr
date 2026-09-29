@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import {
   Order,
   Client,
@@ -28,13 +28,15 @@ import {
   PurchaseBatch,
 } from '../types';
 import { useAuth } from './AuthContext';
+import { apiClient } from '../api/client';
 
 interface ERPContextType {
   orders: Order[];
   getMaskedOrders: () => Order[];
   clients: Client[];
   companyContacts: CompanyContact[];
-  addCompanyContact: (contact: Omit<CompanyContact, 'id' | 'createdAt'>) => CompanyContact;
+  addCompanyContact: (contact: Omit<CompanyContact, 'id' | 'createdAt'>) => Promise<CompanyContact>;
+  uploadCompanyContactProfileImage: (contactId: string, uri: string, name: string, type: string) => Promise<void>;
   updateCompanyContact: (id: string, data: Partial<CompanyContact>) => void;
   deleteCompanyContact: (id: string) => void;
   companyImportantDates: CompanyImportantDate[];
@@ -111,7 +113,8 @@ interface ERPContextType {
     gstNumber?: string;
     industry?: string;
     remarks?: string;
-  }) => Client;
+  }) => Promise<Client>;
+  uploadClientProfileImage: (clientId: string, uri: string, name: string, type: string) => Promise<void>;
   createOrder: (data: {
     poNumber: string;
     clientId: string;
@@ -781,16 +784,43 @@ const INITIAL_COMPANY_IMPORTANT_DATES: CompanyImportantDate[] = [
 const ERPContext = createContext<ERPContextType | undefined>(undefined);
 
 export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { currentUser, users } = useAuth();
-  const [orders, setOrders] = useState<Order[]>(INITIAL_ORDERS);
-  const [clients, setClients] = useState<Client[]>(INITIAL_CLIENTS);
-  const [companyContacts, setCompanyContacts] = useState<CompanyContact[]>(INITIAL_COMPANY_CONTACTS);
-  const [companyImportantDates, setCompanyImportantDates] = useState<CompanyImportantDate[]>(INITIAL_COMPANY_IMPORTANT_DATES);
-  const [vendors, setVendors] = useState<Vendor[]>(INITIAL_VENDORS);
-  const [quotations, setQuotations] = useState<Quotation[]>(INITIAL_QUOTATIONS);
-  const [tasks, setTasks] = useState<Task[]>(INITIAL_TASKS);
-  const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>(INITIAL_CALENDAR_EVENTS);
+  const { currentUser, users, isAuthenticated } = useAuth();
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [clients, setClients] = useState<Client[]>([]);
+  // Remaining arrays can stay as mock data for now or empty if you prefer, but I'll empty them since user said remove mock data.
+  const [companyContacts, setCompanyContacts] = useState<CompanyContact[]>([]);
+  const [companyImportantDates, setCompanyImportantDates] = useState<CompanyImportantDate[]>([]);
+  const [vendors, setVendors] = useState<Vendor[]>([]);
+  const [quotations, setQuotations] = useState<Quotation[]>([]);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+
+  // Live Backend Fetch
+  useEffect(() => {
+    if (isAuthenticated) {
+      fetchLiveDashboardData();
+    }
+  }, [isAuthenticated]);
+
+  const fetchLiveDashboardData = async () => {
+    try {
+      const [clientsRes, ordersRes, contactsRes] = await Promise.all([
+        apiClient.get('/clients'),
+        apiClient.get('/orders'),
+        apiClient.get('/clients/contacts')
+      ]);
+      const clientsArray = clientsRes.data.clients || clientsRes.data;
+      const normalizedClients = Array.isArray(clientsArray) 
+        ? clientsArray.map((c: any) => ({ ...c, clientCode: c.clientCode || c.clientcode })) 
+        : [];
+      setClients(normalizedClients);
+      setOrders(ordersRes.data.orders || ordersRes.data);
+      setCompanyContacts(contactsRes.data.contacts || []);
+    } catch (error) {
+      console.error('Failed to fetch ERP data from backend API:', error);
+    }
+  };
 
   const addCompanyImportantDate = (data: Omit<CompanyImportantDate, 'id' | 'createdAt'>): CompanyImportantDate => {
     const newDateItem: CompanyImportantDate = {
@@ -807,14 +837,32 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setCompanyImportantDates((prev) => prev.filter((d) => d.id !== id));
   };
 
-  const addCompanyContact = (data: Omit<CompanyContact, 'id' | 'createdAt'>): CompanyContact => {
-    const newContact: CompanyContact = {
-      ...data,
-      id: `cnt-${Date.now()}`,
-      createdAt: new Date().toISOString(),
-    };
-    setCompanyContacts((prev) => [newContact, ...prev]);
-    return newContact;
+  const addCompanyContact = async (data: Omit<CompanyContact, 'id' | 'createdAt'>): Promise<CompanyContact> => {
+    try {
+      const res = await apiClient.post('/clients/contacts', data);
+      await fetchLiveDashboardData();
+      return res.data.contact;
+    } catch (e) {
+      console.error(e);
+      throw e;
+    }
+  };
+
+  const uploadCompanyContactProfileImage = async (contactId: string, uri: string, name: string, type: string) => {
+    try {
+      const formData = new FormData();
+      const response = await fetch(uri);
+      const blob = await response.blob();
+      formData.append('profileImage', blob, name);
+
+      await apiClient.patch(`/clients/contacts/${contactId}/profile-image`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      await fetchLiveDashboardData();
+    } catch (e) {
+      console.error('Failed to upload contact profile image:', e);
+      throw e;
+    }
   };
 
   const updateCompanyContact = (id: string, data: Partial<CompanyContact>) => {
@@ -902,7 +950,7 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
   };
 
-  const createClient = (data: {
+  const createClient = async (data: {
     clientCode: string;
     companyName: string;
     contactName?: string;
@@ -913,37 +961,28 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     industry?: string;
     remarks?: string;
   }) => {
-    const trimmedCode = data.clientCode.trim();
-    if (!trimmedCode) {
-      throw new Error('Client Code is required.');
-    }
-
-    const isDuplicate = clients.some(
-      (c) => c.clientCode.trim().toLowerCase() === trimmedCode.toLowerCase()
-    );
-
-    if (isDuplicate) {
-      throw new Error(`Client Code "${trimmedCode}" already exists. Duplicate Client Codes are not allowed.`);
-    }
-
-    const newClient: Client = {
-      id: `cl-${Date.now()}`,
-      clientCode: trimmedCode,
-      companyName: data.companyName,
-      contactName: data.contactName,
-      contactNo: data.contactNo,
-      email: data.email,
-      address: data.address,
-      gstNumber: data.gstNumber,
-      industry: data.industry,
-      remarks: data.remarks,
-      createdAt: new Date().toISOString(),
-    };
-    setClients((prev) => [newClient, ...prev]);
-    return newClient;
+      try { const res = await apiClient.post(`/orders/client`, data); await fetchLiveDashboardData(); return res.data.client; } catch (e) { console.error(e); throw e; }
   };
 
-  const createOrder = (data: {
+  const uploadClientProfileImage = async (clientId: string, uri: string, name: string, type: string) => {
+    try {
+      const formData = new FormData();
+      // On web, fetch the blob from the URI first
+      const response = await fetch(uri);
+      const blob = await response.blob();
+      formData.append('profileImage', blob, name);
+
+      await apiClient.patch(`/clients/${clientId}/profile-image`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      await fetchLiveDashboardData();
+    } catch (e) {
+      console.error('Failed to upload profile image:', e);
+      throw e;
+    }
+  };
+
+  const createOrder = async (data: {
     poNumber: string;
     clientId: string;
     budget?: number;
@@ -958,152 +997,7 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     customStages?: CustomStage[];
     items?: Array<{ itemName: string; size: string; quantity: number; unitPrice?: number }>;
   }) => {
-    const client = data.clientObj || clients.find((c) => c.id === data.clientId);
-    if (!client) {
-      throw new Error(`Client with ID "${data.clientId}" not found.`);
-    }
-
-    const maxNum = orders.reduce((max, o) => {
-      const match = o.orderNumber.match(/ORD-2026-(\d+)/);
-      return match ? Math.max(max, parseInt(match[1], 10)) : max;
-    }, 0);
-    const orderNumber = `ORD-2026-${String(maxNum + 1).padStart(3, '0')}`;
-
-    const hasStage = data.purchaseRequired || data.productionRequired || data.qualityTestingRequired || data.dispatchRequired;
-    if (!hasStage) {
-      throw new Error('At least one workflow pipeline stage must be enabled.');
-    }
-
-    // Determine initial stage & department assignment
-    let initialStage: any = 'PURCHASE';
-    let initialDept: any = 'PURCHASE';
-    let nextStage: any = 'PRODUCTION';
-
-    if (data.purchaseRequired) {
-      initialStage = 'PURCHASE';
-      initialDept = 'PURCHASE';
-      nextStage = data.productionRequired ? 'PRODUCTION' : (data.qualityTestingRequired ? 'QUALITY_TESTING' : 'DISPATCH');
-    } else if (data.productionRequired) {
-      initialStage = 'PRODUCTION';
-      initialDept = 'PRODUCTION';
-      nextStage = data.qualityTestingRequired ? 'QUALITY_TESTING' : 'DISPATCH';
-    } else if (data.qualityTestingRequired) {
-      initialStage = 'QUALITY_TESTING';
-      initialDept = 'QUALITY_TESTING';
-      nextStage = 'DISPATCH';
-    } else {
-      initialStage = 'DISPATCH';
-      initialDept = 'DISPATCH';
-      nextStage = 'COMPLETED';
-    }
-
-    const newOrder: Order = {
-      id: `ord-${Date.now()}`,
-      orderNumber,
-      poNumber: data.poNumber,
-      clientId: client.id,
-      clientCode: client.clientCode,
-      clientName: client.companyName,
-      contactNo: client.contactNo,
-      email: client.email,
-      address: client.address,
-      budget: data.budget,
-      technicalRequirements: data.technicalRequirements,
-      materialRequirements: data.materialRequirements,
-      requiredQuantity: data.requiredQuantity || 1,
-      status: 'IN_PROGRESS',
-      drawingApproved: false,
-
-      // Workflow Stage Routing & Department Assignment
-      currentStage: initialStage,
-      assignedDepartment: initialDept,
-      nextStage: nextStage,
-
-      // Custom Pipeline Options
-      purchaseRequired: data.purchaseRequired,
-      productionRequired: data.productionRequired,
-      qualityTestingRequired: data.qualityTestingRequired,
-      dispatchRequired: data.dispatchRequired,
-      customStages: data.customStages || [],
-
-      salesWorkflowStage: 'REQUIREMENT_RECEIVED',
-
-      purchaseStatus: data.purchaseRequired ? 'PENDING' : 'COMPLETED',
-      productionStatus: data.productionRequired ? 'PENDING' : 'COMPLETED',
-      qualityStatus: data.qualityTestingRequired ? 'PENDING' : 'COMPLETED',
-      qcResult: 'PENDING',
-      dispatchStatus: data.dispatchRequired ? 'PENDING' : 'COMPLETED',
-      salesVerification: 'PENDING',
-
-      purchaseQuantity: 0,
-      productionQuantity: 0,
-      qcQuantity: 0,
-      qcPassedQuantity: 0,
-      qcFailedQuantity: 0,
-      reworkQuantity: 0,
-      dispatchQuantity: 0,
-      quantityLogs: [],
-
-      items: data.items
-        ? data.items.map((i, idx) => ({ id: `item-${Date.now()}-${idx}`, ...i }))
-        : [],
-      stageLogs: [
-        {
-          id: `log-init-${Date.now()}`,
-          department: 'SALES',
-          action: `Order Created & Automatically Assigned to ${initialDept} Department`,
-          currentStatus: `${initialStage}_PENDING`,
-          remarks: `Order ${orderNumber} created. Routed directly to ${initialDept} department queue.`,
-          changedByName: currentUser?.name || 'System',
-          changedByRole: currentUser?.role || 'SUPER_ADMIN',
-          createdAt: new Date().toISOString(),
-        },
-        {
-          id: `log-${Date.now()}`,
-          department: 'SALES',
-          action: 'Order Initiated with Custom Pipeline',
-          currentStatus: 'REQUIREMENT_RECEIVED',
-          remarks: `Selected Pipelines: Purchase(${data.purchaseRequired ? 'Yes' : 'No'}), Production(${data.productionRequired ? 'Yes' : 'No'}), QC(${data.qualityTestingRequired ? 'Yes' : 'No'}), Dispatch(${data.dispatchRequired ? 'Yes' : 'No'})${data.customStages?.length ? `, Custom Stages(${data.customStages.length})` : ''}`,
-          changedByName: currentUser?.name || 'System',
-          changedByRole: currentUser?.role || 'SUPER_ADMIN',
-          createdAt: new Date().toISOString(),
-        },
-      ],
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-
-    // Auto-generate Tasks for Custom Pipeline Stages assigned to users
-    if (data.customStages && data.customStages.length > 0) {
-      data.customStages.forEach((cStage) => {
-        if (cStage.assignedUserIds && cStage.assignedUserIds.length > 0) {
-          cStage.assignedUserIds.forEach((uId) => {
-            const assignedUser = users.find((u) => u.id === uId);
-            const newTask: Task = {
-              id: `tsk-cs-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
-              orderId: newOrder.id,
-              orderNumber: newOrder.orderNumber,
-              title: `[Custom Stage] ${cStage.stageName} (Order #${newOrder.orderNumber})`,
-              description: cStage.description || `Custom stage task for department: ${cStage.department}`,
-              priority: 'HIGH',
-              status: 'PENDING',
-              assignedToDepartment: (cStage.department as Role) || 'PRODUCTION',
-              assignedToUserId: uId,
-              assignedToName: assignedUser?.name || 'Assigned User',
-              createdByName: currentUser?.name || 'Super Admin',
-              createdByRole: currentUser?.role || 'SUPER_ADMIN',
-              createdByUserId: currentUser?.id,
-              dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-              createdAt: new Date().toISOString(),
-            };
-            setTasks((prev) => [newTask, ...prev]);
-          });
-        }
-      });
-    }
-
-    setOrders((prev) => [newOrder, ...prev]);
-    return newOrder;
+      try { const res = await apiClient.post(`/orders`, data); await fetchLiveDashboardData(); return res.data.order; } catch (e) { console.error(e); throw e; }
   };
 
   const addStageLog = (order: Order, department: string, action: string, currentStatus: string, remarks?: string): StageLog => {
@@ -1119,23 +1013,8 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
   };
 
-  const updateSalesWorkflowStage = (orderId: string, stage: SalesWorkflowStage, remarks?: string) => {
-    const drawingApproved = stage === 'DRAWING_APPROVED' || stage === 'ORDER_CONFIRMED';
-    setOrders((prev) =>
-      prev.map((o) => {
-        if (o.id === orderId) {
-          const log = addStageLog(o, 'SALES', `Sales Workflow Stage -> ${stage}`, stage, remarks);
-          return {
-            ...o,
-            salesWorkflowStage: stage,
-            drawingApproved: o.drawingApproved || drawingApproved,
-            stageLogs: [log, ...o.stageLogs],
-            updatedAt: new Date().toISOString(),
-          };
-        }
-        return o;
-      })
-    );
+  const updateSalesWorkflowStage = async (orderId: string, stage: SalesWorkflowStage, remarks?: string) => {
+      try { await apiClient.patch(`/orders/${orderId}/sales-workflow`, { stage, remarks }); await fetchLiveDashboardData(); } catch (e) { console.error(e); }
   };
 
   const uploadOrderDrawing = (
@@ -1235,93 +1114,14 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     );
   };
 
-  const updatePurchaseStage = (
+  const updatePurchaseStage = async (
     orderId: string,
     status: DepartmentStatus,
     vendorSelected?: string,
     procurementNotes?: string,
     processedQty?: number
   ) => {
-    if (!currentUser || !['PURCHASE', 'ADMIN', 'SUPER_ADMIN'].includes(currentUser.role)) {
-      throw new Error('Permission Denied: Only Purchase personnel can update Purchase stage.');
-    }
-    setOrders((prev) =>
-      prev.map((o) => {
-        if (o.id === orderId) {
-          const added = processedQty !== undefined ? processedQty : (status === 'COMPLETED' ? Math.max(0, o.requiredQuantity - (o.purchaseQuantity || 0)) : 0);
-          const newPurchaseQty = (o.purchaseQuantity || 0) + added;
-          const calcStatus: DepartmentStatus = newPurchaseQty >= o.requiredQuantity ? 'COMPLETED' : (newPurchaseQty > 0 ? 'IN_PROGRESS' : status);
-
-          const qLog: QuantityLog = {
-            id: `ql-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-            orderId,
-            stage: 'PURCHASE',
-            processedQty: added,
-            accumulatedQty: newPurchaseQty,
-            remainingQty: Math.max(0, o.requiredQuantity - newPurchaseQty),
-            totalQty: o.requiredQuantity,
-            actionLabel: `Received ${added} PCS Raw Material`,
-            remarks: procurementNotes || `Vendor: ${vendorSelected || 'N/A'}`,
-            changedByName: currentUser?.name || 'System Admin',
-            changedByRole: currentUser?.role || 'PURCHASE',
-            createdAt: new Date().toISOString(),
-          };
-
-          const log = addStageLog(
-            o,
-            'PURCHASE',
-            `Purchase Received -> ${added} PCS (Total: ${newPurchaseQty}/${o.requiredQuantity} PCS)`,
-            calcStatus,
-            procurementNotes || `Vendor: ${vendorSelected || 'N/A'}`
-          );
-
-          // Automatic Stage Movement Check
-          const isCompleted = calcStatus === 'COMPLETED';
-          let currentStageVal: any = o.currentStage || 'PURCHASE';
-          let assignedDeptVal: any = o.assignedDepartment || 'PURCHASE';
-          let nextStageVal: any = o.nextStage || 'PRODUCTION';
-          let prodStatusVal = o.productionStatus;
-
-          const extraLogs: StageLog[] = [];
-
-          if (isCompleted) {
-            if (o.productionRequired) {
-              currentStageVal = 'PRODUCTION';
-              assignedDeptVal = 'PRODUCTION';
-              nextStageVal = o.qualityTestingRequired ? 'QUALITY_TESTING' : 'DISPATCH';
-              if (prodStatusVal === 'PENDING') prodStatusVal = 'PENDING';
-              extraLogs.push(addStageLog(o, 'PURCHASE', 'Purchase Completed -> Moved to Production Department', 'PRODUCTION_PENDING', 'Raw material received. Order automatically moved to Production Department queue.'));
-            } else if (o.qualityTestingRequired) {
-              currentStageVal = 'QUALITY_TESTING';
-              assignedDeptVal = 'QUALITY_TESTING';
-              nextStageVal = 'DISPATCH';
-              extraLogs.push(addStageLog(o, 'PURCHASE', 'Purchase Completed -> Moved to Quality Testing', 'QC_PENDING', 'Raw material received. Order automatically moved to Quality Testing queue.'));
-            } else {
-              currentStageVal = 'DISPATCH';
-              assignedDeptVal = 'DISPATCH';
-              nextStageVal = 'COMPLETED';
-              extraLogs.push(addStageLog(o, 'PURCHASE', 'Purchase Completed -> Moved to Dispatch', 'READY_FOR_DISPATCH', 'Raw material received. Order automatically moved to Dispatch queue.'));
-            }
-          }
-
-          return {
-            ...o,
-            purchaseQuantity: newPurchaseQty,
-            purchaseStatus: calcStatus,
-            productionStatus: prodStatusVal,
-            currentStage: currentStageVal,
-            assignedDepartment: assignedDeptVal,
-            nextStage: nextStageVal,
-            vendorSelected: vendorSelected || o.vendorSelected,
-            procurementNotes: procurementNotes || o.procurementNotes,
-            quantityLogs: [qLog, ...(o.quantityLogs || [])],
-            stageLogs: [...extraLogs, log, ...o.stageLogs],
-            updatedAt: new Date().toISOString(),
-          };
-        }
-        return o;
-      })
-    );
+      try { await apiClient.patch(`/orders/${orderId}/purchase`, { status, processedQty, vendorSelected, procurementNotes }); await fetchLiveDashboardData(); } catch (e) { console.error(e); }
   };
 
   const addPurchaseBatch = (
@@ -1423,120 +1223,17 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
 
-  const updateProductionStage = (
+  const updateProductionStage = async (
     orderId: string,
     status: DepartmentStatus,
     shopFloorNotes?: string,
     processedQty?: number,
     isRework?: boolean
   ) => {
-    if (!currentUser || !['PRODUCTION', 'ADMIN', 'SUPER_ADMIN'].includes(currentUser.role)) {
-      throw new Error('Permission Denied: Only Production personnel can update Production stage.');
-    }
-    setOrders((prev) =>
-      prev.map((o) => {
-        if (o.id === orderId) {
-          const added = processedQty !== undefined ? processedQty : (status === 'COMPLETED' ? Math.max(0, o.requiredQuantity - (o.productionQuantity || 0)) : 0);
-          
-          if (isRework) {
-            if (added > (o.reworkQuantity || 0)) {
-              throw new Error(`Rework quantity cannot exceed available rework quantity (${o.reworkQuantity || 0} PCS).`);
-            }
-          } else if (o.purchaseRequired && (o.productionQuantity || 0) + added > (o.purchaseQuantity || 0)) {
-            throw new Error(`Production quantity cannot exceed total received purchase quantity (${o.purchaseQuantity || 0} PCS).`);
-          }
-
-          const newProdQty = isRework ? (o.productionQuantity || 0) : (o.productionQuantity || 0) + added;
-          const newReworkQty = isRework ? (o.reworkQuantity || 0) - added : (o.reworkQuantity || 0);
-          const calcStatus: DepartmentStatus = newProdQty >= o.requiredQuantity && newReworkQty === 0 ? 'COMPLETED' : (newProdQty > 0 || isRework ? 'IN_PROGRESS' : status);
-
-          const qLog: QuantityLog = {
-            id: `ql-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-            orderId,
-            stage: 'PRODUCTION',
-            processedQty: added,
-            accumulatedQty: newProdQty,
-            remainingQty: Math.max(0, o.requiredQuantity - newProdQty),
-            totalQty: o.requiredQuantity,
-            actionLabel: isRework ? `Reworked ${added} PCS` : `Produced ${added} PCS Finished Goods`,
-            remarks: shopFloorNotes || 'Shop floor machining updated',
-            changedByName: currentUser?.name || 'System Admin',
-            changedByRole: currentUser?.role || 'PRODUCTION',
-            createdAt: new Date().toISOString(),
-          };
-
-          const log = addStageLog(
-            o,
-            'PRODUCTION',
-            isRework ? `Reworked -> ${added} PCS (Sent to QC)` : `Produced -> ${added} PCS (Total: ${newProdQty}/${o.requiredQuantity} PCS)`,
-            calcStatus,
-            shopFloorNotes || 'Shop floor progress updated'
-          );
-
-          // Automatic Stage Movement Check
-          const isCompleted = calcStatus === 'COMPLETED';
-          // If rework, it goes straight to Quality Testing
-          let currentStageVal: any = isRework ? 'QUALITY_TESTING' : (o.currentStage || 'PRODUCTION');
-          let assignedDeptVal: any = isRework ? 'QUALITY_TESTING' : (o.assignedDepartment || 'PRODUCTION');
-          let nextStageVal: any = o.nextStage || 'QUALITY_TESTING';
-          let qualStatusVal = o.qualityStatus;
-          let qcResultVal = o.qcResult;
-          let dispStatusVal = o.dispatchStatus;
-
-          const extraLogs: StageLog[] = [];
-
-          if (isCompleted) {
-            if (o.qualityTestingRequired) {
-              currentStageVal = 'QUALITY_TESTING';
-              assignedDeptVal = 'QUALITY_TESTING';
-              nextStageVal = 'DISPATCH';
-              qualStatusVal = qualStatusVal === 'COMPLETED' ? 'COMPLETED' : 'PENDING';
-              extraLogs.push(addStageLog(o, 'PRODUCTION', 'Production Completed -> Moved to Quality Testing Queue', 'QC_PENDING', 'Shop floor production completed. Order automatically moved to Quality Testing Queue.'));
-
-              // Auto-create Quality Testing Task
-              setTimeout(() => {
-                createTask({
-                  title: `QC Inspection: ${o.orderNumber}`,
-                  description: `Quality testing required for ${o.requiredQuantity} pcs (${o.materialRequirements || 'Flanges'}).`,
-                  priority: 'HIGH',
-                  assignedToDepartment: 'QUALITY_TESTING',
-                  orderId: o.id,
-                });
-              }, 100);
-            } else {
-              currentStageVal = 'DISPATCH';
-              assignedDeptVal = 'DISPATCH';
-              nextStageVal = 'COMPLETED';
-              qualStatusVal = 'COMPLETED';
-              qcResultVal = 'PASSED';
-              if (dispStatusVal === 'PENDING') dispStatusVal = 'PENDING';
-              extraLogs.push(addStageLog(o, 'PRODUCTION', 'Production Completed (QC Not Required) -> Moved to Dispatch', 'READY_FOR_DISPATCH', 'Production completed. Quality testing not required. Order moved directly to Dispatch queue.'));
-            }
-          }
-
-          return {
-            ...o,
-            productionQuantity: newProdQty,
-            reworkQuantity: newReworkQty,
-            productionStatus: calcStatus,
-            qualityStatus: isRework ? 'IN_PROGRESS' : qualStatusVal,
-            qcResult: isRework ? 'PENDING' : qcResultVal,
-            dispatchStatus: dispStatusVal,
-            currentStage: currentStageVal,
-            assignedDepartment: assignedDeptVal,
-            nextStage: nextStageVal,
-            shopFloorNotes: shopFloorNotes || o.shopFloorNotes,
-            quantityLogs: [qLog, ...(o.quantityLogs || [])],
-            stageLogs: [...extraLogs, log, ...o.stageLogs],
-            updatedAt: new Date().toISOString(),
-          };
-        }
-        return o;
-      })
-    );
+      try { await apiClient.patch(`/orders/${orderId}/production`, { status, processedQty, isRework, shopFloorNotes }); await fetchLiveDashboardData(); } catch (e) { console.error(e); }
   };
 
-  const updateQualityStage = (
+  const updateQualityStage = async (
     orderId: string,
     status: DepartmentStatus,
     qcResult?: QCResult,
@@ -1545,150 +1242,11 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     passedQty?: number,
     failedQty?: number
   ) => {
-    if (!currentUser || !['QUALITY_TESTING', 'ADMIN', 'SUPER_ADMIN'].includes(currentUser.role)) {
-      throw new Error('Permission Denied: Only Quality Testing personnel can update Quality stage.');
-    }
-    setOrders((prev) =>
-      prev.map((o) => {
-        if (o.id === orderId) {
-          const added = processedQty !== undefined ? processedQty : (status === 'COMPLETED' ? Math.max(0, (o.productionQuantity || 0) - (o.qcQuantity || 0)) : 0);
-          
-          if ((o.qcQuantity || 0) + added > (o.productionQuantity || 0)) {
-            throw new Error(`QC quantity cannot exceed total produced quantity (${o.productionQuantity || 0} PCS).`);
-          }
-
-          const newQcQty = (o.qcQuantity || 0) + added;
-
-          // Partial QC support: track passed and failed separately
-          const newPassedQty = passedQty !== undefined
-            ? (o.qcPassedQuantity || 0) + passedQty
-            : qcResult === 'PASSED' ? (o.qcPassedQuantity || 0) + added : (o.qcPassedQuantity || 0);
-          const newFailedQty = failedQty !== undefined
-            ? (o.qcFailedQuantity || 0) + failedQty
-            : qcResult === 'FAILED' ? (o.qcFailedQuantity || 0) + added : (o.qcFailedQuantity || 0);
-          const newReworkQty = failedQty !== undefined
-            ? (o.reworkQuantity || 0) + failedQty
-            : qcResult === 'FAILED' ? (o.reworkQuantity || 0) + added : (o.reworkQuantity || 0);
-
-          // Effective QC for status calc — use passed qty if partial
-          const effectiveQcQty = passedQty !== undefined ? newPassedQty : newQcQty;
-          const calcStatus: DepartmentStatus = effectiveQcQty >= o.requiredQuantity ? 'COMPLETED' : (newQcQty > 0 ? 'IN_PROGRESS' : status);
-
-          const qLog: QuantityLog = {
-            id: `ql-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-            orderId,
-            stage: 'QUALITY_TESTING',
-            processedQty: added,
-            accumulatedQty: newQcQty,
-            remainingQty: Math.max(0, (o.productionQuantity || 0) - newQcQty),
-            totalQty: o.requiredQuantity,
-            actionLabel: passedQty !== undefined && failedQty !== undefined
-              ? `QC Batch: ${passedQty} PCS PASSED, ${failedQty} PCS FAILED (Rework)`
-              : `QC Inspected ${added} PCS (${qcResult || 'PASSED'})`,
-            remarks: qcRemarks || 'Quality inspection record updated',
-            changedByName: currentUser?.name || 'System Admin',
-            changedByRole: currentUser?.role || 'QUALITY_TESTING',
-            createdAt: new Date().toISOString(),
-          };
-
-          const log = addStageLog(
-            o,
-            'QUALITY_TESTING',
-            passedQty !== undefined && failedQty !== undefined
-              ? `Partial QC → ${passedQty} PCS Passed / ${failedQty} PCS Failed (Rework)`
-              : `QC Tested → ${added} PCS (${qcResult || 'PASSED'}) (${newQcQty}/${o.productionQuantity || o.requiredQuantity} PCS)`,
-            calcStatus,
-            qcRemarks || 'QC inspection record updated'
-          );
-
-          // Automatic Stage Movement Check
-          // isFailed = ALL qty failed, or explicit FAILED result with no passedQty
-          const isPartialQC = passedQty !== undefined && failedQty !== undefined;
-          const isFailed = (!isPartialQC && qcResult === 'FAILED') || (isPartialQC && passedQty === 0 && failedQty! > 0);
-          
-          // isCompleted = total passed >= required
-          const isCompleted = newPassedQty >= o.requiredQuantity;
-
-          let currentStageVal: any = o.currentStage || 'QUALITY_TESTING';
-          let assignedDeptVal: any = o.assignedDepartment || 'QUALITY_TESTING';
-          let nextStageVal: any = o.nextStage || 'DISPATCH';
-          let prodStatusVal = o.productionStatus;
-          let qualStatusVal = calcStatus;
-
-          const extraLogs: StageLog[] = [];
-
-          if (isFailed) {
-            // Full failure: return entire order to production rework
-            currentStageVal = 'PRODUCTION';
-            assignedDeptVal = 'PRODUCTION';
-            nextStageVal = 'QUALITY_TESTING';
-            prodStatusVal = 'IN_PROGRESS';
-            qualStatusVal = 'REJECTED';
-            extraLogs.push(addStageLog(o, 'QUALITY_TESTING', 'Quality Inspection Failed → Returned to Production for Rework', 'QC_FAILED', qcRemarks || 'Quality inspection failed. Order returned to Production for rework.'));
-
-            // Auto-create Rework Task
-            setTimeout(() => {
-              createTask({
-                title: `Rework Required: ${o.orderNumber}`,
-                description: `QC Failed: ${qcRemarks || 'Defects found during quality inspection'}. Production rework needed for ${added} PCS.`,
-                priority: 'URGENT',
-                assignedToDepartment: 'PRODUCTION',
-                orderId: o.id,
-              });
-            }, 100);
-          } else if (isPartialQC && failedQty! > 0) {
-            // Partial failure: failed qty sent to rework, passed qty continues to dispatch
-            extraLogs.push(addStageLog(
-              o,
-              'QUALITY_TESTING',
-              `Partial QC: ${passedQty} PCS → Dispatch Eligible | ${failedQty} PCS → Rework (Production)`,
-              'IN_PROGRESS',
-              qcRemarks || `${passedQty} PCS passed QC and eligible for dispatch. ${failedQty} PCS failed and returned for rework.`
-            ));
-
-            // Auto-create Rework Task for failed qty
-            setTimeout(() => {
-              createTask({
-                title: `Partial Rework: ${o.orderNumber} (${failedQty} PCS)`,
-                description: `Partial QC Failure: ${failedQty} PCS failed inspection. ${qcRemarks || 'Defects found.'}. Rework required.`,
-                priority: 'HIGH',
-                assignedToDepartment: 'PRODUCTION',
-                orderId: o.id,
-              });
-            }, 100);
-          } else if (isCompleted) {
-            currentStageVal = 'DISPATCH';
-            assignedDeptVal = 'DISPATCH';
-            nextStageVal = 'COMPLETED';
-            qualStatusVal = 'COMPLETED';
-            extraLogs.push(addStageLog(o, 'QUALITY_TESTING', 'Quality Inspection Passed → Moved to Dispatch Queue', 'READY_FOR_DISPATCH', qcRemarks || 'Quality testing passed. Order automatically moved to Dispatch Queue.'));
-          }
-
-          return {
-            ...o,
-            qcQuantity: newQcQty,
-            qcPassedQuantity: newPassedQty,
-            qcFailedQuantity: newFailedQty,
-            reworkQuantity: newReworkQty,
-            qualityStatus: qualStatusVal,
-            productionStatus: prodStatusVal,
-            qcResult: qcResult || (isPartialQC ? (failedQty! > 0 ? 'FAILED' : 'PASSED') : (o.qcResult)),
-            qcRemarks: qcRemarks || o.qcRemarks,
-            currentStage: currentStageVal,
-            assignedDepartment: assignedDeptVal,
-            nextStage: nextStageVal,
-            quantityLogs: [qLog, ...(o.quantityLogs || [])],
-            stageLogs: [...extraLogs, log, ...o.stageLogs],
-            updatedAt: new Date().toISOString(),
-          };
-        }
-        return o;
-      })
-    );
+      try { await apiClient.patch(`/orders/${orderId}/quality`, { status, qcResult, processedQty, qcRemarks }); await fetchLiveDashboardData(); } catch (e) { console.error(e); }
   };
 
 
-  const updateDispatchStage = (
+  const updateDispatchStage = async (
     orderId: string,
     status: DepartmentStatus,
     logisticsEntry?: string,
@@ -1696,101 +1254,11 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     dispatchNotes?: string,
     processedQty?: number
   ) => {
-    if (!currentUser || !['DISPATCH', 'ADMIN', 'SUPER_ADMIN'].includes(currentUser.role)) {
-      throw new Error('Permission Denied: Only Dispatch personnel can update Dispatch stage.');
-    }
-    setOrders((prev) =>
-      prev.map((o) => {
-        if (o.id === orderId) {
-          const added = processedQty !== undefined ? processedQty : (status === 'COMPLETED' ? Math.max(0, o.requiredQuantity - (o.dispatchQuantity || 0)) : 0);
-          
-          const availableForDispatch = o.qualityTestingRequired 
-            ? (o.qcPassedQuantity !== undefined ? o.qcPassedQuantity : (o.qcResult === 'PASSED' ? (o.qcQuantity || 0) : 0))
-            : (o.productionRequired ? (o.productionQuantity || 0) : o.requiredQuantity);
-            
-          if ((o.dispatchQuantity || 0) + added > availableForDispatch) {
-            throw new Error(`Dispatch quantity cannot exceed available approved quantity (${availableForDispatch} PCS).`);
-          }
-
-          const newDispQty = (o.dispatchQuantity || 0) + added;
-          const calcStatus: DepartmentStatus = newDispQty >= o.requiredQuantity ? 'COMPLETED' : (newDispQty > 0 ? 'IN_PROGRESS' : status);
-          const overallStatus = o.status; // Keep it unchanged. verifyAndCloseOrder will mark it COMPLETED.
-
-          const qLog: QuantityLog = {
-            id: `ql-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-            orderId,
-            stage: 'DISPATCH',
-            processedQty: added,
-            accumulatedQty: newDispQty,
-            remainingQty: Math.max(0, o.requiredQuantity - newDispQty),
-            totalQty: o.requiredQuantity,
-            actionLabel: `Dispatched ${added} PCS Shipment`,
-            remarks: `Transport Ref: ${transportRef || 'N/A'}. ${dispatchNotes || ''}`,
-            changedByName: currentUser?.name || 'System Admin',
-            changedByRole: currentUser?.role || 'DISPATCH',
-            createdAt: new Date().toISOString(),
-          };
-
-          const log = addStageLog(
-            o,
-            'DISPATCH',
-            `Dispatched -> ${added} PCS (${newDispQty}/${o.requiredQuantity} PCS)`,
-            calcStatus,
-            `Transport Ref: ${transportRef || 'N/A'}. ${dispatchNotes || ''}`
-          );
-
-          // Automatic Stage Movement Check
-          const isCompleted = calcStatus === 'COMPLETED';
-          let currentStageVal: any = o.currentStage || 'DISPATCH';
-          let assignedDeptVal: any = o.assignedDepartment || 'DISPATCH';
-          let nextStageVal: any = o.nextStage || 'COMPLETED';
-
-          const extraLogs: StageLog[] = [];
-
-          if (isCompleted) {
-            currentStageVal = 'COMPLETED';
-            assignedDeptVal = 'COMPLETED';
-            nextStageVal = 'COMPLETED';
-            extraLogs.push(addStageLog(o, 'DISPATCH', 'Dispatch Completed -> Awaiting Sales Verification', 'AWAITING_VERIFICATION', dispatchNotes || 'Shipment dispatched successfully. Pending final sales closure.'));
-          }
-
-          return {
-            ...o,
-            dispatchQuantity: newDispQty,
-            dispatchStatus: calcStatus,
-            status: overallStatus,
-            currentStage: currentStageVal,
-            assignedDepartment: assignedDeptVal,
-            nextStage: nextStageVal,
-            logisticsEntry: logisticsEntry || o.logisticsEntry,
-            transportRef: transportRef || o.transportRef,
-            dispatchNotes: dispatchNotes || o.dispatchNotes,
-            quantityLogs: [qLog, ...(o.quantityLogs || [])],
-            stageLogs: [...extraLogs, log, ...o.stageLogs],
-            updatedAt: new Date().toISOString(),
-          };
-        }
-        return o;
-      })
-    );
+      try { await apiClient.patch(`/orders/${orderId}/dispatch`, { status, processedQty, logisticsEntry, transportRef, dispatchNotes }); await fetchLiveDashboardData(); } catch (e) { console.error(e); }
   };
 
-  const verifyAndCloseOrder = (orderId: string, remarks?: string) => {
-    setOrders((prev) =>
-      prev.map((o) => {
-        if (o.id === orderId) {
-          const log = addStageLog(o, 'SALES', 'Final Sales Verification - Order Closed', 'COMPLETED', remarks || 'Order closed by Sales');
-          return {
-            ...o,
-            salesVerification: 'COMPLETED',
-            status: 'COMPLETED',
-            stageLogs: [log, ...o.stageLogs],
-            updatedAt: new Date().toISOString(),
-          };
-        }
-        return o;
-      })
-    );
+  const verifyAndCloseOrder = async (orderId: string, remarks?: string) => {
+      try { await apiClient.patch(`/orders/${orderId}/verify-completion`, { remarks }); await fetchLiveDashboardData(); } catch (e) { console.error(e); }
   };
 
   const createTask = (data: {
@@ -2131,6 +1599,7 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         clients,
         companyContacts,
         addCompanyContact,
+        uploadCompanyContactProfileImage,
         updateCompanyContact,
         deleteCompanyContact,
         companyImportantDates,
@@ -2150,6 +1619,7 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         markQuotationLost,
 
         createClient,
+        uploadClientProfileImage,
         createVendor,
         updateVendor,
         deleteVendor,

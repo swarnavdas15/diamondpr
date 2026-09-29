@@ -1,5 +1,7 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Role, User, AuthAuditLog } from '../types';
+import { apiClient } from '../api/client';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface AuthContextType {
   currentUser: User | null;
@@ -7,8 +9,8 @@ interface AuthContextType {
   users: User[];
   authAuditLogs: AuthAuditLog[];
 
-  login: (username: string, pass: string) => void;
-  logout: () => void;
+  login: (username: string, pass: string) => Promise<void>;
+  logout: () => Promise<void>;
 
   requestOtp: (identifier: string) => { emailMasked: string; expiresMinutes: number };
   verifyOtp: (identifier: string, code: string) => boolean;
@@ -18,18 +20,18 @@ interface AuthContextType {
   createUser: (userData: {
     name: string;
     username: string;
-    password: string;
+    password?: string;
     email: string;
     mobileNumber?: string;
     employeeId?: string;
     role: Role;
     isActive?: boolean;
-  }) => User;
-  updateUser: (userId: string, data: Partial<User>) => void;
-  adminResetUserPassword: (userId: string, newPass: string) => void;
-  deleteUser: (userId: string) => void;
-  toggleUserStatus: (userId: string) => void;
-  updateUserRole: (userId: string, newRole: Role) => void;
+  }) => Promise<User>;
+  updateUser: (userId: string, data: Partial<User>) => Promise<void>;
+  adminResetUserPassword: (userId: string, newPass: string) => Promise<void>;
+  deleteUser: (userId: string) => Promise<void>;
+  toggleUserStatus: (userId: string) => Promise<void>;
+  updateUserRole: (userId: string, newRole: Role) => Promise<void>;
 }
 
 const INITIAL_USERS: User[] = [
@@ -113,13 +115,38 @@ const INITIAL_LOGS: AuthAuditLog[] = [
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [users, setUsers] = useState<User[]>(INITIAL_USERS);
+  const [users, setUsers] = useState<User[]>([]);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [authAuditLogs, setAuthAuditLogs] = useState<AuthAuditLog[]>(INITIAL_LOGS);
 
   // Secure OTP Store: email -> { hashedCode, expiresAt, requests }
   const [otpStore, setOtpStore] = useState<{ [email: string]: { hashedCode: string; expiresAt: number; requests: number } }>({});
+
+  useEffect(() => {
+    const loadPersistedAuth = async () => {
+      try {
+        const token = await AsyncStorage.getItem('jwt_token');
+        const userStr = await AsyncStorage.getItem('current_user');
+        if (token && userStr) {
+          const user = JSON.parse(userStr);
+          setCurrentUser(user);
+          setIsAuthenticated(true);
+        }
+      } catch (e) {
+        console.error('Failed to load persisted auth', e);
+      }
+    };
+    loadPersistedAuth();
+  }, []);
+
+  useEffect(() => {
+    if (isAuthenticated && (currentUser?.role === 'SUPER_ADMIN' || currentUser?.role === 'ADMIN')) {
+      apiClient.get('/users')
+        .then(res => setUsers(res.data.users || []))
+        .catch(err => console.error('Failed to fetch users:', err));
+    }
+  }, [isAuthenticated, currentUser]);
 
   const addAuditLog = (event: any, details: string, user?: User | null, username?: string, email?: string) => {
     const newLog: AuthAuditLog = {
@@ -134,37 +161,35 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setAuthAuditLogs((prev) => [newLog, ...prev]);
   };
 
-  const login = (inputUsername: string, inputPass: string) => {
-    const trimmedUser = inputUsername.trim().toLowerCase();
-    const user = users.find(
-      (u) => u.username.toLowerCase() === trimmedUser || u.email.toLowerCase() === trimmedUser
-    );
+  const login = async (inputUsername: string, inputPass: string) => {
+    try {
+      const response = await apiClient.post('/auth/login', {
+        identifier: inputUsername,
+        password: inputPass,
+      });
 
-    if (!user) {
-      addAuditLog('LOGIN_FAILED', `Invalid User ID or Password attempt for: '${inputUsername}'`, null, inputUsername);
-      throw new Error('Invalid User ID or Password. Please try again.');
+      const { token, user } = response.data;
+
+      // Save token
+      await AsyncStorage.setItem('jwt_token', token);
+      await AsyncStorage.setItem('current_user', JSON.stringify(user));
+
+      // Login Successful
+      setCurrentUser(user);
+      setIsAuthenticated(true);
+      addAuditLog('LOGIN_SUCCESS', `User '${user.name}' (${user.role}) logged in successfully.`, user);
+    } catch (error: any) {
+      addAuditLog('LOGIN_FAILED', `Invalid attempt for: '${inputUsername}'`, null, inputUsername);
+      throw new Error(error.response?.data?.message || error.response?.data?.error || 'Invalid User ID or Password. Please try again.');
     }
-
-    if (!user.isActive) {
-      addAuditLog('LOGIN_FAILED', `Login attempt on deactivated account: '${user.username}'`, user);
-      throw new Error('Your account has been deactivated. Please contact Super Admin.');
-    }
-
-    if (user.password !== inputPass) {
-      addAuditLog('LOGIN_FAILED', `Incorrect password attempt for User ID: '${user.username}'`, user);
-      throw new Error('Invalid User ID or Password. Please try again.');
-    }
-
-    // Login Successful
-    setCurrentUser(user);
-    setIsAuthenticated(true);
-    addAuditLog('LOGIN_SUCCESS', `User '${user.name}' (${user.role}) logged in successfully.`, user);
   };
 
-  const logout = () => {
+  const logout = async () => {
     if (currentUser) {
       addAuditLog('LOGOUT', `User '${currentUser.name}' logged out.`, currentUser);
     }
+    await AsyncStorage.removeItem('jwt_token');
+    await AsyncStorage.removeItem('current_user');
     setCurrentUser(null);
     setIsAuthenticated(false);
   };
@@ -306,10 +331,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     addAuditLog('PASSWORD_CHANGED', `Super Admin updated recovery email to: ${newEmail}`);
   };
 
-  const createUser = (userData: {
+  const createUser = async (userData: {
     name: string;
     username: string;
-    password: string;
+    password?: string;
     email: string;
     mobileNumber?: string;
     employeeId?: string;
@@ -320,77 +345,62 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       throw new Error('Permission Denied: Only Super Admin can create user accounts.');
     }
 
-    const cleanUsername = userData.username.trim();
-    if (!cleanUsername) {
-      throw new Error('Username is required.');
+    try {
+      const response = await apiClient.post('/users', {
+        name: userData.name.trim(),
+        username: userData.username.trim(), // sent for controller validation
+        email: userData.email.trim(),
+        password: userData.password,
+        mobileNumber: userData.mobileNumber,
+        employeeId: userData.employeeId,
+        role: userData.role,
+      });
+
+      const newUser = {
+        ...response.data.user,
+        password: response.data.generatedPassword || response.data.user.password
+      };
+
+      setUsers((prev) => [newUser, ...prev]);
+      addAuditLog(
+        'USER_CREATED',
+        `Super Admin manually created user '${newUser.email}' (${newUser.name}) with role '${newUser.role}'.`,
+        currentUser
+      );
+      return newUser;
+    } catch (error: any) {
+      throw new Error(error.response?.data?.error || 'Failed to create user');
     }
-
-    // Check Username Uniqueness (Case-Insensitive)
-    const existingUser = users.find(
-      (u) => u.username.toLowerCase() === cleanUsername.toLowerCase()
-    );
-    if (existingUser) {
-      throw new Error(`Username '${cleanUsername}' is already taken. Please enter a unique Username.`);
-    }
-
-    if (!userData.password || userData.password.length < 6) {
-      throw new Error('Password must be at least 6 characters long.');
-    }
-
-    const newUser: User = {
-      id: `usr-${Date.now()}`,
-      name: userData.name.trim(),
-      username: cleanUsername,
-      email: userData.email.trim(),
-      mobileNumber: userData.mobileNumber ? userData.mobileNumber.trim() : undefined,
-      employeeId: userData.employeeId ? userData.employeeId.trim() : undefined,
-      password: userData.password,
-      role: userData.role,
-      isActive: userData.isActive !== undefined ? userData.isActive : true,
-      createdAt: new Date().toISOString(),
-    };
-
-    setUsers((prev) => [newUser, ...prev]);
-    addAuditLog(
-      'USER_CREATED',
-      `Super Admin manually created user '${newUser.username}' (${newUser.name}) with role '${newUser.role}'.`,
-      currentUser
-    );
-    return newUser;
   };
 
-  const updateUser = (userId: string, data: Partial<User>) => {
+  const updateUser = async (userId: string, data: Partial<User>) => {
     if (!currentUser || currentUser.role !== 'SUPER_ADMIN') {
       throw new Error('Permission Denied: Only Super Admin can update user accounts.');
     }
 
-    if (data.username) {
-      const cleanUser = data.username.trim();
-      const conflict = users.find(
-        (u) => u.id !== userId && u.username.toLowerCase() === cleanUser.toLowerCase()
+    try {
+      await apiClient.patch(`/users/${userId}`, data);
+      
+      setUsers((prev) =>
+        prev.map((u) => {
+          if (u.id === userId) {
+            const updated = { ...u, ...data };
+            addAuditLog(
+              'USER_UPDATED',
+              `Super Admin updated user account details for '${u.email}'.`,
+              currentUser
+            );
+            return updated;
+          }
+          return u;
+        })
       );
-      if (conflict) {
-        throw new Error(`Username '${cleanUser}' is already taken by another account.`);
-      }
+    } catch (e: any) {
+      throw new Error(e.response?.data?.error || 'Failed to update user details');
     }
-
-    setUsers((prev) =>
-      prev.map((u) => {
-        if (u.id === userId) {
-          const updated = { ...u, ...data };
-          addAuditLog(
-            'USER_UPDATED',
-            `Super Admin updated user account details for '${u.username}'.`,
-            currentUser
-          );
-          return updated;
-        }
-        return u;
-      })
-    );
   };
 
-  const adminResetUserPassword = (userId: string, newPass: string) => {
+  const adminResetUserPassword = async (userId: string, newPass: string) => {
     if (!currentUser || currentUser.role !== 'SUPER_ADMIN') {
       throw new Error('Permission Denied: Only Super Admin can reset user passwords.');
     }
@@ -399,22 +409,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       throw new Error('New password must be at least 6 characters long.');
     }
 
-    setUsers((prev) =>
-      prev.map((u) => {
-        if (u.id === userId) {
-          addAuditLog(
-            'PASSWORD_RESET',
-            `Super Admin reset password for User ID: '${u.username}'.`,
-            currentUser
-          );
-          return { ...u, password: newPass };
-        }
-        return u;
-      })
-    );
+    try {
+      await apiClient.patch(`/users/${userId}/password`, { password: newPass });
+      
+      const targetUser = users.find((u) => u.id === userId);
+      if (targetUser) {
+        addAuditLog(
+          'PASSWORD_RESET',
+          `Super Admin reset password for User ID: '${targetUser.email}'.`,
+          currentUser
+        );
+      }
+    } catch (e: any) {
+      throw new Error(e.response?.data?.error || 'Failed to reset password');
+    }
   };
 
-  const deleteUser = (userId: string) => {
+  const deleteUser = async (userId: string) => {
     if (!currentUser || currentUser.role !== 'SUPER_ADMIN') {
       throw new Error('Permission Denied: Only Super Admin can delete user accounts.');
     }
@@ -422,42 +433,57 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const targetUser = users.find((u) => u.id === userId);
     if (!targetUser) return;
 
-    if (targetUser.username.toLowerCase() === 'superadmin') {
-      throw new Error('Protected Account: The primary Super Admin account cannot be deleted.');
+    if (targetUser.role === 'SUPER_ADMIN') {
+      throw new Error('Protected Account: Users with Super Admin privileges cannot be deleted.');
     }
 
-    setUsers((prev) => prev.filter((u) => u.id !== userId));
-    addAuditLog(
-      'USER_DELETED',
-      `Super Admin deleted user account: '${targetUser.username}' (${targetUser.role}).`,
-      currentUser
-    );
+    try {
+      await apiClient.delete(`/users/${userId}`);
+      setUsers((prev) => prev.filter((u) => u.id !== userId));
+      addAuditLog(
+        'USER_DELETED',
+        `Super Admin deleted user account: '${targetUser.email}' (${targetUser.role}).`,
+        currentUser
+      );
+    } catch (error: any) {
+      throw new Error(error.response?.data?.error || 'Failed to delete user');
+    }
   };
 
-  const toggleUserStatus = (userId: string) => {
+  const toggleUserStatus = async (userId: string) => {
     if (!currentUser || currentUser.role !== 'SUPER_ADMIN') {
       throw new Error('Permission Denied: Only Super Admin can modify user status.');
     }
     if (userId === currentUser.id) {
       throw new Error('You cannot deactivate your own account.');
     }
-    setUsers((prev) =>
-      prev.map((u) => {
-        if (u.id === userId) {
-          const nextActive = !u.isActive;
-          addAuditLog(
-            'USER_UPDATED',
-            `Super Admin ${nextActive ? 'activated' : 'deactivated'} user '${u.username}'.`,
-            currentUser
-          );
-          return { ...u, isActive: nextActive };
-        }
-        return u;
-      })
-    );
+
+    const userToToggle = users.find((u) => u.id === userId);
+    if (!userToToggle) return;
+
+    try {
+      const nextActive = !userToToggle.isActive;
+      await apiClient.patch(`/users/${userId}/status`, { isActive: nextActive });
+      
+      setUsers((prev) =>
+        prev.map((u) => {
+          if (u.id === userId) {
+            addAuditLog(
+              'USER_UPDATED',
+              `Super Admin ${nextActive ? 'activated' : 'deactivated'} user '${u.email}'.`,
+              currentUser
+            );
+            return { ...u, isActive: nextActive };
+          }
+          return u;
+        })
+      );
+    } catch (e: any) {
+      console.error("Failed to toggle status:", e);
+    }
   };
 
-  const updateUserRole = (userId: string, newRole: Role) => {
+  const updateUserRole = async (userId: string, newRole: Role) => {
     if (!currentUser || currentUser.role !== 'SUPER_ADMIN') {
       throw new Error('Permission Denied: Only Super Admin can modify user roles.');
     }
@@ -465,11 +491,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       throw new Error('You cannot modify your own role.');
     }
     const userToUpdate = users.find((u) => u.id === userId);
-    setUsers((prev) =>
-      prev.map((u) => (u.id === userId ? { ...u, role: newRole } : u))
-    );
-    if (userToUpdate) {
-      addAuditLog('USER_ROLE_UPDATED', `Super Admin updated role of ${userToUpdate.username} to ${newRole}.`, currentUser);
+    
+    try {
+      await apiClient.patch(`/users/${userId}/role`, { role: newRole });
+      setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, role: newRole } : u)));
+      if (userToUpdate) {
+        addAuditLog('USER_ROLE_UPDATED', `Super Admin updated role of ${userToUpdate.email} to ${newRole}.`, currentUser);
+      }
+    } catch (e: any) {
+       console.error("Failed to update user role:", e);
     }
   };
 

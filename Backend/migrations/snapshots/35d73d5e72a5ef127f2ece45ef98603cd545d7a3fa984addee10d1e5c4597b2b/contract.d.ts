@@ -34,7 +34,7 @@ import type {
 } from '@prisma/orm-postgres/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'1f43df35d5008aab9af6708542bcb1bb09cf2e9e5b9f34db1d1491a9182e8852'>;
+  StorageHashBase<'35d73d5e72a5ef127f2ece45ef98603cd545d7a3fa984addee10d1e5c4597b2b'>;
 export type ExecutionHash =
   ExecutionHashBase<'cb98dcda337d25d34194fe72d84ecaf72aa7572ad7ba8d6956c409e0379dd9fa'>;
 export type ProfileHash =
@@ -253,7 +253,6 @@ export type FieldOutputTypes = {
       readonly gstNumber: CodecTypes['pg/text@1']['output'] | null;
       readonly industry: CodecTypes['pg/text@1']['output'] | null;
       readonly remarks: CodecTypes['pg/text@1']['output'] | null;
-      readonly profileImage: CodecTypes['pg/text@1']['output'] | null;
       readonly createdById: Char<36> | null;
       readonly isDeleted: CodecTypes['pg/int4@1']['output'];
       readonly createdAt: CodecTypes['pg/timestamptz-string@1']['output'];
@@ -369,7 +368,6 @@ export type FieldInputTypes = {
       readonly gstNumber: CodecTypes['pg/text@1']['input'] | null;
       readonly industry: CodecTypes['pg/text@1']['input'] | null;
       readonly remarks: CodecTypes['pg/text@1']['input'] | null;
-      readonly profileImage: CodecTypes['pg/text@1']['input'] | null;
       readonly createdById: CodecTypes['sql/char@1']['input'] | null;
       readonly isDeleted: CodecTypes['pg/int4@1']['input'];
       readonly createdAt: CodecTypes['pg/timestamptz-string@1']['input'];
@@ -487,7 +485,6 @@ export type StorageColumnTypes = {
       readonly id: Char<36>;
       readonly industry: CodecTypes['pg/text@1']['output'] | null;
       readonly isDeleted: CodecTypes['pg/int4@1']['output'];
-      readonly profileImage: CodecTypes['pg/text@1']['output'] | null;
       readonly remarks: CodecTypes['pg/text@1']['output'] | null;
     };
     readonly Drawing: {
@@ -603,7 +600,6 @@ export type StorageColumnInputTypes = {
       readonly id: CodecTypes['sql/char@1']['input'];
       readonly industry: CodecTypes['pg/text@1']['input'] | null;
       readonly isDeleted: CodecTypes['pg/int4@1']['input'];
-      readonly profileImage: CodecTypes['pg/text@1']['input'] | null;
       readonly remarks: CodecTypes['pg/text@1']['input'] | null;
     };
     readonly Drawing: {
@@ -755,7 +751,6 @@ export namespace Models {
     gstNumber: CodecTypes['pg/text@1']['output'] | null;
     industry: CodecTypes['pg/text@1']['output'] | null;
     remarks: CodecTypes['pg/text@1']['output'] | null;
-    profileImage: CodecTypes['pg/text@1']['output'] | null;
     createdById: Char<36> | null;
     isDeleted: CodecTypes['pg/int4@1']['output'];
     createdAt: CodecTypes['pg/timestamptz-string@1']['output'];
@@ -942,11 +937,6 @@ type ContractBase = Omit<
                   readonly nullable: true;
                 };
                 readonly remarks: {
-                  readonly nativeType: 'text';
-                  readonly codecId: 'pg/text@1';
-                  readonly nullable: true;
-                };
-                readonly profileImage: {
                   readonly nativeType: 'text';
                   readonly codecId: 'pg/text@1';
                   readonly nullable: true;
@@ -1485,10 +1475,6 @@ type ContractBase = Omit<
                 readonly nullable: true;
                 readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
               };
-              readonly profileImage: {
-                readonly nullable: true;
-                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
-              };
               readonly createdById: {
                 readonly nullable: true;
                 readonly type: {
@@ -1545,7 +1531,6 @@ type ContractBase = Omit<
                 readonly gstNumber: { readonly column: 'gstNumber' };
                 readonly industry: { readonly column: 'industry' };
                 readonly remarks: { readonly column: 'remarks' };
-                readonly profileImage: { readonly column: 'profileImage' };
                 readonly createdById: { readonly column: 'createdById' };
                 readonly isDeleted: { readonly column: 'isDeleted' };
                 readonly createdAt: { readonly column: 'createdAt' };

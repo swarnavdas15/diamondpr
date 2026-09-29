@@ -111,6 +111,7 @@ export interface Client {
   website?: string;
   description?: string;
   logo?: string;
+  profileImage?: string;
   remarks?: string;
   createdAt: string;
 }

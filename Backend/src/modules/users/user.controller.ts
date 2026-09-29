@@ -4,12 +4,12 @@ import * as userService from './user.service';
 
 export const handleCreateUser = async (req: AuthRequest, res: Response) => {
   try {
-    const { name, username, email, password, role } = req.body;
-    if (!name || !username || !email || !role) {
+    const { name, email, password, role, username, mobileNumber, employeeId } = req.body;
+    if (!name || !email || !role || !username) {
       return res.status(400).json({ error: 'Name, username, email, and role are required' });
     }
 
-    const result = await userService.createUser({ name, username, email, password, role });
+    const result = await userService.createUser({ name, email, password, role, username, mobileNumber, employeeId });
     return res.status(201).json({
       message: 'User account successfully created',
       ...result,
@@ -47,5 +47,37 @@ export const handleUpdateUserRole = async (req: AuthRequest, res: Response) => {
     return res.status(200).json({ message: 'User role updated', user: updated });
   } catch (err: any) {
     return res.status(400).json({ error: err.message || 'Failed to update user role' });
+  }
+};
+
+export const handleDeleteUser = async (req: AuthRequest, res: Response) => {
+  try {
+    const id = req.params.id as string;
+    await userService.deleteUser(id);
+    return res.status(200).json({ message: 'User deleted successfully' });
+  } catch (err: any) {
+    return res.status(400).json({ error: err.message || 'Failed to delete user' });
+  }
+};
+
+export const handleResetPassword = async (req: AuthRequest, res: Response) => {
+  try {
+    const id = req.params.id as string;
+    const { password } = req.body;
+    await userService.resetPassword(id, password);
+    return res.status(200).json({ message: 'Password reset successfully' });
+  } catch (err: any) {
+    return res.status(400).json({ error: err.message || 'Failed to reset password' });
+  }
+};
+
+export const handleUpdateUserDetails = async (req: AuthRequest, res: Response) => {
+  try {
+    const id = req.params.id as string;
+    const { name, email, role, mobileNumber, employeeId } = req.body;
+    await userService.updateUserDetails(id, { name, email, role, mobileNumber, employeeId });
+    return res.status(200).json({ message: 'User updated' });
+  } catch (err: any) {
+    return res.status(400).json({ error: err.message || 'Failed to update user' });
   }
 };

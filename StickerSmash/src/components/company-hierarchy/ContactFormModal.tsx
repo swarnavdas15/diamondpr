@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, Modal, TouchableOpacity, TextInput, ScrollView, StyleSheet, useWindowDimensions } from 'react-native';
+import { View, Text, Modal, TouchableOpacity, TextInput, ScrollView, StyleSheet, useWindowDimensions, Image } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
+import { useERP } from '../../context/ERPContext';
 import { CompanyContact } from '../../types';
 import { Colors, Spacing, Radius, Shadows } from '../../theme';
 import { SearchableDropdown } from '../ui/SearchableDropdown';
@@ -43,8 +45,24 @@ export const ContactFormModal: React.FC<ContactFormModalProps> = ({
   const [reportsToId, setReportsToId] = useState<string>('');
   const [notes, setNotes] = useState('');
   const [error, setError] = useState('');
+  const [profileImageUri, setProfileImageUri] = useState<string | null>(null);
+  const { uploadCompanyContactProfileImage } = useERP();
 
+  
+  const pickImage = async () => {
+    let result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    });
+    if (!result.canceled) {
+      setProfileImageUri(result.assets[0].uri);
+    }
+  };
+  
   const resetForm = () => {
+    setProfileImageUri(null);
     setFullName('');
     setDesignation('');
     setDepartment(DEPARTMENTS[0]);
@@ -72,7 +90,7 @@ export const ContactFormModal: React.FC<ContactFormModalProps> = ({
     }
   }, [contactToEdit, visible]);
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     setError('');
     if (!fullName.trim()) {
       setError('Full Name is required.');
@@ -130,6 +148,16 @@ export const ContactFormModal: React.FC<ContactFormModalProps> = ({
 
           <ScrollView style={styles.formScroll} showsVerticalScrollIndicator={false}>
             {/* Full Name */}
+            
+            <Text style={styles.label}>Contact Profile Image</Text>
+            <TouchableOpacity style={styles.imagePickerBtn} onPress={pickImage}>
+              {profileImageUri || (contactToEdit?.profileImage) ? (
+                <Image source={{ uri: profileImageUri || contactToEdit?.profileImage }} style={styles.previewImage} />
+              ) : (
+                <Text style={styles.imagePickerText}>+ Select Image</Text>
+              )}
+            </TouchableOpacity>
+
             <Text style={styles.label}>Full Name *</Text>
             <TextInput
               style={styles.input}

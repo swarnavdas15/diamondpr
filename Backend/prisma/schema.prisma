@@ -1,0 +1,336 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  username  String   @unique
+  email     String   @unique
+  password  String
+  name      String
+  role      String   @default("SALES")
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Client {
+  id          String   @id @default(uuid())
+  clientCode  String   @unique
+  companyName String
+  contactName String?
+  contactNo   String
+  email       String?
+  address     String?
+  gstNumber   String?
+  panNumber   String?
+  industry    String?
+  website     String?
+  description String?
+  logo        String?
+  remarks     String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  contacts      CompanyContact[]
+  importantDates CompanyImportantDate[]
+  orders        Order[]
+  quotations    Quotation[]
+}
+
+model CompanyContact {
+  id          String   @id @default(uuid())
+  clientId    String
+  client      Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  fullName    String
+  designation String
+  department  String
+  email       String
+  mobile      String
+  whatsapp    String
+  profileImage String?
+  reportsToId String?
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model CompanyImportantDate {
+  id          String   @id @default(uuid())
+  clientId    String
+  client      Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  title       String
+  dateType    String
+  eventDate   DateTime
+  description String?
+  createdByName String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Vendor {
+  id               String   @id @default(uuid())
+  vendorCode       String   @unique
+  vendorName       String
+  companyName      String?
+  gstNumber        String?
+  panNumber        String?
+  contactPerson    String
+  mobileNumber     String
+  alternateMobile  String?
+  email            String
+  website          String?
+  addressLine1     String?
+  addressLine2     String?
+  city             String?
+  state            String?
+  pinCode          String?
+  country          String?
+  materialSupplied String
+  vendorCategory   String?
+  paymentTerms     String?
+  leadTime         String?
+  status           String   @default("ACTIVE")
+  remarks          String?
+  notes            String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+model Quotation {
+  id                   String   @id @default(uuid())
+  quotationNumber      String   @unique
+  quotationDate        DateTime @default(now())
+  clientId             String
+  client               Client   @relation(fields: [clientId], references: [id])
+  clientCode           String
+  companyName          String
+  contactPerson        String
+  mobileNumber         String
+  email                String
+  inquiryRef           String?
+  quotationAmount      Float
+  expectedOrderValue   Float?
+  salesExecutive       String
+  salesExecutiveUserId String?
+  followUpDate         DateTime?
+  status               String   @default("DRAFT")
+  remarks              String?
+  
+  convertedOrderValue  Float?
+  lostValue            Float?
+  convertedOrderId     String?
+  convertedOrderNumber String?
+  lostDate             DateTime?
+  lostReason           String?
+  lostRemarks          String?
+  competitorName       String?
+  
+  sentVia              String?
+  sentAt               DateTime?
+  sentNotes            String?
+  negotiationDate      DateTime?
+  expectedClosureDate  DateTime?
+  isLocked             Boolean  @default(false)
+  
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  
+  followUps            QuotationFollowUp[]
+}
+
+model QuotationFollowUp {
+  id            String    @id @default(uuid())
+  quotationId   String
+  quotation     Quotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+  followUpDate  DateTime
+  notes         String
+  status        String    @default("PENDING")
+  createdByName String
+  createdAt     DateTime  @default(now())
+}
+
+model Order {
+  id                     String   @id @default(uuid())
+  orderNumber            String   @unique
+  poNumber               String
+  clientId               String
+  client                 Client   @relation(fields: [clientId], references: [id])
+  clientCode             String
+  clientName             String?
+  contactNo              String?
+  email                  String?
+  address                String?
+  budget                 Float?
+
+  technicalRequirements  String?
+  materialRequirements   String?
+  requiredQuantity       Int      @default(1)
+  status                 String   @default("PENDING")
+  drawingApproved        Boolean  @default(false)
+  currentStage           String?
+  nextStage              String?
+  assignedDepartment     String?
+  
+  purchaseQuantity       Int?     @default(0)
+  productionQuantity     Int?     @default(0)
+  qcQuantity             Int?     @default(0)
+  qcPassedQuantity       Int?     @default(0)
+  qcFailedQuantity       Int?     @default(0)
+  reworkQuantity         Int?     @default(0)
+  dispatchQuantity       Int?     @default(0)
+
+  purchaseRequired       Boolean  @default(true)
+  productionRequired     Boolean  @default(true)
+  qualityTestingRequired Boolean  @default(true)
+  dispatchRequired       Boolean  @default(true)
+  
+  salesWorkflowStage     String   @default("INITIATION")
+  purchaseStatus         String   @default("PENDING")
+  vendorSelected         String?
+  procurementNotes       String?
+  productionStatus       String   @default("PENDING")
+  shopFloorNotes         String?
+  qualityStatus          String   @default("PENDING")
+  qcResult               String?
+  qcRemarks              String?
+  dispatchStatus         String   @default("PENDING")
+  logisticsEntry         String?
+  transportRef           String?
+  dispatchNotes          String?
+  salesVerification      String   @default("PENDING")
+
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  items                  OrderItem[]
+  stageLogs              StageLog[]
+  quantityLogs           QuantityLog[]
+  purchaseBatches        PurchaseBatch[]
+  drawings               OrderDrawing[]
+  customStages           CustomStage[]
+}
+
+model OrderItem {
+  id        String @id @default(uuid())
+  orderId   String
+  order     Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  itemName  String
+  size      String
+  quantity  Int
+  unitPrice Float?
+}
+
+model PurchaseBatch {
+  id               String   @id @default(uuid())
+  orderId          String
+  order            Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  vendorId         String?
+  vendorName       String
+  vendorCode       String?
+  materialSpec     String?
+  quantityOrdered  Int
+  quantityReceived Int      @default(0)
+  batchNumber      String?
+  deliveryDate     DateTime?
+  invoiceRef       String?
+  remarks          String?
+  status           String   @default("ORDERED")
+  createdByName    String
+  createdAt        DateTime @default(now())
+}
+
+model StageLog {
+  id            String   @id @default(uuid())
+  orderId       String
+  order         Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  department    String
+  action        String
+  currentStatus String
+  remarks       String?
+  changedByName String
+  changedByRole String
+  createdAt     DateTime @default(now())
+}
+
+model QuantityLog {
+  id            String   @id @default(uuid())
+  orderId       String
+  order         Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  stage         String
+  processedQty  Int
+  accumulatedQty Int
+  remainingQty  Int
+  totalQty      Int
+  actionLabel   String
+  remarks       String?
+  changedByName String
+  changedByRole String
+  batchNumber   String?
+  skuNumber     String?
+  createdAt     DateTime @default(now())
+}
+
+model OrderDrawing {
+  id            String   @id @default(uuid())
+  orderId       String
+  order         Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  drawingNumber String
+  drawingName   String
+  fileUri       String?
+  fileName      String
+  fileType      String
+  fileSize      String?
+  versionNumber Int      @default(1)
+  uploadedBy    String
+  uploadDate    DateTime @default(now())
+  status        String   @default("PENDING")
+  reviewRemarks String?
+}
+
+model CustomStage {
+  id                String   @id @default(uuid())
+  orderId           String
+  order             Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  stageName         String
+  description       String?
+  department        String
+  assignedUserIds   String[]
+  assignedUserNames String[]
+  status            String   @default("PENDING")
+  createdAt         DateTime @default(now())
+}
+
+model Task {
+  id                   String   @id @default(uuid())
+  orderId              String?
+  orderNumber          String?
+  title                String
+  description          String?
+  priority             String   @default("HIGH")
+  status               String   @default("PENDING")
+  assignedToDepartment String?
+  assignedToUserId     String?
+  assignedToName       String?
+  createdByName        String
+  createdByRole        String
+  createdByUserId      String?
+  dueDate              DateTime?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+}
+
+model CalendarEvent {
+  id            String   @id @default(uuid())
+  title         String
+  type          String
+  eventDate     DateTime
+  description   String?
+  createdByName String
+  createdAt     DateTime @default(now())
+}

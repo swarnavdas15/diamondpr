@@ -10,9 +10,12 @@ export class OrderService {
     data: {
       companyName: string;
       contactNo: string;
+      contactName?: string;
       email?: string;
       gstNumber?: string;
       address?: string;
+      industry?: string;
+      remarks?: string;
       clientCode: string;
     },
     userId: string
@@ -20,10 +23,13 @@ export class OrderService {
     return await db.orm.public.Client.create({
       clientcode: data.clientCode,
       companyName: data.companyName,
+      contactName: data.contactName ?? null,
       contactNo: data.contactNo,
       email: data.email ?? null,
       gstNumber: data.gstNumber ?? null,
       address: data.address ?? null,
+      industry: data.industry ?? null,
+      remarks: data.remarks ?? null,
       createdById: dbId(userId)
     });
   }

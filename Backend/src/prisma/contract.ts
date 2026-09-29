@@ -1,9 +1,5 @@
 import { defineContract, enumType, member } from '@prisma/orm-postgres/contract-builder';
 
-// ======================================
-// ENUMS DEFINITION
-// ======================================
-
 const pgText = { codecId: 'pg/text@1', nativeType: 'text' } as const;
 
 export const Role = enumType(
@@ -14,7 +10,8 @@ export const Role = enumType(
   member('SALES', 'SALES'),
   member('PURCHASE', 'PURCHASE'),
   member('PRODUCTION', 'PRODUCTION'),
-  member('TESTING', 'TESTING')
+  member('QUALITY_TESTING', 'QUALITY_TESTING'),
+  member('DISPATCH', 'DISPATCH')
 );
 
 export const OrderStage = enumType(
@@ -48,54 +45,73 @@ export const TaskStatus = enumType(
   member('COMPLETED', 'COMPLETED')
 );
 
-// ======================================
-// CONTRACT DEFINITION
-// ======================================
-
 export const contract = defineContract(
   {},
   ({ field, model, rel }) => {
-    // 1. User Model
     const User = model('User', {
       fields: {
         id: field.id.uuidv7String(),
         name: field.text(),
+        username: field.text().unique().optional(),
         email: field.text().unique(),
         password: field.text(),
+        mobileNumber: field.text().optional(),
+        employeeId: field.text().optional(),
         role: field.namedType(Role).default(Role.members.PRODUCTION),
         fcmToken: field.text().optional(),
         refreshToken: field.text().optional(),
+        isActive: field.boolean().default(true),
         isDeleted: field.int().default(0),
         createdAt: field.temporal.createdAtString(),
         updatedAt: field.temporal.updatedAtString(),
       },
     });
 
-    // 2. Client Model
     const Client = model('Client', {
       fields: {
         id: field.id.uuidv7String(),
         clientcode: field.text().unique(),
         companyName: field.text(),
-        gstNumber: field.text().optional(),
+        contactName: field.text().optional(),
         contactNo: field.text(),
         email: field.text().optional(),
         address: field.text().optional(),
-        createdById: field.uuidString(),
+        gstNumber: field.text().optional(),
+        industry: field.text().optional(),
+        remarks: field.text().optional(),
+        profileImage: field.text().optional(),
+        createdById: field.uuidString().optional(),
+        isDeleted: field.int().default(0),
         createdAt: field.temporal.createdAtString(),
       },
     });
 
-    // 3. Order Model
+    const CompanyContact = model('CompanyContact', {
+      fields: {
+        id: field.id.uuidv7String(),
+        companyId: field.uuidString(), // links to Client
+        fullName: field.text(),
+        designation: field.text().optional(),
+        department: field.text().optional(),
+        email: field.text().optional(),
+        mobile: field.text().optional(),
+        whatsapp: field.text().optional(),
+        profileImage: field.text().optional(),
+        reportsToId: field.uuidString().optional(),
+        notes: field.text().optional(),
+        isDeleted: field.int().default(0),
+        createdAt: field.temporal.createdAtString(),
+      },
+    });
+
     const Order = model('Order', {
       fields: {
         id: field.id.uuidv7String(),
         poNumber: field.text().unique(),
         clientId: field.uuidString(),
-        requirements: field.text(),
-        stageSequence: field.text(),
+        requirements: field.text().optional(),
         budget: field.bigint().optional(),
-        createdById: field.uuidString(),
+        createdById: field.uuidString().optional(),
         isDeleted: field.int().default(0),
         createdAt: field.temporal.createdAtString(),
         updatedAt: field.temporal.updatedAtString(),
@@ -103,7 +119,6 @@ export const contract = defineContract(
       },
     });
 
-    // 4. OrderItem Model
     const OrderItem = model('OrderItem', {
       fields: {
         id: field.id.uuidv7String(),
@@ -115,57 +130,53 @@ export const contract = defineContract(
       },
     });
 
-    // 5. StageLog Model
     const StageLog = model('StageLog', {
       fields: {
         id: field.id.uuidv7String(),
         orderId: field.uuidString(),
         stage: field.namedType(OrderStage),
-        changedById: field.uuidString(),
+        changedById: field.uuidString().optional(),
         createdAt: field.temporal.createdAtString(),
       },
     });
 
-    // 6. Task Model
     const Task = model('Task', {
       fields: {
         id: field.id.uuidv7String(),
-        orderId: field.uuidString(),
+        orderId: field.uuidString().optional(),
         title: field.text(),
         description: field.text().optional(),
         priority: field.namedType(Priority).default(Priority.members.MEDIUM),
         status: field.namedType(TaskStatus).default(TaskStatus.members.PENDING),
         dueDate: field.temporal.timestampString().optional(),
-        assignedToId: field.uuidString(),
-        createdById: field.uuidString(),
+        assignedToId: field.uuidString().optional(),
+        createdById: field.uuidString().optional(),
+        isDeleted: field.int().default(0),
         createdAt: field.temporal.createdAtString(),
       },
     });
 
-    // 7. Drawing Model
     const Drawing = model('Drawing', {
       fields: {
         id: field.id.uuidv7String(),
         orderId: field.uuidString(),
         filename: field.text(),
         fileUrl: field.text(),
-        uploadedById: field.uuidString(),
+        uploadedById: field.uuidString().optional(),
         createdAt: field.temporal.createdAtString(),
       },
     });
 
-    // 8. Note Model
     const Note = model('Note', {
       fields: {
         id: field.id.uuidv7String(),
         orderId: field.uuidString(),
-        userId: field.uuidString(),
+        userId: field.uuidString().optional(),
         content: field.text(),
         createdAt: field.temporal.createdAtString(),
       },
     });
 
-    // RETURN ENUMS AND MODEL RELATIONS
     return {
       enums: { Role, OrderStage, Priority, TaskStatus },
       models: {

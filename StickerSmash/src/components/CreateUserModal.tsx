@@ -38,7 +38,7 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({ visible, onClo
     { role: 'DISPATCH', label: 'Dispatch Department', department: 'Logistics & Shipment' },
   ];
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     setErrorMsg('');
 
     if (!name.trim()) {
@@ -71,7 +71,7 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({ visible, onClo
     }
 
     try {
-      const newUser = createUser({
+      const newUser = await createUser({
         name: name.trim(),
         username: username.trim(),
         password,

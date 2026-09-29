@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, TextInput, ScrollView, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, TextInput, ScrollView, StyleSheet, Image } from 'react-native';
 import { CompanyContact } from '../../types';
 import { Colors, Spacing, Radius, Shadows } from '../../theme';
 
@@ -133,9 +133,15 @@ export const ContactManagement: React.FC<ContactManagementProps> = ({
                       style={[styles.tdCell, { width: 180, flexDirection: 'row', alignItems: 'center', gap: 8 }]}
                       onPress={() => onSelectContact(c)}
                     >
-                      <View style={styles.tableAvatar}>
-                        <Text style={styles.tableAvatarText}>{initial}</Text>
-                      </View>
+                      
+                      {c.profileImage ? (
+                        <Image source={{ uri: c.profileImage }} style={[styles.tableAvatar, { backgroundColor: Colors.borderDark }]} />
+                      ) : (
+                        <View style={styles.tableAvatar}>
+                          <Text style={styles.tableAvatarText}>{initial}</Text>
+                        </View>
+                      )}
+
                       <View style={{ flex: 1 }}>
                         <Text style={styles.tdBold} numberOfLines={1}>
                           {c.fullName}

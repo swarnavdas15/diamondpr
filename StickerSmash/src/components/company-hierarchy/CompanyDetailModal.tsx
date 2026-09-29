@@ -75,11 +75,12 @@ export const CompanyDetailModal: React.FC<CompanyDetailModalProps> = ({
     setDrawerVisible(true);
   };
 
-  const handleFormSubmit = (data: Omit<CompanyContact, 'id' | 'createdAt'>) => {
+  const handleFormSubmit = async (data: Omit<CompanyContact, 'id' | 'createdAt'>) => {
     if (contactToEdit) {
-      updateCompanyContact(contactToEdit.id, data);
+      await updateCompanyContact(contactToEdit.id, data);
+      return contactToEdit;
     } else {
-      addCompanyContact(data);
+      return await addCompanyContact(data);
     }
   };
 
