@@ -21,7 +21,7 @@ router.patch('/:id/role', authenticateToken, requireRole(['SUPER_ADMIN']), handl
 router.delete('/:id', authenticateToken, requireRole(['SUPER_ADMIN']), handleDeleteUser);
 router.patch('/:id/password', authenticateToken, requireRole(['SUPER_ADMIN']), handleResetPassword);
 
-// SUPER_ADMIN and ADMIN can list users
-router.get('/', authenticateToken, requireRole(['SUPER_ADMIN', 'ADMIN']), handleListUsers);
+// All authenticated users can list active users (required for task/stage user assignment dropdowns)
+router.get('/', authenticateToken, handleListUsers);
 
 export default router;

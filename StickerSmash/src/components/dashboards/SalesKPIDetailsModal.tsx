@@ -3,6 +3,7 @@ import { View, Text, Modal, TouchableOpacity, ScrollView, TextInput, StyleSheet,
 import { useERP } from '../../context/ERPContext';
 import { Quotation, QuotationStatus, LostReason } from '../../types';
 import { Colors, Spacing, Radius, Shadows } from '../../theme';
+import { formatDate } from '../../utils/formatUtils';
 
 interface SalesKPIDetailsModalProps {
   visible: boolean;
@@ -377,7 +378,7 @@ export const SalesKPIDetailsModal: React.FC<SalesKPIDetailsModalProps> = ({
                         return (
                           <View key={q.id} style={styles.trRow}>
                             <Text style={[styles.tdHighlight, { width: 120 }]}>{q.quotationNumber}</Text>
-                            <Text style={[styles.tdSmall, { width: 95 }]}>{q.quotationDate}</Text>
+                            <Text style={[styles.tdSmall, { width: 95 }]}>{formatDate(q.quotationDate)}</Text>
                             <Text style={[styles.tdBold, { width: 100 }]}>{q.clientCode}</Text>
 
                             <View style={{ width: 180 }}>
@@ -505,7 +506,7 @@ export const SalesKPIDetailsModal: React.FC<SalesKPIDetailsModalProps> = ({
                           <Text style={[styles.tdBold, { width: 120, color: Colors.successBright }]}>
                             {q.convertedOrderNumber || `PO-${q.quotationNumber.replace('QT-', '')}`}
                           </Text>
-                          <Text style={[styles.tdSmall, { width: 95 }]}>{q.quotationDate}</Text>
+                          <Text style={[styles.tdSmall, { width: 95 }]}>{formatDate(q.quotationDate)}</Text>
                           <View style={{ width: 180 }}>
                             <Text style={styles.tdBold} numberOfLines={1}>{q.companyName}</Text>
                             <Text style={styles.tdSub}>{q.clientCode}</Text>
@@ -623,7 +624,7 @@ export const SalesKPIDetailsModal: React.FC<SalesKPIDetailsModalProps> = ({
                       filteredLostQuotations.map((q) => (
                         <View key={q.id} style={styles.trRow}>
                           <Text style={[styles.tdHighlight, { width: 120 }]}>{q.quotationNumber}</Text>
-                          <Text style={[styles.tdSmall, { width: 95 }]}>{q.lostDate || q.quotationDate}</Text>
+                          <Text style={[styles.tdSmall, { width: 95 }]}>{formatDate(q.lostDate || q.quotationDate)}</Text>
                           <View style={{ width: 180 }}>
                             <Text style={styles.tdBold} numberOfLines={1}>{q.companyName}</Text>
                             <Text style={styles.tdSub}>{q.clientCode}</Text>

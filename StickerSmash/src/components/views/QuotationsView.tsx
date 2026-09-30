@@ -10,6 +10,7 @@ import { QuotationFollowUpModal } from '../quotations/QuotationFollowUpModal';
 import { QuotationConversionModal, QuotationConversionData } from '../quotations/QuotationConversionModal';
 import { ExportButton } from '../ui/ExportButton';
 import { ExportDataPayload } from '../../utils/exportUtils';
+import { formatDate } from '../../utils/formatUtils';
 
 interface QuotationsViewProps {
   onOpenCreateQuotation?: () => void;
@@ -281,7 +282,7 @@ export const QuotationsView: React.FC<QuotationsViewProps> = ({ onOpenCreateQuot
     setFollowUpModalQuotation(null);
   };
 
-  const handleSaveConversion = (data: QuotationConversionData) => {
+  const handleSaveConversion = async (data: QuotationConversionData) => {
     if (!conversionModalQuotation) return;
     const q = conversionModalQuotation;
 
@@ -290,7 +291,7 @@ export const QuotationsView: React.FC<QuotationsViewProps> = ({ onOpenCreateQuot
       // 1. Sets quotation status to FULLY_CONVERTED or PARTIALLY_CONVERTED
       // 2. Stores convertedOrderValue, lostValue, convertedOrderId, convertedOrderNumber
       // 3. Creates the linked Order with correct pipeline flags
-      const newOrder = convertQuotationToOrder(q.id, {
+      const newOrder = await convertQuotationToOrder(q.id, {
         convertedOrderValue: data.approvedAmount,
         poNumber: `PO-${q.quotationNumber}`,
         technicalRequirements: q.remarks || data.finalRemarks,
@@ -494,8 +495,8 @@ export const QuotationsView: React.FC<QuotationsViewProps> = ({ onOpenCreateQuot
                       <View style={styles.mobileCardBody}>
                         <Text style={styles.mobileCardDetail}>Contact: <Text style={styles.mobileCardVal}>{q.contactPerson} ({q.mobileNumber})</Text></Text>
                         <Text style={styles.mobileCardDetail}>Sales Exec: <Text style={styles.mobileCardVal}>{q.salesExecutive}</Text></Text>
-                        <Text style={styles.mobileCardDetail}>Follow-Up: <Text style={styles.mobileCardVal}>{q.followUpDate || 'None'}</Text></Text>
-                        <Text style={styles.mobileCardDetail}>Date: <Text style={styles.mobileCardVal}>{q.quotationDate}</Text></Text>
+                        <Text style={styles.mobileCardDetail}>Follow-Up: <Text style={styles.mobileCardVal}>{formatDate(q.followUpDate)}</Text></Text>
+                        <Text style={styles.mobileCardDetail}>Date: <Text style={styles.mobileCardVal}>{formatDate(q.quotationDate)}</Text></Text>
 
                         <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap', marginTop: Spacing.sm }}>
                           <TouchableOpacity style={styles.actBtnView} onPress={() => setViewQuotation(q)}>
@@ -547,7 +548,7 @@ export const QuotationsView: React.FC<QuotationsViewProps> = ({ onOpenCreateQuot
                   return (
                     <View key={q.id} style={styles.trRow}>
                       <Text style={[styles.tdHighlight, { width: 120 }]}>{q.quotationNumber}</Text>
-                      <Text style={[styles.tdSmall, { width: 95 }]}>{q.quotationDate}</Text>
+                      <Text style={[styles.tdSmall, { width: 95 }]}>{formatDate(q.quotationDate)}</Text>
                       <Text style={[styles.tdBold, { width: 95 }]}>{q.clientCode}</Text>
 
                       <View style={{ width: 180 }}>
@@ -589,7 +590,7 @@ export const QuotationsView: React.FC<QuotationsViewProps> = ({ onOpenCreateQuot
                       </View>
 
                       {/* Follow-Up Date */}
-                      <Text style={[styles.tdSmall, { width: 100 }]}>{q.followUpDate || 'None'}</Text>
+                      <Text style={[styles.tdSmall, { width: 100 }]}>{formatDate(q.followUpDate)}</Text>
 
                       {/* Actions Column (Cleaned Up: View, Edit/Locked, Mark Lost, Unlock) */}
                       <View style={{ width: 270, flexDirection: 'row', gap: 4, alignItems: 'center', flexWrap: 'wrap' }}>

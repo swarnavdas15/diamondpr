@@ -1,44 +1,62 @@
+import { db } from '../../prisma/db';
+import { dbId } from '../../prisma/ids';
+
 export interface CalendarEventItem {
   id: string;
   title: string;
   type: string;
   eventDate: string;
   description?: string;
-  createdById: string;
+  createdByName?: string;
   createdAt: string;
 }
-
-const eventsStore: CalendarEventItem[] = [];
 
 export const createCalendarEvent = async (data: {
   title: string;
   type?: string;
-  eventDate: Date | string;
+  eventDate: string;
   description?: string;
-  createdById: string;
+  createdByName?: string;
 }): Promise<CalendarEventItem> => {
-  const eventItem: CalendarEventItem = {
-    id: `cal-${Date.now()}`,
+  const row = await db.orm.public.CalendarEvent.create({
     title: data.title,
     type: data.type || 'MEETING',
-    eventDate: typeof data.eventDate === 'string' ? data.eventDate : data.eventDate.toISOString(),
-    description: data.description,
-    createdById: data.createdById,
-    createdAt: new Date().toISOString(),
+    eventDate: data.eventDate,
+    description: data.description || null,
+    createdByName: data.createdByName || 'System',
+  });
+  return {
+    id: row.id,
+    title: row.title,
+    type: row.type,
+    eventDate: row.eventDate,
+    description: row.description || undefined,
+    createdByName: row.createdByName || undefined,
+    createdAt: row.createdAt,
   };
-  eventsStore.push(eventItem);
-  return eventItem;
 };
 
 export const listCalendarEvents = async (): Promise<CalendarEventItem[]> => {
-  return [...eventsStore].sort((a, b) => a.eventDate.localeCompare(b.eventDate));
+  const rows = await db.orm.public.CalendarEvent
+    .orderBy((e) => e.eventDate.asc())
+    .all();
+
+  return rows.map((row) => ({
+    id: row.id,
+    title: row.title,
+    type: row.type,
+    eventDate: row.eventDate,
+    description: row.description || undefined,
+    createdByName: row.createdByName || undefined,
+    createdAt: row.createdAt,
+  }));
 };
 
 export const deleteCalendarEvent = async (id: string): Promise<boolean> => {
-  const idx = eventsStore.findIndex((e) => e.id === id);
-  if (idx !== -1) {
-    eventsStore.splice(idx, 1);
+  try {
+    await db.orm.public.CalendarEvent.where({ id: dbId(id) }).delete();
     return true;
+  } catch {
+    return false;
   }
-  return false;
 };

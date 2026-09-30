@@ -6,37 +6,41 @@ export class TaskService {
   static async createTask(
     data: {
       orderId?: string;
+      orderNumber?: string;
       title: string;
       description?: string;
-      priority?: Priority;
-      assignedToId?: string;
+      priority?: any;
       assignedToDepartment?: string;
+      assignedToUserId?: string;
+      assignedToName?: string;
       dueDate?: string;
     },
-    createdById: string
+    currentUser: any
   ) {
     const taskData: any = {
       title: data.title,
       description: data.description ?? null,
-      priority: data.priority ?? Priority.MEDIUM,
-      status: TaskStatus.PENDING,
+      priority: data.priority || 'MEDIUM',
+      status: 'PENDING',
       dueDate: data.dueDate ?? null,
-      createdById: dbId(createdById),
+      assignedToDepartment: data.assignedToDepartment ?? null,
+      assignedToUserId: data.assignedToUserId ? dbId(data.assignedToUserId) : null,
+      assignedToName: data.assignedToName ?? null,
+      createdByName: currentUser?.name || 'System',
+      createdByRole: currentUser?.role || 'SUPER_ADMIN',
+      createdByUserId: currentUser?.userId ? dbId(currentUser.userId) : null,
+      createdById: currentUser?.userId ? dbId(currentUser.userId) : null,
     };
 
     if (data.orderId) taskData.orderId = dbId(data.orderId);
-    if (data.assignedToId) taskData.assignedToId = dbId(data.assignedToId);
+    if (data.orderNumber) taskData.orderNumber = data.orderNumber;
+    if (data.assignedToUserId) taskData.assignedToId = dbId(data.assignedToUserId);
 
     const task = await db.orm.public.Task.create(taskData);
-
-    return await db.orm.public.Task
-      .where({ id: task.id })
-      .include('assignedTo', (user) => user.select('id', 'name', 'role'))
-      .include('createdBy', (user) => user.select('id', 'name', 'role'))
-      .first();
+    return task;
   }
 
-  static async updateTaskStatus(taskId: string, status: TaskStatus) {
+  static async updateTaskStatus(taskId: string, status: any) {
     return await db.orm.public.Task
       .where({ id: dbId(taskId) })
       .update({ status });
@@ -44,16 +48,14 @@ export class TaskService {
 
   static async getTasksByUser(userId: string) {
     return await db.orm.public.Task
-      .where({ assignedToId: dbId(userId) })
-      .include('order', (order) => order.select('poNumber', 'currentStage'))
+      .where({ isDeleted: 0 })
       .orderBy((task) => task.createdAt.desc())
       .all();
   }
 
   static async listTasks() {
     return await db.orm.public.Task
-      .include('assignedTo', (user) => user.select('id', 'name', 'role'))
-      .include('createdBy', (user) => user.select('id', 'name', 'role'))
+      .where({ isDeleted: 0 })
       .orderBy((task) => task.createdAt.desc())
       .all();
   }
@@ -61,7 +63,7 @@ export class TaskService {
   static async deleteTask(taskId: string) {
     return await db.orm.public.Task
       .where({ id: dbId(taskId) })
-      .delete();
+      .update({ isDeleted: 1 });
   }
 }
 

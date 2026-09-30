@@ -21,16 +21,16 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
       return { id: 'Quotations', label: 'Quotations', icon: '📜' };
     }
     if (userRole === 'PURCHASE') {
-      return { id: 'Purchase', label: 'Purchase', icon: '🛒' };
+      return { id: 'Vendors', label: 'Vendors', icon: '🏢' };
     }
     if (userRole === 'PRODUCTION') {
-      return { id: 'WorkOrders', label: 'Work Orders', icon: '⚙️' };
+      return { id: 'Tasks', label: 'Tasks', icon: '☑️' };
     }
     if (userRole === 'QUALITY_TESTING') {
       return { id: 'QualityControl', label: 'QC Test', icon: '🔍' };
     }
     if (userRole === 'DISPATCH') {
-      return { id: 'DispatchQueue', label: 'Dispatch', icon: '🚛' };
+      return { id: 'Tasks', label: 'Tasks', icon: '☑️' };
     }
     return { id: 'Orders', label: 'Orders', icon: '📋' };
   };

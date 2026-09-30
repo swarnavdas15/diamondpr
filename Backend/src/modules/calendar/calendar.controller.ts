@@ -9,13 +9,13 @@ export const handleCreateCalendarEvent = async (req: AuthRequest, res: Response)
       return res.status(400).json({ error: 'Title and event date are required' });
     }
 
-    const createdById = req.user?.userId || '';
+    const createdByName = req.user?.name || 'System';
     const event = await calendarService.createCalendarEvent({
       title,
       type,
-      eventDate: new Date(eventDate),
+      eventDate: typeof eventDate === 'string' ? eventDate : new Date(eventDate).toISOString(),
       description,
-      createdById,
+      createdByName,
     });
 
     return res.status(201).json({ message: 'Calendar event created', event });

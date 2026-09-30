@@ -22,14 +22,8 @@ export const TaskKPICards: React.FC<TaskKPICardsProps> = ({ style }) => {
 
   const isSuperAdminOrAdmin = currentUser.role === 'SUPER_ADMIN' || currentUser.role === 'ADMIN';
 
-  // Role-based task filtering logic
-  const roleFilteredTasks = tasks.filter((t) => {
-    if (isSuperAdminOrAdmin) return true;
-    return (
-      (t.assignedToDepartment && t.assignedToDepartment === currentUser.role) ||
-      (t.assignedToUserId && t.assignedToUserId === currentUser.id)
-    );
-  });
+  // All tasks are visible across all department dashboards
+  const roleFilteredTasks = tasks;
 
   const totalTasks = roleFilteredTasks.length;
   const dueTasks = roleFilteredTasks.filter((t) => t.status === 'PENDING' || t.status === 'IN_PROGRESS').length;

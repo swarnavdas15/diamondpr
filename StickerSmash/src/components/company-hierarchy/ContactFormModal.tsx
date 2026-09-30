@@ -12,7 +12,7 @@ interface ContactFormModalProps {
   contactToEdit?: CompanyContact | null;
   existingContacts: CompanyContact[];
   onClose: () => void;
-  onSubmit: (data: Omit<CompanyContact, 'id' | 'createdAt'>) => void;
+  onSubmit: (data: Omit<CompanyContact, 'id' | 'createdAt'>) => any;
 }
 
 const DEPARTMENTS = [
@@ -108,19 +108,23 @@ export const ContactFormModal: React.FC<ContactFormModalProps> = ({
     // Standardize WhatsApp number (digits only or raw string)
     const cleanWa = whatsapp.trim() || mobile.replace(/\D/g, '');
 
-    onSubmit({
-      companyId,
-      fullName: fullName.trim(),
-      designation: designation.trim(),
-      department,
-      email: email.trim(),
-      mobile: mobile.trim(),
-      whatsapp: cleanWa,
-      reportsToId: reportsToId || undefined,
-      notes: notes.trim(),
-    });
+    try {
+      await onSubmit({
+        companyId,
+        fullName: fullName.trim(),
+        designation: designation.trim(),
+        department,
+        email: email.trim(),
+        mobile: mobile.trim(),
+        whatsapp: cleanWa,
+        reportsToId: reportsToId || undefined,
+        notes: notes.trim(),
+      });
 
-    handleClose();
+      handleClose();
+    } catch (err: any) {
+      setError(err.message || 'Failed to save contact.');
+    }
   };
 
   const handleClose = () => {
@@ -148,15 +152,6 @@ export const ContactFormModal: React.FC<ContactFormModalProps> = ({
 
           <ScrollView style={styles.formScroll} showsVerticalScrollIndicator={false}>
             {/* Full Name */}
-            
-            <Text style={styles.label}>Contact Profile Image</Text>
-            <TouchableOpacity style={styles.imagePickerBtn} onPress={pickImage}>
-              {profileImageUri || (contactToEdit?.profileImage) ? (
-                <Image source={{ uri: profileImageUri || contactToEdit?.profileImage }} style={styles.previewImage} />
-              ) : (
-                <Text style={styles.imagePickerText}>+ Select Image</Text>
-              )}
-            </TouchableOpacity>
 
             <Text style={styles.label}>Full Name *</Text>
             <TextInput
@@ -439,5 +434,28 @@ const styles = StyleSheet.create({
     color: Colors.white,
     fontSize: 14,
     fontWeight: '800',
+  },
+  imagePickerBtn: {
+    backgroundColor: Colors.inputBg,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: Colors.borderDark,
+    borderStyle: 'dashed',
+    height: 80,
+    width: 80,
+    justifyContent: 'center',
+    alignItems: 'center',
+    overflow: 'hidden',
+    marginBottom: 8,
+  },
+  previewImage: {
+    width: '100%',
+    height: '100%',
+  },
+  imagePickerText: {
+    color: Colors.accentTeal,
+    fontSize: 11,
+    fontWeight: '600',
+    textAlign: 'center',
   },
 });

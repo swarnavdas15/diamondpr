@@ -25,7 +25,8 @@ export const DispatchDashboard: React.FC = () => {
   });
 
   const completedDispatch = getMaskedOrders().filter((o) => {
-    return o.dispatchRequired && o.dispatchStatus === 'COMPLETED';
+    if (!o.dispatchRequired) return false;
+    return o.dispatchStatus === 'COMPLETED' || (o.dispatchQuantity || 0) > 0;
   });
 
   const maskedOrders = activeTab === 'PENDING' ? pendingDispatch : completedDispatch;
@@ -130,7 +131,9 @@ export const DispatchDashboard: React.FC = () => {
         <Text style={styles.sectionTitle}>{activeTab === 'PENDING' ? 'Ready To Ship Queue' : 'Dispatched Orders'}</Text>
 
         {maskedOrders.length === 0 ? (
-          <Text style={styles.emptyText}>No orders currently in ready-to-ship queue.</Text>
+          <Text style={styles.emptyText}>
+            {activeTab === 'PENDING' ? 'No orders currently in ready-to-ship queue.' : 'No dispatched orders found.'}
+          </Text>
         ) : (
           maskedOrders.map((ord) => {
             const passedQcQty = ord.qualityTestingRequired
@@ -222,13 +225,19 @@ export const DispatchDashboard: React.FC = () => {
 
                 {/* Action Buttons */}
                 <View style={styles.actionRow}>
-                  <TouchableOpacity
-                    style={[styles.actionBtn, styles.btnDispatched, isQCBlocked && styles.btnDisabled]}
-                    disabled={isQCBlocked}
-                    onPress={() => handleOpenProcessModal(ord)}
-                  >
-                    <Text style={styles.actionBtnText}>{isQCBlocked ? '🔒 QC Blocked' : '🚚 Record Dispatch Shipment (Batch)'}</Text>
-                  </TouchableOpacity>
+                  {availableForDispatch > 0 ? (
+                    <TouchableOpacity
+                      style={[styles.actionBtn, styles.btnDispatched, isQCBlocked && styles.btnDisabled]}
+                      disabled={isQCBlocked}
+                      onPress={() => handleOpenProcessModal(ord)}
+                    >
+                      <Text style={styles.actionBtnText}>{isQCBlocked ? '🔒 QC Blocked' : '🚚 Record Dispatch Shipment (Batch)'}</Text>
+                    </TouchableOpacity>
+                  ) : (
+                    <View style={[styles.actionBtn, { backgroundColor: '#16a34a' }]}>
+                      <Text style={styles.actionBtnText}>✓ Order Fully Dispatched ({dispQty} / {ord.requiredQuantity} PCS)</Text>
+                    </View>
+                  )}
                 </View>
               </View>
             );

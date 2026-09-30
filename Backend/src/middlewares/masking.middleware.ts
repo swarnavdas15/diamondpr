@@ -15,23 +15,34 @@
  * Sales, Admin, and Super Admin remain authorized to view full customer details.
  */
 
-export function isRestrictedRole(role?: string): boolean {
+export function isRestrictedRole(role?: string, userVisibility?: string): boolean {
+  if (userVisibility === 'CODE_ONLY') return true;
+  if (userVisibility === 'FULL') return false;
   if (!role) return true;
   return ['PURCHASE', 'PRODUCTION', 'QUALITY_TESTING', 'DISPATCH'].includes(role);
 }
 
-export function maskOrderData(order: any, userRole?: string): any {
+export function maskOrderData(order: any, userRole?: string, userVisibility?: string): any {
   if (!order) return order;
 
-  if (isRestrictedRole(userRole)) {
+  // Resolve client code accurately from order or client object (handling DB clientcode vs JS clientCode)
+  const resolvedClientCode =
+    order.clientCode ||
+    order.client?.clientcode ||
+    order.client?.clientCode ||
+    'CL-UNKNOWN';
+
+  if (isRestrictedRole(userRole, userVisibility)) {
     const masked = { ...order };
     delete masked.budget;
+    masked.clientCode = resolvedClientCode;
 
     if (masked.client) {
       masked.client = {
         id: masked.client.id,
-        clientCode: masked.client.clientCode,
-        companyName: '🔒 MASKED (Confidential)',
+        clientCode: resolvedClientCode,
+        clientcode: resolvedClientCode,
+        companyName: `🔒 Hidden (${resolvedClientCode})`,
         contactName: '🔒 MASKED',
         contactNo: '🔒 MASKED',
         email: '🔒 MASKED',
@@ -42,10 +53,19 @@ export function maskOrderData(order: any, userRole?: string): any {
     return masked;
   }
 
-  return order;
+  // Unmasked - ensure clientCode and clientcode are consistently available
+  const unmasked = { ...order };
+  unmasked.clientCode = resolvedClientCode;
+
+  if (unmasked.client) {
+    unmasked.client.clientCode = resolvedClientCode;
+    unmasked.client.clientcode = resolvedClientCode;
+  }
+
+  return unmasked;
 }
 
-export function maskOrderList(orders: any[], userRole?: string): any[] {
+export function maskOrderList(orders: any[], userRole?: string, userVisibility?: string): any[] {
   if (!Array.isArray(orders)) return orders;
-  return orders.map((o) => maskOrderData(o, userRole));
+  return orders.map((o) => maskOrderData(o, userRole, userVisibility));
 }

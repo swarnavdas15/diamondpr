@@ -27,9 +27,11 @@ const drawingFileFilter = (req: any, file: Express.Multer.File, cb: multer.FileF
 
 // File filter for Images (Profile pics)
 const imageFileFilter = (req: any, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
-  const allowedExts = ['.png', '.jpg', '.jpeg', '.webp'];
-  const ext = path.extname(file.originalname).toLowerCase();
-  if (allowedExts.includes(ext)) {
+  const allowedExts = ['.png', '.jpg', '.jpeg', '.webp', '.gif', '.svg', '.bmp', '.heic', '.heif'];
+  const ext = path.extname(file.originalname || '').toLowerCase();
+  const isImageMime = file.mimetype && (file.mimetype.startsWith('image/') || file.mimetype === 'application/octet-stream');
+
+  if (allowedExts.includes(ext) || isImageMime || !ext) {
     cb(null, true);
   } else {
     cb(new Error('Unsupported image format. Allowed: PNG, JPG, JPEG, WEBP'));

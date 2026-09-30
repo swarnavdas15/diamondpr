@@ -273,7 +273,7 @@ export const UsersView: React.FC<UsersViewProps> = ({ onOpenCreateUser }) => {
                         </Text>
                       </View>
                       <View style={[styles.roleBadge, { backgroundColor: getRoleBadgeColor(u.role) }]}>
-                        <Text style={styles.roleBadgeText}>{u.role.replace('_', ' ')}</Text>
+                        <Text style={styles.roleBadgeText}>{(u.role || '').replace('_', ' ')}</Text>
                       </View>
                     </View>
 
@@ -381,7 +381,7 @@ export const UsersView: React.FC<UsersViewProps> = ({ onOpenCreateUser }) => {
                     {/* Role & Dept */}
                     <View style={{ width: 160 }}>
                       <View style={[styles.roleBadge, { backgroundColor: getRoleBadgeColor(u.role) }]}>
-                        <Text style={styles.roleBadgeText}>{u.role.replace('_', ' ')}</Text>
+                        <Text style={styles.roleBadgeText}>{(u.role || '').replace('_', ' ')}</Text>
                       </View>
                       <Text style={styles.deptSubText}>{deptInfo.department}</Text>
                     </View>
@@ -491,7 +491,7 @@ export const UsersView: React.FC<UsersViewProps> = ({ onOpenCreateUser }) => {
                 <View style={styles.detailRow}>
                   <Text style={styles.detailLabel}>Security Role:</Text>
                   <View style={[styles.roleBadge, { backgroundColor: getRoleBadgeColor(viewUser.role) }]}>
-                    <Text style={styles.roleBadgeText}>{viewUser.role.replace('_', ' ')}</Text>
+                    <Text style={styles.roleBadgeText}>{(viewUser.role || '').replace('_', ' ')}</Text>
                   </View>
                 </View>
                 <View style={styles.detailRow}>

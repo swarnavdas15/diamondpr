@@ -62,7 +62,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenCalendar, onToggleSidebar 
             <View>
               <Text style={styles.userName}>{currentUser.name}</Text>
               <Text style={[styles.userRoleTag, { color: getRoleBadgeColor(currentUser.role) }]}>
-                {currentUser.role.replace('_', ' ')}
+                {(currentUser?.role || '').replace('_', ' ')}
               </Text>
             </View>
           )}

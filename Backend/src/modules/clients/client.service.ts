@@ -11,7 +11,8 @@ export const createClient = async (data: {
   createdById: string;
 }) => {
   // Auto-generate Client Code
-  const count = await db.orm.public.Client.count();
+  const existingClients = await db.orm.public.Client.all();
+  const count = existingClients.length;
   const clientcode = `CL-${1001 + count}`;
 
   const client = await db.orm.public.Client.create({

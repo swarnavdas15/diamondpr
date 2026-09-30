@@ -66,7 +66,7 @@ export const advanceOrderStageController = async (req: AuthRequest, res: Respons
       return res.status(404).json({ message: 'Order not found' });
     }
 
-    const currentSequence = parseStageSequence(order.stageSequence);
+    const currentSequence = parseStageSequence(order.stageSequence || '');
     const currentIndex = currentSequence.indexOf(order.currentStage);
 
     if (currentIndex === -1 || currentIndex >= currentSequence.length - 1) {

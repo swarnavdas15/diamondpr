@@ -30,11 +30,9 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({ visible, onClo
 
   const roles: { role: Role; label: string; department: string }[] = [
     { role: 'SUPER_ADMIN', label: 'Super Admin', department: 'Executive Management' },
-    { role: 'ADMIN', label: 'Admin', department: 'Plant Operations' },
     { role: 'SALES', label: 'Sales Department', department: 'Commercial & Accounts' },
     { role: 'PURCHASE', label: 'Purchase Department', department: 'Procurement & Supply Chain' },
     { role: 'PRODUCTION', label: 'Production Department', department: 'Shop Floor & Machining' },
-    { role: 'QUALITY_TESTING', label: 'Quality Testing', department: 'Inspection & QA' },
     { role: 'DISPATCH', label: 'Dispatch Department', department: 'Logistics & Shipment' },
   ];
 
@@ -125,7 +123,7 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({ visible, onClo
               <Text style={styles.infoText}>Assigned Password: <Text style={styles.boldHighlight}>{createdUser.password}</Text></Text>
               <Text style={styles.infoText}>Registered Email: <Text style={styles.bold}>{createdUser.email}</Text></Text>
               <Text style={styles.infoText}>Mobile Contact: <Text style={styles.bold}>{createdUser.mobileNumber || 'N/A'}</Text></Text>
-              <Text style={styles.infoText}>Department & Role: <Text style={styles.bold}>{createdUser.role.replace('_', ' ')}</Text></Text>
+              <Text style={styles.infoText}>Department & Role: <Text style={styles.bold}>{(createdUser.role || '').replace('_', ' ')}</Text></Text>
               <Text style={styles.infoText}>Employee ID: <Text style={styles.bold}>{createdUser.employeeId || 'N/A'}</Text></Text>
               <Text style={styles.infoText}>Status: <Text style={styles.boldGreen}>{createdUser.isActive ? 'Active (Can Log In Immediately)' : 'Inactive'}</Text></Text>
 

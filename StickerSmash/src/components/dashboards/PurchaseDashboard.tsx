@@ -9,6 +9,7 @@ import { QuantityProcessModal } from '../QuantityProcessModal';
 import { OrderQuantityTracker } from '../OrderQuantityTracker';
 import { ExportButton } from '../ui/ExportButton';
 import { ExportDataPayload } from '../../utils/exportUtils';
+import { SearchableDropdown } from '../ui/SearchableDropdown';
 
 export const PurchaseDashboard: React.FC = () => {
   const { width } = useWindowDimensions();
@@ -53,16 +54,21 @@ export const PurchaseDashboard: React.FC = () => {
     setProcessModalVisible(true);
   };
 
-  const handleProcessSubmit = (data: { processedQty: number; remarks?: string; vendorSelected?: string }) => {
+  const handleProcessSubmit = async (data: { processedQty: number; remarks?: string; vendorSelected?: string }) => {
     if (!selectedProcessOrder) return;
     const vendor = data.vendorSelected || selectedVendorMap[selectedProcessOrder.id] || 'Jindal Stainless Steel Works';
     const notes = data.remarks || notesMap[selectedProcessOrder.id] || 'Material procured and verified in stock.';
-    const newQty = (selectedProcessOrder.purchaseQuantity || 0) + data.processedQty;
+    const currentQty = selectedProcessOrder.purchaseQuantity || 0;
+    const newQty = currentQty + data.processedQty;
     const calcStatus: DepartmentStatus = newQty >= selectedProcessOrder.requiredQuantity ? 'COMPLETED' : 'IN_PROGRESS';
 
-    updatePurchaseStage(selectedProcessOrder.id, calcStatus, vendor, notes, data.processedQty);
-    setProcessModalVisible(false);
-    setSelectedProcessOrder(null);
+    try {
+      await updatePurchaseStage(selectedProcessOrder.id, calcStatus, vendor, notes, newQty);
+      setProcessModalVisible(false);
+      setSelectedProcessOrder(null);
+    } catch (err: any) {
+      console.error('Failed to update purchase stage:', err);
+    }
   };
 
   const getStatusBadgeStyle = (status: DepartmentStatus, purQty: number = 0, reqQty: number = 50) => {
@@ -183,23 +189,20 @@ export const PurchaseDashboard: React.FC = () => {
                 {ord.purchaseStatus !== 'COMPLETED' && (
                   <>
                     <View style={styles.vendorBox}>
-                      <Text style={styles.inputLabel}>Select Material Vendor / Supplier:</Text>
-                      <View style={styles.vendorChips}>
-                        {sampleVendors.map((v) => {
-                          const isSel = (selectedVendorMap[ord.id] || ord.vendorSelected) === v;
-                          return (
-                            <TouchableOpacity
-                              key={v}
-                              style={[styles.vendorChip, isSel && styles.vendorChipActive]}
-                              onPress={() => setSelectedVendorMap({ ...selectedVendorMap, [ord.id]: v })}
-                            >
-                              <Text style={[styles.vendorChipText, isSel && styles.vendorChipTextActive]}>{v}</Text>
-                            </TouchableOpacity>
-                          );
-                        })}
-                      </View>
+                      <SearchableDropdown
+                        label="Select Material Vendor / Supplier:"
+                        placeholder="Search or select material vendor..."
+                        options={sampleVendors.map((v) => ({
+                          id: v,
+                          label: v,
+                          sublabel: 'Approved Material Supplier',
+                          icon: '🏭',
+                        }))}
+                        selectedValue={selectedVendorMap[ord.id] || ord.vendorSelected || ''}
+                        onSelect={(v) => setSelectedVendorMap({ ...selectedVendorMap, [ord.id]: v })}
+                      />
 
-                      <Text style={styles.inputLabel}>Procurement Remarks / Delivery Notes:</Text>
+                      <Text style={[styles.inputLabel, { marginTop: 10 }]}>Procurement Remarks / Delivery Notes:</Text>
                       <TextInput
                         style={styles.input}
                         placeholder="Enter warehouse gate receipt number or MTC ref..."
@@ -212,22 +215,10 @@ export const PurchaseDashboard: React.FC = () => {
                     {/* Action Buttons */}
                     <View style={styles.actionRow}>
                       <TouchableOpacity
-                        style={[styles.actionBtn, styles.btnProg]}
+                        style={[styles.actionBtn, styles.btnProg, { flex: 1 }]}
                         onPress={() => handleOpenProcessModal(ord)}
                       >
                         <Text style={styles.actionBtnText}>📦 Record Material Received (Batch)</Text>
-                      </TouchableOpacity>
-
-                      <TouchableOpacity
-                        style={[styles.actionBtn, styles.btnDone]}
-                        onPress={() => {
-                          const vendor = selectedVendorMap[ord.id] || ord.vendorSelected || 'Jindal Stainless Steel Works';
-                          const notes = notesMap[ord.id] || ord.procurementNotes || 'Material fully procured and verified.';
-                          const remainingQty = Math.max(0, ord.requiredQuantity - (ord.purchaseQuantity || 0));
-                          updatePurchaseStage(ord.id, 'COMPLETED', vendor, notes, remainingQty);
-                        }}
-                      >
-                        <Text style={styles.actionBtnText}>✓ Purchase Done</Text>
                       </TouchableOpacity>
                     </View>
                   </>

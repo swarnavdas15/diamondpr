@@ -31,14 +31,8 @@ export const TaskKPIDetailsModal: React.FC<TaskKPIDetailsModalProps> = ({
 
   const isSuperAdminOrAdmin = currentUser.role === 'SUPER_ADMIN' || currentUser.role === 'ADMIN';
 
-  // Role-based task filtering
-  const roleFilteredTasks = tasks.filter((t) => {
-    if (isSuperAdminOrAdmin) return true;
-    return (
-      (t.assignedToDepartment && t.assignedToDepartment === currentUser.role) ||
-      (t.assignedToUserId && t.assignedToUserId === currentUser.id)
-    );
-  });
+  // All tasks are visible across all department dashboards
+  const roleFilteredTasks = tasks;
 
   const todayStr = new Date().toISOString().split('T')[0];
 

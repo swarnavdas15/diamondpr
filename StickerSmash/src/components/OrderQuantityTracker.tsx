@@ -15,10 +15,13 @@ export const OrderQuantityTracker: React.FC<OrderQuantityTrackerProps> = ({ orde
   const qcQty = order.qcQuantity || 0;
   const dispQty = order.dispatchQuantity || 0;
 
+  const passedQcQty = order.qcPassedQuantity !== undefined ? order.qcPassedQuantity : (order.qcResult === 'PASSED' ? qcQty : 0);
+  const failedQcQty = order.qcFailedQuantity || 0;
+
   // Calculation of availability & progress
   const availableForDispatch = Math.max(
     0,
-    (order.qualityTestingRequired ? qcQty : prodQty) - dispQty
+    (order.qualityTestingRequired ? passedQcQty : prodQty) - dispQty
   );
   const pendingProduction = Math.max(0, totalQty - prodQty);
 
@@ -29,7 +32,7 @@ export const OrderQuantityTracker: React.FC<OrderQuantityTrackerProps> = ({ orde
 
   const purPct = getPercent(purQty, totalQty);
   const prodPct = getPercent(prodQty, totalQty);
-  const qcPct = order.qualityTestingRequired ? getPercent(qcQty, prodQty > 0 ? prodQty : totalQty) : 100;
+  const qcPct = order.qualityTestingRequired ? getPercent(passedQcQty, totalQty) : 100;
   const dispPct = getPercent(dispQty, totalQty);
 
   return (
@@ -52,6 +55,11 @@ export const OrderQuantityTracker: React.FC<OrderQuantityTrackerProps> = ({ orde
         {pendingProduction > 0 && (
           <View style={styles.pendingBadge}>
             <Text style={styles.pendingBadgeText}>⏳ Pending Production: {pendingProduction} PCS</Text>
+          </View>
+        )}
+        {failedQcQty > 0 && (
+          <View style={[styles.pendingBadge, { backgroundColor: 'rgba(239, 68, 68, 0.12)', borderColor: '#ef4444' }]}>
+            <Text style={[styles.pendingBadgeText, { color: '#dc2626' }]}>🔁 Returned to Production (Rework): {failedQcQty} PCS</Text>
           </View>
         )}
         {dispQty >= totalQty && totalQty > 0 && (
@@ -100,11 +108,11 @@ export const OrderQuantityTracker: React.FC<OrderQuantityTrackerProps> = ({ orde
               <Text style={styles.stageIcon}>🔍</Text>
               <Text style={styles.stageName}>QC Testing</Text>
             </View>
-            <Text style={styles.stageRatio}>{qcQty} / {prodQty} PCS</Text>
+            <Text style={styles.stageRatio}>{passedQcQty} Pass / {failedQcQty} Fail</Text>
             <View style={styles.barTrack}>
               <View style={[styles.barFill, { width: `${qcPct}%`, backgroundColor: qcPct >= 100 ? Colors.successBright : Colors.accentTeal }]} />
             </View>
-            <Text style={styles.pctText}>{qcPct}% Tested</Text>
+            <Text style={styles.pctText}>{passedQcQty} Passed ({qcQty} Inspected)</Text>
           </View>
         )}
 

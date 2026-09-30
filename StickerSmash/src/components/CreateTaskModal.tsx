@@ -130,7 +130,7 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ visible, onClo
                 }
               }}
               allowManual={true}
-              manualLabel={`🏢 Entire ${assignedToDepartment.replace(/_/g, ' ')} Team`}
+              manualLabel={`🏢 Entire ${(assignedToDepartment || '').replace(/_/g, ' ')} Team`}
               manualId=""
             />
 

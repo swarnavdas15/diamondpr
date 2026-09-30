@@ -72,6 +72,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           'Purchase',
           'Production',
           'Dispatch',
+          'Vendors',
           'Users',
           'Tasks',
           'Reports',
@@ -106,7 +107,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
       case 'PURCHASE':
         return [
           'Dashboard',
-          'Purchase',
           'Vendors',
           'Tasks',
           'Logout',
@@ -114,7 +114,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
       case 'PRODUCTION':
         return [
           'Dashboard',
-          'WorkOrders',
           'Tasks',
           'Logout',
         ];
@@ -128,7 +127,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
       case 'DISPATCH':
         return [
           'Dashboard',
-          'DispatchQueue',
           'Tasks',
           'Logout',
         ];
@@ -178,7 +176,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               {currentUser.name}
             </Text>
             <View style={[styles.roleBadge, { backgroundColor: getRoleBadgeColor(currentUser.role) }]}>
-              <Text style={styles.roleBadgeText}>{currentUser.role.replace('_', ' ')}</Text>
+              <Text style={styles.roleBadgeText}>{(currentUser?.role || '').replace('_', ' ')}</Text>
             </View>
           </View>
         )}

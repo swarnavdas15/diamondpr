@@ -57,7 +57,7 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, style, textSty
   };
 
   const colors = getBadgeColors();
-  const displayLabel = label || status.replace(/_/g, ' ');
+  const displayLabel = label || (status || '').replace(/_/g, ' ');
 
   return (
     <View style={[styles.badge, { backgroundColor: colors.bg, borderColor: colors.border }, style]}>

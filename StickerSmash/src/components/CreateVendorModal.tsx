@@ -119,7 +119,7 @@ export const CreateVendorModal: React.FC<CreateVendorModalProps> = ({
     }
   }, [vendorToEdit, visible]);
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     setError('');
 
     if (!vendorName.trim()) {
@@ -145,7 +145,7 @@ export const CreateVendorModal: React.FC<CreateVendorModalProps> = ({
 
     try {
       if (vendorToEdit) {
-        updateVendor(vendorToEdit.id, {
+        await updateVendor(vendorToEdit.id, {
           vendorCode: vendorCode.trim(),
           vendorName: vendorName.trim(),
           companyName: companyName.trim(),
@@ -175,7 +175,7 @@ export const CreateVendorModal: React.FC<CreateVendorModalProps> = ({
           notes: notes.trim(),
         });
       } else {
-        createVendor({
+        await createVendor({
           vendorCode: vendorCode.trim(),
           vendorName: vendorName.trim(),
           companyName: companyName.trim(),

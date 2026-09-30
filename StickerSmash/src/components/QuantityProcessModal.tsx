@@ -3,6 +3,7 @@ import { View, Text, Modal, TouchableOpacity, ScrollView, TextInput, StyleSheet,
 import { Order, QCResult } from '../types';
 import { Colors, StatusColors, Spacing, Radius, Shadows } from '../theme';
 import { useERP } from '../context/ERPContext';
+import { SearchableDropdown } from './ui/SearchableDropdown';
 
 interface QuantityProcessModalProps {
   visible: boolean;
@@ -86,13 +87,16 @@ export const QuantityProcessModal: React.FC<QuantityProcessModalProps> = ({
     stageTitle = isRework ? 'Production Rework Update' : 'Production & Manufacturing Output Update';
     questionPrompt = isRework ? 'How many reworked items have been fixed?' : 'How many finished items have been produced?';
     alreadyProcessed = isRework ? 0 : (order.productionQuantity || 0);
-    maxAvailable = isRework ? (order.reworkQuantity || 0) : Math.max(0, totalQty - alreadyProcessed);
+    const availableMaterial = (order.purchaseRequired && (order.purchaseQuantity !== undefined && order.purchaseQuantity !== null))
+      ? (order.purchaseQuantity || 0)
+      : totalQty;
+    maxAvailable = isRework ? (order.reworkQuantity || 0) : Math.max(0, availableMaterial - alreadyProcessed);
   } else if (stage === 'QUALITY_TESTING') {
     stageTitle = 'Quality Testing & Inspection Result Log';
     questionPrompt = 'Enter the number of passed and failed items.';
-    alreadyProcessed = order.qcQuantity || 0;
+    alreadyProcessed = order.qcPassedQuantity || 0;
     const producedAvailable = order.productionQuantity || 0;
-    maxAvailable = Math.max(0, producedAvailable - alreadyProcessed);
+    maxAvailable = Math.max(0, producedAvailable - (order.qcPassedQuantity || 0));
   } else if (stage === 'DISPATCH') {
     stageTitle = 'Dispatch & Logistics Shipment Process';
     questionPrompt = 'How many items are being dispatched in this shipment?';
@@ -146,7 +150,11 @@ export const QuantityProcessModal: React.FC<QuantityProcessModalProps> = ({
       return;
     }
     if (val > maxAvailable) {
-      setErrorMsg(`Quantity cannot exceed remaining quantity available for this stage (${maxAvailable} PCS).`);
+      if (stage === 'PRODUCTION' && order.purchaseRequired && (order.purchaseQuantity || 0) < totalQty) {
+        setErrorMsg(`Cannot produce ${val} units. Only ${order.purchaseQuantity || 0} PCS raw material has been received so far (${alreadyProcessed} PCS already produced). Available for production: ${maxAvailable} PCS.`);
+      } else {
+        setErrorMsg(`Quantity cannot exceed remaining quantity available for this stage (${maxAvailable} PCS).`);
+      }
       return;
     }
     if (!isRework && alreadyProcessed + val > totalQty) {
@@ -275,44 +283,61 @@ export const QuantityProcessModal: React.FC<QuantityProcessModalProps> = ({
             {/* Stage-Specific Fields */}
             {stage === 'PURCHASE' && (
               <View style={{ marginTop: Spacing.sm }}>
-                <Text style={styles.inputLabel}>Material Vendor / Supplier:</Text>
-                <View style={styles.vendorChips}>
-                  {vendorList.map((v) => (
-                    <TouchableOpacity
-                      key={v}
-                      style={[styles.chip, vendorSelected === v && styles.chipActive]}
-                      onPress={() => setVendorSelected(v)}
-                    >
-                      <Text style={[styles.chipText, vendorSelected === v && styles.chipTextActive]}>{v}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
+                <SearchableDropdown
+                  label="Material Vendor / Supplier:"
+                  placeholder="Search or select material vendor..."
+                  options={vendorList.map((v) => ({
+                    id: v,
+                    label: v,
+                    sublabel: 'Approved Supplier',
+                    icon: '🏭',
+                  }))}
+                  selectedValue={vendorSelected}
+                  onSelect={(v) => setVendorSelected(v)}
+                />
               </View>
             )}
 
             {stage === 'QUALITY_TESTING' && (
-              <View style={{ marginTop: Spacing.sm, flexDirection: 'row', gap: Spacing.md }}>
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.inputLabel, { color: StatusColors.COMPLETED.text }]}>✓ Passed Qty (PCS)</Text>
-                  <TextInput
-                    style={[styles.input, { fontSize: 16, fontWeight: '800', color: StatusColors.COMPLETED.text, borderColor: StatusColors.COMPLETED.text }]}
-                    placeholder="e.g. 90"
-                    placeholderTextColor="#94a3b8"
-                    value={passedQty}
-                    onChangeText={setPassedQty}
-                    keyboardType="numeric"
-                  />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.inputLabel, { color: StatusColors.FAILED.text }]}>✕ Failed/Rework Qty</Text>
-                  <TextInput
-                    style={[styles.input, { fontSize: 16, fontWeight: '800', color: StatusColors.FAILED.text, borderColor: StatusColors.FAILED.text }]}
-                    placeholder="e.g. 10"
-                    placeholderTextColor="#94a3b8"
-                    value={failedQty}
-                    onChangeText={setFailedQty}
-                    keyboardType="numeric"
-                  />
+              <View style={{ marginTop: Spacing.sm, gap: 8 }}>
+                <Text style={{ fontSize: 13, fontWeight: '700', color: Colors.textLight, marginBottom: 4 }}>
+                  Inspection Results Breakdown:
+                </Text>
+
+                <View style={{ flexDirection: 'row', gap: Spacing.md }}>
+                  {/* Left Box: PASS */}
+                  <View style={{ flex: 1, backgroundColor: '#f0fdf4', padding: 10, borderRadius: Radius.md, borderWidth: 1.5, borderColor: '#16a34a' }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+                      <Text style={{ fontSize: 16 }}>✓</Text>
+                      <Text style={{ color: '#15803d', fontSize: 14, fontWeight: '900', letterSpacing: 0.5 }}>PASS</Text>
+                      <Text style={{ color: '#166534', fontSize: 12, fontWeight: '600' }}>(Passed Qty)</Text>
+                    </View>
+                    <TextInput
+                      style={[styles.input, { fontSize: 16, fontWeight: '800', color: '#15803d', borderColor: '#16a34a', borderWidth: 1.5, backgroundColor: '#ffffff' }]}
+                      placeholder="Pass Qty (e.g. 40)"
+                      placeholderTextColor="#94a3b8"
+                      value={passedQty}
+                      onChangeText={setPassedQty}
+                      keyboardType="numeric"
+                    />
+                  </View>
+
+                  {/* Right Box: FAIL */}
+                  <View style={{ flex: 1, backgroundColor: '#fef2f2', padding: 10, borderRadius: Radius.md, borderWidth: 1.5, borderColor: '#dc2626' }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+                      <Text style={{ fontSize: 16 }}>✕</Text>
+                      <Text style={{ color: '#b91c1c', fontSize: 14, fontWeight: '900', letterSpacing: 0.5 }}>FAIL</Text>
+                      <Text style={{ color: '#991b1b', fontSize: 12, fontWeight: '600' }}>(Failed Qty)</Text>
+                    </View>
+                    <TextInput
+                      style={[styles.input, { fontSize: 16, fontWeight: '800', color: '#b91c1c', borderColor: '#dc2626', borderWidth: 1.5, backgroundColor: '#ffffff' }]}
+                      placeholder="Fail Qty (e.g. 60)"
+                      placeholderTextColor="#94a3b8"
+                      value={failedQty}
+                      onChangeText={setFailedQty}
+                      keyboardType="numeric"
+                    />
+                  </View>
                 </View>
               </View>
             )}

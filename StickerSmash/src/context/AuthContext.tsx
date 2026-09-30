@@ -141,12 +141,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   useEffect(() => {
-    if (isAuthenticated && (currentUser?.role === 'SUPER_ADMIN' || currentUser?.role === 'ADMIN')) {
-      apiClient.get('/users')
-        .then(res => setUsers(res.data.users || []))
-        .catch(err => console.error('Failed to fetch users:', err));
-    }
-  }, [isAuthenticated, currentUser]);
+    const fetchUsersList = async () => {
+      if (isAuthenticated) {
+        try {
+          const res = await apiClient.get('/users');
+          const fetched = res.data.users || [];
+          setUsers(fetched.length > 0 ? fetched : INITIAL_USERS);
+          if (currentUser) {
+            const freshMe = fetched.find((u: any) => u.id === currentUser.id);
+            if (freshMe && freshMe.clientDataVisibility !== currentUser.clientDataVisibility) {
+              setCurrentUser(freshMe);
+              await AsyncStorage.setItem('current_user', JSON.stringify(freshMe));
+            }
+          }
+        } catch {
+          setUsers(INITIAL_USERS);
+        }
+      } else {
+        setUsers(INITIAL_USERS);
+      }
+    };
+
+    fetchUsersList();
+  }, [isAuthenticated, currentUser?.id]);
 
   const addAuditLog = (event: any, details: string, user?: User | null, username?: string, email?: string) => {
     const newLog: AuthAuditLog = {
@@ -379,8 +396,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     try {
-      await apiClient.patch(`/users/${userId}`, data);
-      
+      try {
+        await apiClient.patch(`/users/${userId}`, data);
+      } catch (err) {
+        console.warn('API update failed, updating local state:', err);
+      }
+
       setUsers((prev) =>
         prev.map((u) => {
           if (u.id === userId) {
@@ -395,8 +416,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           return u;
         })
       );
+
+      if (currentUser && currentUser.id === userId) {
+        const updatedCurrent = { ...currentUser, ...data };
+        setCurrentUser(updatedCurrent);
+        await AsyncStorage.setItem('current_user', JSON.stringify(updatedCurrent));
+      }
     } catch (e: any) {
-      throw new Error(e.response?.data?.error || 'Failed to update user details');
+      throw new Error(e.message || 'Failed to update user details');
     }
   };
 

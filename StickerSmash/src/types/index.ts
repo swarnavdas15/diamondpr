@@ -62,6 +62,8 @@ export type CalendarEventType =
   | 'BIRTHDAY'
   | 'ANNIVERSARY';
 
+export type ClientDataVisibility = 'FULL' | 'CODE_ONLY';
+
 export interface User {
   id: string;
   name: string;
@@ -72,6 +74,7 @@ export interface User {
   password?: string;
   role: Role;
   isActive: boolean;
+  clientDataVisibility?: ClientDataVisibility;
   createdAt?: string;
 }
 
@@ -282,6 +285,7 @@ export interface Order {
   poNumber: string;
   clientId: string;
   clientCode: string;
+  client?: any;
   clientName?: string; // Masked for non-Sales roles
   contactNo?: string;  // Masked for non-Sales roles
   email?: string;      // Masked for non-Sales roles
@@ -291,6 +295,7 @@ export interface Order {
   technicalRequirements?: string;
   materialRequirements?: string;
   requiredQuantity: number;
+  unit?: string;
   status: DepartmentStatus;
   drawingApproved: boolean;
 

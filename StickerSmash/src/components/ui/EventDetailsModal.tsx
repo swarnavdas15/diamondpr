@@ -50,7 +50,7 @@ export const EventDetailsModal: React.FC<EventDetailsModalProps> = ({
           <View style={styles.header}>
             <View style={styles.headerTitleRow}>
               <View style={[styles.typeDot, { backgroundColor: categoryColor }]} />
-              <Text style={styles.typeText}>{event.type.replace('_', ' ')}</Text>
+              <Text style={styles.typeText}>{(event?.type || '').replace('_', ' ')}</Text>
             </View>
             <TouchableOpacity onPress={onClose}>
               <Text style={styles.closeBtn}>✕</Text>

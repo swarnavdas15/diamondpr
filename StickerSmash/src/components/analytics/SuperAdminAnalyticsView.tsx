@@ -65,20 +65,113 @@ const VisualPieChart: React.FC<VisualPieChartProps> = ({
     name: item.label,
     population: typeof item.value === 'number' && !isNaN(item.value) ? item.value : 0,
     color: item.color,
-    legendFontColor: '#7F7F7F',
-    legendFontSize: 15
   }));
 
-  // Force chart to show default gray if all values are 0
-  if (totalValue === 0) {
-    chartData.push({
-      name: 'Empty',
-      population: 1,
-      color: '#e2e8f0',
-      legendFontColor: '#7F7F7F',
-      legendFontSize: 15
-    });
-  }
+  const renderDonutChart = () => {
+    const size = 160;
+    const strokeWidth = 20;
+    const radius = (size - strokeWidth) / 2; // 70
+    const circumference = 2 * Math.PI * radius; // 439.82
+
+    if (totalValue === 0) {
+      return (
+        <View style={{ width: size, height: size, justifyContent: 'center', alignItems: 'center', position: 'relative' }}>
+          {Platform.OS === 'web' ? (
+            <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+              <circle
+                cx={size / 2}
+                cy={size / 2}
+                r={radius}
+                fill="none"
+                stroke="#e2e8f0"
+                strokeWidth={strokeWidth}
+              />
+            </svg>
+          ) : (
+            <PieChart
+              data={[{ name: 'Empty', population: 1, color: '#e2e8f0' }]}
+              width={size}
+              height={size}
+              chartConfig={{ color: (opacity = 1) => `rgba(255, 255, 255, ${opacity})` }}
+              accessor={"population"}
+              backgroundColor={"transparent"}
+              paddingLeft={"0"}
+              hasLegend={false}
+              absolute
+            />
+          )}
+          <View style={[styles.donutCenter, { position: 'absolute' }]}>
+            <Text style={styles.donutCenterValue}>{centerLabel !== undefined ? centerLabel : 0}</Text>
+            <Text style={styles.donutCenterSub}>{centerSubLabel !== undefined ? centerSubLabel : 'Total'}</Text>
+          </View>
+        </View>
+      );
+    }
+
+    if (Platform.OS === 'web') {
+      let accumulatedLength = 0;
+      return (
+        <View style={{ width: size, height: size, justifyContent: 'center', alignItems: 'center', position: 'relative' }}>
+          <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+            {chartData.map((item, index) => {
+              if (item.population <= 0) return null;
+              const strokeLength = (item.population / totalValue) * circumference;
+              const strokeOffset = -accumulatedLength;
+              accumulatedLength += strokeLength;
+
+              return (
+                <circle
+                  key={index}
+                  cx={size / 2}
+                  cy={size / 2}
+                  r={radius}
+                  fill="none"
+                  stroke={item.color}
+                  strokeWidth={strokeWidth}
+                  strokeDasharray={`${strokeLength} ${circumference - strokeLength}`}
+                  strokeDashoffset={strokeOffset}
+                  transform={`rotate(-90 ${size / 2} ${size / 2})`}
+                  style={{ transition: 'stroke-dasharray 0.4s ease' }}
+                />
+              );
+            })}
+          </svg>
+          <View style={[styles.donutCenter, { position: 'absolute' }]}>
+            <Text style={styles.donutCenterValue}>
+              {centerLabel !== undefined ? centerLabel : totalValue}
+            </Text>
+            <Text style={styles.donutCenterSub}>
+              {centerSubLabel !== undefined ? centerSubLabel : 'Total'}
+            </Text>
+          </View>
+        </View>
+      );
+    }
+
+    return (
+      <View style={{ width: size, height: size, justifyContent: 'center', alignItems: 'center', position: 'relative' }}>
+        <PieChart
+          data={chartData.map(d => ({ ...d, legendFontColor: '#7F7F7F', legendFontSize: 15 }))}
+          width={size}
+          height={size}
+          chartConfig={{ color: (opacity = 1) => `rgba(255, 255, 255, ${opacity})` }}
+          accessor={"population"}
+          backgroundColor={"transparent"}
+          paddingLeft={"0"}
+          hasLegend={false}
+          absolute
+        />
+        <View style={[styles.donutCenter, { position: 'absolute' }]}>
+          <Text style={styles.donutCenterValue}>
+            {centerLabel !== undefined ? centerLabel : totalValue}
+          </Text>
+          <Text style={styles.donutCenterSub}>
+            {centerSubLabel !== undefined ? centerSubLabel : 'Total'}
+          </Text>
+        </View>
+      </View>
+    );
+  };
 
   return (
     <View style={styles.pieChartCard}>
@@ -86,35 +179,12 @@ const VisualPieChart: React.FC<VisualPieChartProps> = ({
       {subtitle ? <Text style={styles.pieChartSubtitle}>{subtitle}</Text> : null}
 
       <View style={styles.pieChartBodyRow}>
-        {/* Donut Circle Container */}
         <View style={styles.pieWrapper}>
           <View style={styles.pieCircle}>
-            <PieChart
-              data={chartData}
-              width={140}
-              height={140}
-              chartConfig={{
-                color: (opacity = 1) => `rgba(255, 255, 255, ${opacity})`,
-              }}
-              accessor={"population"}
-              backgroundColor={"transparent"}
-              paddingLeft={"0"}
-              hasLegend={false}
-              absolute
-            />
-            {/* Center Donut Hole */}
-            <View style={[styles.donutCenter, { position: 'absolute' }]}>
-              <Text style={styles.donutCenterValue}>
-                {centerLabel !== undefined ? centerLabel : totalValue}
-              </Text>
-              <Text style={styles.donutCenterSub}>
-                {centerSubLabel !== undefined ? centerSubLabel : 'Total'}
-              </Text>
-            </View>
+            {renderDonutChart()}
           </View>
         </View>
 
-        {/* Donut Legend Key Details */}
         <View style={styles.legendContainer}>
           {items.map((item, idx) => {
             const valNum = typeof item.value === 'number' && !isNaN(item.value) ? item.value : 0;
@@ -209,11 +279,33 @@ export const SuperAdminAnalyticsView: React.FC = () => {
   // 2. Aggregate KPI Metrics Calculations
   const metrics = useMemo(() => {
     const totalOrders = filteredOrders.length;
-    const completedOrders = filteredOrders.filter((o) => o.status === 'COMPLETED').length;
-    const activeOrders = filteredOrders.filter(
-      (o) => o.status === 'IN_PROGRESS' || o.purchaseStatus === 'IN_PROGRESS' || o.productionStatus === 'IN_PROGRESS'
+    const completedOrders = filteredOrders.filter((o) =>
+      o.currentStage === 'COMPLETED' || o.dispatchStatus === 'COMPLETED' || o.status === 'COMPLETED'
     ).length;
-    const delayedOrders = filteredOrders.filter((o) => o.status !== 'COMPLETED' && o.productionStatus === 'IN_PROGRESS').length;
+
+    const activeOrders = filteredOrders.filter((o) =>
+      (o.currentStage === 'PRODUCTION' || o.productionStatus === 'IN_PROGRESS') &&
+      o.currentStage !== 'COMPLETED' && o.dispatchStatus !== 'COMPLETED'
+    ).length;
+
+    const pendingPurchaseOrders = filteredOrders.filter((o) =>
+      (o.currentStage === 'PURCHASE' || o.purchaseStatus === 'IN_PROGRESS' || o.purchaseStatus === 'PENDING') &&
+      o.productionStatus === 'PENDING' && o.currentStage !== 'PRODUCTION' && o.currentStage !== 'QUALITY_TESTING' && o.currentStage !== 'DISPATCH' && o.currentStage !== 'COMPLETED'
+    ).length;
+
+    const testingOrders = filteredOrders.filter((o) =>
+      (o.currentStage === 'QUALITY_TESTING' || o.qualityStatus === 'IN_PROGRESS') &&
+      o.currentStage !== 'COMPLETED' && o.dispatchStatus !== 'COMPLETED'
+    ).length;
+
+    const dispatchOrders = filteredOrders.filter((o) =>
+      (o.currentStage === 'DISPATCH' || o.dispatchStatus === 'IN_PROGRESS') &&
+      o.currentStage !== 'COMPLETED' && o.dispatchStatus !== 'COMPLETED'
+    ).length;
+
+    const delayedOrders = filteredOrders.filter((o) =>
+      o.status !== 'COMPLETED' && o.currentStage !== 'COMPLETED' && o.productionStatus === 'IN_PROGRESS'
+    ).length;
 
     const totalQuotations = filteredQuotations.length;
     const convertedQuotations = filteredQuotations.filter(
@@ -235,6 +327,9 @@ export const SuperAdminAnalyticsView: React.FC = () => {
       totalOrders,
       activeOrders,
       completedOrders,
+      pendingPurchaseOrders,
+      testingOrders,
+      dispatchOrders,
       delayedOrders,
       totalQuotations,
       conversionRate,
@@ -695,13 +790,15 @@ export const SuperAdminAnalyticsView: React.FC = () => {
 
           <VisualPieChart
             title="📊 Order Distribution Pie Chart"
-            subtitle="Breakdown of completed orders, active shop floor machining, and delayed bottleneck orders."
+            subtitle="Real-time breakdown of orders across manufacturing pipeline stages."
             centerLabel={metrics.totalOrders}
             centerSubLabel="Total Orders"
             items={[
               { label: 'Completed Orders', value: metrics.completedOrders, color: '#22c55e' },
-              { label: 'Active Shop Floor Work Orders', value: metrics.activeOrders, color: '#0284c7' },
-              { label: 'Delayed / Bottleneck Orders', value: metrics.delayedOrders, color: '#f97316' },
+              { label: 'Active Shop Floor Production', value: metrics.activeOrders, color: '#0284c7' },
+              { label: 'Pending Sourcing & Procurement', value: metrics.pendingPurchaseOrders, color: '#f59e0b' },
+              { label: 'Quality Testing & Inspection', value: metrics.testingOrders, color: '#8b5cf6' },
+              { label: 'Ready for Dispatch / Shipping', value: metrics.dispatchOrders, color: '#ec4899' },
             ]}
           />
         </View>

@@ -22,7 +22,7 @@ export const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ isQCMo
 
   const [shopFloorNotesMap, setShopFloorNotesMap] = useState<{ [key: string]: string }>({});
   const [qcRemarksMap, setQcRemarksMap] = useState<{ [key: string]: string }>({});
-  const [activeTab, setActiveTab] = useState<'PRODUCTION' | 'QUALITY_TESTING' | 'REWORK' | 'COMPLETED'>(isQCMode ? 'QUALITY_TESTING' : 'PRODUCTION');
+  const [activeTab, setActiveTab] = useState<'PRODUCTION' | 'QUALITY_TESTING' | 'REWORK'>(isQCMode ? 'QUALITY_TESTING' : 'PRODUCTION');
 
   const [processModalVisible, setProcessModalVisible] = useState(false);
   const [selectedProcessOrder, setSelectedProcessOrder] = useState<Order | null>(null);
@@ -126,10 +126,10 @@ export const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ isQCMo
   };
 
   const productionQueue = maskedOrders.filter(
-    (o) => o.productionRequired && (o.purchaseStatus === 'COMPLETED' || !o.purchaseRequired) && o.productionStatus !== 'COMPLETED'
+    (o) => o.productionRequired && ((o.purchaseQuantity || 0) > 0 || o.purchaseStatus === 'COMPLETED' || !o.purchaseRequired) && o.productionStatus !== 'COMPLETED'
   );
   const qcQueue = maskedOrders.filter(
-    (o) => o.qualityTestingRequired && (o.productionStatus === 'COMPLETED' || (o.productionQuantity || 0) > 0) && o.qualityStatus !== 'COMPLETED'
+    (o) => o.qualityTestingRequired && (o.productionStatus === 'COMPLETED' || (o.productionQuantity || 0) > (o.qcPassedQuantity || 0)) && o.qualityStatus !== 'COMPLETED'
   );
   // Rework Queue: orders returned from QC failure that are back in Production
   const reworkQueue = maskedOrders.filter(
@@ -191,14 +191,6 @@ export const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ isQCMo
           </TouchableOpacity>
         )}
 
-        <TouchableOpacity
-          style={[styles.tabBtn, activeTab === 'COMPLETED' && styles.tabBtnActive]}
-          onPress={() => setActiveTab('COMPLETED')}
-        >
-          <Text style={[styles.tabText, activeTab === 'COMPLETED' && styles.tabTextActive]}>
-            ✓ Completed ({completedQueue.length})
-          </Text>
-        </TouchableOpacity>
       </View>
 
       {/* SECTION 1: PRODUCTION WORK ORDERS QUEUE */}
@@ -236,7 +228,7 @@ export const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ isQCMo
                   <View style={styles.specBox}>
                     <Text style={styles.specTitle}>MANUFACTURING SPECIFICATIONS & DRAWINGS</Text>
                     <Text style={styles.specVal}>Drawing Status: <Text style={styles.bold}>{ord.drawingApproved ? '✓ Drawing Approved' : '☐ Drawing Pending'}</Text></Text>
-                    <Text style={styles.specVal}>Material Stock Status: <Text style={styles.bold}>{ord.purchaseStatus === 'COMPLETED' ? '✓ Raw Material Received' : '⏳ Procurement Pending'}</Text></Text>
+                    <Text style={styles.specVal}>Material Stock Status: <Text style={styles.bold}>{ord.purchaseStatus === 'COMPLETED' ? `✓ Raw Material Received (${ord.purchaseQuantity || ord.requiredQuantity} pcs)` : (ord.purchaseQuantity || 0) > 0 ? `⚡ Partial Material Received (${ord.purchaseQuantity} / ${ord.requiredQuantity} pcs)` : '⏳ Procurement Pending'}</Text></Text>
                     <Text style={styles.specVal}>Finished Produced: <Text style={styles.bold}>{ord.productionQuantity || 0} / {ord.requiredQuantity} pcs</Text></Text>
                     <Text style={styles.specVal}>Technical Specs: {ord.technicalRequirements || 'ANSI B16.5 Standard'}</Text>
                     <Text style={styles.specVal}>Batch Quantity: <Text style={styles.bold}>{ord.requiredQuantity} units</Text></Text>
@@ -415,41 +407,7 @@ export const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ isQCMo
         </View>
       )}
 
-      {/* SECTION 4: COMPLETED QUEUE */}
-      {activeTab === 'COMPLETED' && (
-        <View style={styles.sectionCard}>
-          <Text style={styles.sectionTitle}>Completed Orders</Text>
 
-          {completedQueue.length === 0 ? (
-            <Text style={styles.emptyText}>No completed orders yet.</Text>
-          ) : (
-            completedQueue.map((ord) => {
-              const badge = getComprehensiveBadge(ord);
-              return (
-                <View key={ord.id} style={[styles.orderCard, { borderLeftWidth: 4, borderLeftColor: badge.bg, opacity: 0.8 }]}>
-                  <View style={styles.cardHeader}>
-                    <TouchableOpacity onPress={() => setSelectedOrder(ord)}>
-                      <View style={styles.orderRefRow}>
-                        <Text style={styles.orderNum}>{ord.orderNumber}</Text>
-                        <View style={styles.codeBadge}>
-                          <Text style={styles.codeBadgeText}>Client Code: {ord.clientCode}</Text>
-                        </View>
-                      </View>
-                      <Text style={styles.poNumberText}>PO Ref: {ord.poNumber}</Text>
-                    </TouchableOpacity>
-
-                    <View style={[styles.statusBadge, { backgroundColor: badge.bg, borderWidth: 1, borderColor: badge.border }]}>
-                      <Text style={[styles.statusBadgeText, { color: badge.text }]}>{badge.label}</Text>
-                    </View>
-                  </View>
-
-                  <OrderQuantityTracker order={ord} style={{ marginTop: Spacing.xs }} />
-                </View>
-              );
-            })
-          )}
-        </View>
-      )}
 
       {/* Stage-Wise Quantity Process Modal */}
       <QuantityProcessModal

@@ -31,6 +31,7 @@ export const handleListClients = async (req: AuthRequest, res: Response) => {
     const clients = await clientService.listClients();
     return res.status(200).json({ clients });
   } catch (err: any) {
+    console.error('Error in handleListClients:', err);
     return res.status(500).json({ error: err.message || 'Failed to fetch clients' });
   }
 };
@@ -55,6 +56,7 @@ export const handleUploadProfileImage = async (req: AuthRequest, res: Response) 
       client: updatedClient 
     });
   } catch (err: any) {
+    console.error('Error in handleUploadProfileImage:', err);
     return res.status(500).json({ error: err.message || 'Failed to upload image' });
   }
 };
@@ -70,6 +72,7 @@ export const handleCreateCompanyContact = async (req: AuthRequest, res: Response
     });
     return res.status(201).json({ message: 'Contact created', contact });
   } catch (err: any) {
+    console.error('Error in handleCreateCompanyContact:', err);
     return res.status(400).json({ error: err.message || 'Failed to create contact' });
   }
 };
@@ -79,6 +82,7 @@ export const handleListCompanyContacts = async (req: AuthRequest, res: Response)
     const contacts = await clientService.listCompanyContacts();
     return res.status(200).json({ contacts });
   } catch (err: any) {
+    console.error('Error in handleListCompanyContacts:', err);
     return res.status(500).json({ error: err.message || 'Failed to list contacts' });
   }
 };

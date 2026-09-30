@@ -145,6 +145,7 @@ export const OrderKPIDetailsModal: React.FC<OrderKPIDetailsModalProps> = ({
                 <Text style={[styles.th, { width: 120 }]}>Order Number</Text>
                 <Text style={[styles.th, { width: 100 }]}>Client Code</Text>
                 <Text style={[styles.th, { width: 180 }]}>Client Name</Text>
+                <Text style={[styles.th, { width: 110 }]}>Quantity</Text>
                 <Text style={[styles.th, { width: 140 }]}>Sales Stage</Text>
                 <Text style={[styles.th, { width: 110 }]}>Purchase</Text>
                 <Text style={[styles.th, { width: 110 }]}>Production</Text>
@@ -176,7 +177,8 @@ export const OrderKPIDetailsModal: React.FC<OrderKPIDetailsModalProps> = ({
                       <Text style={[styles.tdHighlight, { width: 120 }]}>{ord.orderNumber}</Text>
                       <Text style={[styles.td, { width: 100 }]}>{ord.clientCode}</Text>
                       <Text style={[styles.tdBold, { width: 180 }]}>{ord.clientName}</Text>
-                      <Text style={[styles.tdSmall, { width: 140 }]}>{ord.salesWorkflowStage.replace(/_/g, ' ')}</Text>
+                      <Text style={[styles.tdBold, { width: 110, color: Colors.accentTeal }]}>{ord.requiredQuantity || 0} {ord.unit || 'pcs'}</Text>
+                      <Text style={[styles.tdSmall, { width: 140 }]}>{(ord.salesWorkflowStage || ord.currentStage || 'PENDING').replace(/_/g, ' ')}</Text>
 
                       <View style={{ width: 110 }}>
                         <View style={[styles.statusPill, { backgroundColor: purStyle.bg, borderColor: purStyle.border }]}>
@@ -392,10 +394,17 @@ export const OrderKPIDetailsModal: React.FC<OrderKPIDetailsModalProps> = ({
           <View style={styles.header}>
             <View>
               <Text style={styles.modalTitle}>📊 Manufacturing Order Pipeline Analytics</Text>
-              <Text style={styles.modalSub}>
-                Role Access Scope: <Text style={{ color: Colors.accentTeal, fontWeight: '800' }}>{currentUser.role}</Text>{' '}
-                ({currentUser.role === 'SUPER_ADMIN' || currentUser.role === 'ADMIN' ? 'All Orders Unmasked' : 'Strict Client Masking Active'})
-              </Text>
+              {(() => {
+                const isMasked = currentUser.clientDataVisibility
+                  ? currentUser.clientDataVisibility === 'CODE_ONLY'
+                  : ['PURCHASE', 'PRODUCTION', 'QUALITY_TESTING', 'DISPATCH'].includes(currentUser.role);
+                return (
+                  <Text style={styles.modalSub}>
+                    Role Access Scope: <Text style={{ color: Colors.accentTeal, fontWeight: '800' }}>{currentUser.role}</Text>{' '}
+                    ({isMasked ? 'Strict Client Masking Active' : 'All Orders Unmasked'})
+                  </Text>
+                );
+              })()}
             </View>
 
             <TouchableOpacity onPress={onClose} style={styles.closeBtn}>

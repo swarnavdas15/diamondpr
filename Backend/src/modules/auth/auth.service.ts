@@ -34,8 +34,16 @@ export const loginUser = async (identifier: string, pass: string) => {
     throw new Error('Your account has been deactivated. Please contact the administrator.');
   }
 
+  const visibility = user.clientDataVisibility || (['PURCHASE', 'PRODUCTION', 'QUALITY_TESTING', 'DISPATCH'].includes(user.role) ? 'CODE_ONLY' : 'FULL');
+
   const token = jwt.sign(
-    { userId: user.id, role: user.role, name: user.name, email: user.email },
+    {
+      userId: user.id,
+      role: user.role,
+      name: user.name,
+      email: user.email,
+      clientDataVisibility: visibility,
+    },
     JWT_SECRET,
     { expiresIn: '7d' }
   );
@@ -48,6 +56,7 @@ export const loginUser = async (identifier: string, pass: string) => {
       email: user.email,
       role: user.role,
       isActive: user.isActive,
+      clientDataVisibility: visibility,
     },
     token,
   };

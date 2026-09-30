@@ -352,10 +352,10 @@ export const OrderOverviewModal: React.FC<OrderOverviewModalProps> = ({ visible,
             {/* Workflow Timeline & Audit Logs */}
             <View style={styles.timelineCard}>
               <Text style={styles.cardTitle}>Department History & Audit Logs</Text>
-              {selectedOrder.stageLogs.length === 0 ? (
+              {!selectedOrder.stageLogs || selectedOrder.stageLogs.length === 0 ? (
                 <Text style={styles.emptyText}>No activity recorded yet.</Text>
               ) : (
-                selectedOrder.stageLogs.map((log) => (
+                (selectedOrder.stageLogs || []).map((log) => (
                   <View key={log.id} style={styles.timelineItem}>
                     <View style={styles.timelineDot} />
                     <View style={styles.timelineContent}>

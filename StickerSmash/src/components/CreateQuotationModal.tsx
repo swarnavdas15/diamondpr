@@ -31,7 +31,7 @@ export const CreateQuotationModal: React.FC<CreateQuotationModalProps> = ({ visi
   const [expectedOrderValue, setExpectedOrderValue] = useState('');
   const [salesExecutive, setSalesExecutive] = useState(currentUser?.name || '');
   const [followUpDate, setFollowUpDate] = useState('');
-  const [status, setStatus] = useState<QuotationStatus>('SENT');
+  const [status, setStatus] = useState<QuotationStatus>('DRAFT');
   const [remarks, setRemarks] = useState('');
 
   const [errorMsg, setErrorMsg] = useState('');
@@ -70,7 +70,7 @@ export const CreateQuotationModal: React.FC<CreateQuotationModalProps> = ({ visi
     setSuccessMsg('Client Registered Successfully');
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     setErrorMsg('');
     setSuccessMsg('');
 
@@ -100,7 +100,7 @@ export const CreateQuotationModal: React.FC<CreateQuotationModalProps> = ({ visi
     }
 
     try {
-      const created = createQuotation({
+      const created = await createQuotation({
         companyName: companyName.trim(),
         clientCode: clientCode.trim(),
         clientId: selectedClientId || undefined,
@@ -137,7 +137,7 @@ export const CreateQuotationModal: React.FC<CreateQuotationModalProps> = ({ visi
     setExpectedOrderValue('');
     setSalesExecutive(currentUser?.name || '');
     setFollowUpDate('');
-    setStatus('SENT');
+    setStatus('DRAFT');
     setRemarks('');
     setErrorMsg('');
     setSuccessMsg('');

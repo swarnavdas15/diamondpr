@@ -93,6 +93,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isSuperAdmin = f
               <Text style={[styles.th, { width: 120 }]}>Order Number</Text>
               <Text style={[styles.th, { width: 100 }]}>Client Code</Text>
               <Text style={[styles.th, { width: 180 }]}>Client Name</Text>
+              <Text style={[styles.th, { width: 110 }]}>Quantity</Text>
               <Text style={[styles.th, { width: 140 }]}>Sales Stage</Text>
               <Text style={[styles.th, { width: 110 }]}>Purchase</Text>
               <Text style={[styles.th, { width: 110 }]}>Production</Text>
@@ -111,7 +112,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isSuperAdmin = f
                   <Text style={[styles.tdHighlight, { width: 120 }]}>{ord.orderNumber}</Text>
                   <Text style={[styles.td, { width: 100 }]}>{ord.clientCode}</Text>
                   <Text style={[styles.td, { width: 180 }]}>{ord.clientName}</Text>
-                  <Text style={[styles.tdSmall, { width: 140 }]}>{ord.salesWorkflowStage.replace(/_/g, ' ')}</Text>
+                  <Text style={[styles.tdBold, { width: 110, color: Colors.accentTeal }]}>{ord.requiredQuantity || 0} {ord.unit || 'pcs'}</Text>
+                  <Text style={[styles.tdSmall, { width: 140 }]}>{(ord.salesWorkflowStage || ord.currentStage || 'REQUIREMENT_RECEIVED').replace(/_/g, ' ')}</Text>
 
                   <View style={{ width: 110 }}>
                     <View style={{ backgroundColor: purStyle.bg, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, borderWidth: 1, borderColor: purStyle.border, alignItems: 'center' }}>

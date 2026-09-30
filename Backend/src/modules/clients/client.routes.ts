@@ -6,9 +6,9 @@ import { uploadImage } from '../../middlewares/upload.middleware';
 
 const router = Router();
 
-// Only Sales, Admin, Super Admin can manage & view complete Client list
+// All authenticated users can view/list clients (required for ERP dashboard data across all department roles)
 router.post('/', authenticateToken, requireRole(['SUPER_ADMIN', 'ADMIN', 'SALES']), handleCreateClient);
-router.get('/', authenticateToken, requireRole(['SUPER_ADMIN', 'ADMIN', 'SALES']), handleListClients);
+router.get('/', authenticateToken, handleListClients);
 router.patch('/:id/profile-image', authenticateToken, requireRole(['SUPER_ADMIN', 'ADMIN', 'SALES']), uploadImage.single('profileImage'), handleUploadProfileImage);
 
 // Company Contacts

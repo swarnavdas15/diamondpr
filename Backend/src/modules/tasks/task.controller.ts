@@ -4,23 +4,24 @@ import { TaskService } from './task.service';
 
 export const handleCreateTask = async (req: AuthRequest, res: Response) => {
   try {
-    const { title, description, priority, assignedToDepartment, assignedToId, orderId, dueDate } = req.body;
+    const { title, description, priority, assignedToDepartment, assignedToUserId, assignedToId, assignedToName, orderId, orderNumber, dueDate } = req.body;
     if (!title) {
       return res.status(400).json({ error: 'Task title is required', message: 'Task title is required' });
     }
 
-    const createdById = req.user?.userId || '';
     const task = await TaskService.createTask(
       {
         orderId,
+        orderNumber,
         title,
         description,
         priority,
-        assignedToId,
+        assignedToUserId: assignedToUserId || assignedToId,
         assignedToDepartment,
+        assignedToName,
         dueDate,
       },
-      createdById
+      req.user
     );
 
     return res.status(201).json({ success: true, message: 'Task assigned successfully', task });

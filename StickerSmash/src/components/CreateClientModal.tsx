@@ -33,7 +33,7 @@ export const CreateClientModal: React.FC<CreateClientModalProps> = ({ visible, o
   
   const pickImage = async () => {
     let result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ['images'],
       allowsEditing: true,
       aspect: [1, 1],
       quality: 0.8,
@@ -63,7 +63,7 @@ export const CreateClientModal: React.FC<CreateClientModalProps> = ({ visible, o
 
     // Uniqueness validation
     const isDuplicate = clients.some(
-      (c) => (c.clientCode || c.clientcode || '').trim().toLowerCase() === trimmedCode.toLowerCase()
+      (c) => (c.clientCode || (c as any).clientcode || '').trim().toLowerCase() === trimmedCode.toLowerCase()
     );
 
     if (isDuplicate) {
@@ -84,15 +84,6 @@ export const CreateClientModal: React.FC<CreateClientModalProps> = ({ visible, o
         remarks: remarks.trim(),
       });
 
-      if (profileImageUri) {
-        setSuccessMsg('Uploading profile image...');
-        const filename = profileImageUri.split('/').pop() || 'profile.jpg';
-        // Infer type from extension
-        const match = /\.(\w+)$/.exec(filename);
-        const type = match ? `image/${match[1]}` : `image/jpeg`;
-        await uploadClientProfileImage(newClient.id, profileImageUri, filename, type);
-      }
-
       if (onClientCreated) {
         onClientCreated(newClient);
       }
@@ -102,6 +93,7 @@ export const CreateClientModal: React.FC<CreateClientModalProps> = ({ visible, o
         handleClose();
       }, 500);
     } catch (err: any) {
+      setSuccessMsg('');
       setError(err.message || 'Failed to register client.');
     }
   };
@@ -158,14 +150,7 @@ export const CreateClientModal: React.FC<CreateClientModalProps> = ({ visible, o
               />
 
               
-              <Text style={styles.label}>Contact Profile Image</Text>
-              <TouchableOpacity style={styles.imagePickerBtn} onPress={pickImage}>
-                {profileImageUri ? (
-                  <Image source={{ uri: profileImageUri }} style={styles.previewImage} />
-                ) : (
-                  <Text style={styles.imagePickerText}>+ Select Image</Text>
-                )}
-              </TouchableOpacity>
+
 
               <Text style={styles.label}>Contact Person Name</Text>
               <TextInput
@@ -322,7 +307,6 @@ const styles = StyleSheet.create({
   previewImage: {
     width: '100%',
     height: '100%',
-    resizeMode: 'cover',
   },
   imagePickerText: {
     color: Colors.accentTeal,

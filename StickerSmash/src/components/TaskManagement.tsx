@@ -37,24 +37,31 @@ export const TaskManagement: React.FC<TaskManagementProps> = ({ onOpenCreateTask
   const isSuperAdminOrAdmin = currentUser.role === 'SUPER_ADMIN' || currentUser.role === 'ADMIN';
   const todayStr = new Date().toISOString().split('T')[0];
 
-  // Step 1: Base Role-Based Visibility Engine
-  const accessibleTasks = tasks.filter((task) => {
+  // Step 1: All tasks are visible to everyone
+  const accessibleTasks = tasks;
+
+  // Helper to determine if current user is authorized to update a specific task's status
+  const canUpdateTaskStatus = (task: Task): boolean => {
     if (isSuperAdminOrAdmin) return true;
-
-    const isAssignedToUser = task.assignedToUserId === currentUser.id;
-    const isCreatedByUser = task.createdByUserId === currentUser.id || task.createdByName === currentUser.name;
-    const isDeptTask = task.assignedToDepartment === currentUser.role && !task.assignedToUserId;
-
-    return isAssignedToUser || isCreatedByUser || isDeptTask;
-  });
+    if (task.createdByUserId === currentUser.id || task.createdByName === currentUser.name) return true;
+    if (task.assignedToUserId && task.assignedToUserId === currentUser.id) return true;
+    if (task.assignedToName && currentUser.name && task.assignedToName.toLowerCase() === currentUser.name.toLowerCase()) return true;
+    if (task.assignedToDepartment === currentUser.role) {
+      if (!task.assignedToUserId || task.assignedToUserId === currentUser.id) return true;
+    }
+    return false;
+  };
 
   // Step 2: Apply User Tab Filters (My Tasks, Department Tasks, Assigned By Me)
   let filteredTasks = accessibleTasks.filter((task) => {
     if (viewFilter === 'MY_TASKS') {
-      return task.assignedToUserId === currentUser.id;
+      return (
+        task.assignedToUserId === currentUser.id ||
+        (task.assignedToName && currentUser.name && task.assignedToName.toLowerCase() === currentUser.name.toLowerCase())
+      );
     }
     if (viewFilter === 'DEPT_TASKS') {
-      return task.assignedToDepartment === currentUser.role && !task.assignedToUserId;
+      return task.assignedToDepartment === currentUser.role;
     }
     if (viewFilter === 'ASSIGNED_BY_ME') {
       return task.createdByUserId === currentUser.id || task.createdByName === currentUser.name;
@@ -310,32 +317,47 @@ export const TaskManagement: React.FC<TaskManagementProps> = ({ onOpenCreateTask
 
                       {/* Status Toggle Row */}
                       <View style={{ marginTop: Spacing.xs }}>
-                        <Text style={[styles.mobileCardDetail, { marginBottom: 4, fontWeight: '700' }]}>Update Task Status:</Text>
-                        <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap' }}>
-                          {(['PENDING', 'IN_PROGRESS', 'COMPLETED'] as TaskStatus[]).map((st) => {
-                            const active = task.status === st;
-                            const badge = getStatusBadge(st);
-                            return (
-                              <TouchableOpacity
-                                key={st}
-                                style={[
-                                  styles.statusChip,
-                                  active && { backgroundColor: badge.bg, borderColor: badge.border },
-                                ]}
-                                onPress={() => updateTaskStatus(task.id, st)}
-                              >
-                                <Text style={[styles.statusChipText, active && { color: badge.text, fontWeight: '800' }]}>
-                                  {st === 'IN_PROGRESS' ? 'IN PROG' : st}
-                                </Text>
+                        <Text style={[styles.mobileCardDetail, { marginBottom: 4, fontWeight: '700' }]}>
+                          {canUpdateTaskStatus(task) ? 'Update Task Status:' : 'Task Status (Read Only):'}
+                        </Text>
+                        {canUpdateTaskStatus(task) ? (
+                          <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap' }}>
+                            {(['PENDING', 'IN_PROGRESS', 'COMPLETED'] as TaskStatus[]).map((st) => {
+                              const active = task.status === st;
+                              const badge = getStatusBadge(st);
+                              return (
+                                <TouchableOpacity
+                                  key={st}
+                                  style={[
+                                    styles.statusChip,
+                                    active && { backgroundColor: badge.bg, borderColor: badge.border },
+                                  ]}
+                                  onPress={() => updateTaskStatus(task.id, st)}
+                                >
+                                  <Text style={[styles.statusChipText, active && { color: badge.text, fontWeight: '800' }]}>
+                                    {st === 'IN_PROGRESS' ? 'IN PROG' : st}
+                                  </Text>
+                                </TouchableOpacity>
+                              );
+                            })}
+                            {isSuperAdminOrAdmin && (
+                              <TouchableOpacity style={styles.deleteBtn} onPress={() => handleDelete(task.id)}>
+                                <Text style={styles.deleteBtnText}>Delete Task</Text>
                               </TouchableOpacity>
-                            );
-                          })}
-                          {isSuperAdminOrAdmin && (
-                            <TouchableOpacity style={styles.deleteBtn} onPress={() => handleDelete(task.id)}>
-                              <Text style={styles.deleteBtnText}>Delete Task</Text>
-                            </TouchableOpacity>
-                          )}
-                        </View>
+                            )}
+                          </View>
+                        ) : (
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                            <View style={[styles.statusChip, { backgroundColor: sBadge.bg, borderColor: sBadge.border }]}>
+                              <Text style={[styles.statusChipText, { color: sBadge.text, fontWeight: '800' }]}>
+                                {sBadge.label}
+                              </Text>
+                            </View>
+                            <Text style={{ fontSize: 12, color: Colors.textMuted }}>
+                              🔒 Assigned to {task.assignedToName || (task.assignedToDepartment ? `${task.assignedToDepartment} Team` : 'Other Team')}
+                            </Text>
+                          </View>
+                        )}
                       </View>
                     </View>
                   )}
@@ -422,24 +444,35 @@ export const TaskManagement: React.FC<TaskManagementProps> = ({ onOpenCreateTask
 
                     {/* Status Toggle Buttons */}
                     <View style={{ width: 210, flexDirection: 'row', gap: 4, alignItems: 'center' }}>
-                      {(['PENDING', 'IN_PROGRESS', 'COMPLETED'] as TaskStatus[]).map((st) => {
-                        const active = task.status === st;
-                        const badge = getStatusBadge(st);
-                        return (
-                          <TouchableOpacity
-                            key={st}
-                            style={[
-                              styles.statusChip,
-                              active && { backgroundColor: badge.bg, borderColor: badge.border },
-                            ]}
-                            onPress={() => updateTaskStatus(task.id, st)}
-                          >
-                            <Text style={[styles.statusChipText, active && { color: badge.text, fontWeight: '800' }]}>
-                              {st === 'IN_PROGRESS' ? 'IN PROG' : st}
+                      {canUpdateTaskStatus(task) ? (
+                        (['PENDING', 'IN_PROGRESS', 'COMPLETED'] as TaskStatus[]).map((st) => {
+                          const active = task.status === st;
+                          const badge = getStatusBadge(st);
+                          return (
+                            <TouchableOpacity
+                              key={st}
+                              style={[
+                                styles.statusChip,
+                                active && { backgroundColor: badge.bg, borderColor: badge.border },
+                              ]}
+                              onPress={() => updateTaskStatus(task.id, st)}
+                            >
+                              <Text style={[styles.statusChipText, active && { color: badge.text, fontWeight: '800' }]}>
+                                {st === 'IN_PROGRESS' ? 'IN PROG' : st}
+                              </Text>
+                            </TouchableOpacity>
+                          );
+                        })
+                      ) : (
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                          <View style={[styles.statusChip, { backgroundColor: sBadge.bg, borderColor: sBadge.border }]}>
+                            <Text style={[styles.statusChipText, { color: sBadge.text, fontWeight: '800' }]}>
+                              {sBadge.label}
                             </Text>
-                          </TouchableOpacity>
-                        );
-                      })}
+                          </View>
+                          <Text style={{ fontSize: 11, color: Colors.textMuted }}>🔒 Read Only</Text>
+                        </View>
+                      )}
                     </View>
 
                     {/* Actions (RBAC: Delete only Super Admin & Admin) */}

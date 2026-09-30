@@ -74,9 +74,17 @@ export const handleResetPassword = async (req: AuthRequest, res: Response) => {
 export const handleUpdateUserDetails = async (req: AuthRequest, res: Response) => {
   try {
     const id = req.params.id as string;
-    const { name, email, role, mobileNumber, employeeId } = req.body;
-    await userService.updateUserDetails(id, { name, email, role, mobileNumber, employeeId });
-    return res.status(200).json({ message: 'User updated' });
+    const { name, email, role, mobileNumber, employeeId, clientDataVisibility } = req.body;
+    const updateData: any = {};
+    if (name) updateData.name = name;
+    if (email) updateData.email = email;
+    if (role) updateData.role = role;
+    if (mobileNumber !== undefined) updateData.mobileNumber = mobileNumber;
+    if (employeeId !== undefined) updateData.employeeId = employeeId;
+    if (clientDataVisibility !== undefined) updateData.clientDataVisibility = clientDataVisibility;
+
+    await userService.updateUserDetails(id, updateData);
+    return res.status(200).json({ message: 'User updated successfully', user: updateData });
   } catch (err: any) {
     return res.status(400).json({ error: err.message || 'Failed to update user' });
   }

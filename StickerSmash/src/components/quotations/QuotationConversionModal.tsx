@@ -12,6 +12,7 @@ import {
 import { Quotation, LostReason, CustomStage } from '../../types';
 import { Colors, Spacing, Radius, Shadows } from '../../theme';
 import { useAuth } from '../../context/AuthContext';
+import { DatePickerInput } from '../ui/DatePickerInput';
 
 export interface QuotationConversionData {
   approvedAmount: number;
@@ -72,6 +73,18 @@ export const QuotationConversionModal: React.FC<QuotationConversionModalProps> =
   const [newStageName, setNewStageName] = useState('');
   const [newStageDesc, setNewStageDesc] = useState('');
   const [newStageUsers, setNewStageUsers] = useState<string[]>([]);
+  const [userDropdownOpen, setUserDropdownOpen] = useState<boolean>(false);
+
+  const FALLBACK_USERS = [
+    { id: 'usr-admin-1', name: 'Super Admin', username: 'superadmin', role: 'SUPER_ADMIN' },
+    { id: 'usr-admin-2', name: 'Plant Operations Admin', username: 'opsadmin', role: 'ADMIN' },
+    { id: 'usr-sales-1', name: 'Vikram Malhotra', username: 'sales_vikram', role: 'SALES' },
+    { id: 'usr-purchase-1', name: 'Ramesh Patel', username: 'pur_ramesh', role: 'PURCHASE' },
+    { id: 'usr-prod-1', name: 'Suresh Kumar', username: 'prod_suresh', role: 'PRODUCTION' },
+    { id: 'usr-qc-1', name: 'Anjali Sharma', username: 'qc_anjali', role: 'QUALITY_TESTING' },
+    { id: 'usr-dispatch-1', name: 'Mahesh Verma', username: 'disp_mahesh', role: 'DISPATCH' },
+  ];
+  const availableUsers = users && users.length > 0 ? users : FALLBACK_USERS;
 
   React.useEffect(() => {
     if (quotation) {
@@ -160,7 +173,7 @@ export const QuotationConversionModal: React.FC<QuotationConversionModalProps> =
       setError('Please assign at least one user to this stage.');
       return;
     }
-    const userNames = newStageUsers.map(uid => users.find(u => u.id === uid)?.name || 'Unknown User');
+    const userNames = newStageUsers.map(uid => availableUsers.find(u => u.id === uid)?.name || 'Unknown User');
     setCustomStages(prev => [...prev, {
       stageName: newStageName.trim(),
       description: newStageDesc.trim(),
@@ -304,13 +317,11 @@ export const QuotationConversionModal: React.FC<QuotationConversionModalProps> =
               />
 
               {/* Expected Delivery Date */}
-              <Text style={styles.label}>Expected Delivery Date</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="YYYY-MM-DD"
-                placeholderTextColor="#94a3b8"
+              <DatePickerInput
+                label="Expected Delivery Date"
                 value={expectedDeliveryDate}
-                onChangeText={setExpectedDeliveryDate}
+                onChangeDate={setExpectedDeliveryDate}
+                placeholder="Select Expected Delivery Date..."
               />
 
               {/* Pipeline Configuration */}
@@ -391,29 +402,64 @@ export const QuotationConversionModal: React.FC<QuotationConversionModalProps> =
                         value={newStageDesc}
                         onChangeText={setNewStageDesc}
                       />
-                      <Text style={[styles.label, { marginTop: 4, color: '#38bdf8' }]}>Assign Users (Multiple)</Text>
-                      <View style={styles.userChipContainer}>
-                        {users.map(u => {
-                          const isSelected = newStageUsers.includes(u.id);
-                          return (
-                            <TouchableOpacity
-                              key={u.id}
-                              style={[styles.userChip, isSelected && styles.userChipActive]}
-                              onPress={() => toggleStageUser(u.id)}
-                            >
-                              <Text style={[styles.userChipText, isSelected && styles.userChipTextActive]}>
-                                {u.name}
-                              </Text>
-                            </TouchableOpacity>
-                          );
-                        })}
-                      </View>
+                      <Text style={[styles.label, { marginTop: 4, color: '#38bdf8' }]}>Assign Users (Multiple) *</Text>
+                      
+                      <TouchableOpacity
+                        style={styles.dropdownTrigger}
+                        onPress={() => setUserDropdownOpen(!userDropdownOpen)}
+                        activeOpacity={0.8}
+                      >
+                        <Text style={styles.dropdownTriggerText}>
+                          {newStageUsers.length === 0
+                            ? '▼ Select Users to Assign...'
+                            : `✔ ${newStageUsers.length} User(s) Selected`}
+                        </Text>
+                        <Text style={{ color: '#38bdf8', fontSize: 12, fontWeight: '700' }}>
+                          {userDropdownOpen ? '▲ Close' : '▼ Expand'}
+                        </Text>
+                      </TouchableOpacity>
+
+                      {userDropdownOpen && (
+                        <View style={styles.dropdownMenu}>
+                          <ScrollView style={{ maxHeight: 150 }} nestedScrollEnabled showsVerticalScrollIndicator={true}>
+                            {availableUsers.map((u) => {
+                              const isSelected = newStageUsers.includes(u.id);
+                              return (
+                                <TouchableOpacity
+                                  key={u.id}
+                                  style={[styles.dropdownItem, isSelected && styles.dropdownItemActive]}
+                                  onPress={() => toggleStageUser(u.id)}
+                                >
+                                  <Text style={[styles.dropdownItemText, isSelected && styles.dropdownItemTextActive]}>
+                                    {isSelected ? '☑' : '☐'} {u.name} ({u.role})
+                                  </Text>
+                                </TouchableOpacity>
+                              );
+                            })}
+                          </ScrollView>
+                        </View>
+                      )}
+
+                      {newStageUsers.length > 0 && (
+                        <View style={styles.userChipContainer}>
+                          {newStageUsers.map((uid) => {
+                            const uObj = availableUsers.find((u) => u.id === uid);
+                            return (
+                              <TouchableOpacity key={uid} style={styles.userChipActive} onPress={() => toggleStageUser(uid)}>
+                                <Text style={styles.userChipTextActive}>
+                                  {uObj?.name || uid} ✕
+                                </Text>
+                              </TouchableOpacity>
+                            );
+                          })}
+                        </View>
+                      )}
                       <View style={{ flexDirection: 'row', gap: 10, marginTop: 12 }}>
                         <TouchableOpacity 
-                          style={{ flex: 1, backgroundColor: '#0f172a', padding: 8, borderRadius: 6, alignItems: 'center', borderWidth: 1, borderColor: Colors.borderDark }}
+                          style={{ flex: 1, backgroundColor: '#f1f5f9', padding: 8, borderRadius: 6, alignItems: 'center', borderWidth: 1, borderColor: '#cbd5e1' }}
                           onPress={() => setIsAddingStage(false)}
                         >
-                          <Text style={{ color: Colors.textMuted, fontSize: 12, fontWeight: '600' }}>Cancel</Text>
+                          <Text style={{ color: '#475569', fontSize: 12, fontWeight: '600' }}>Cancel</Text>
                         </TouchableOpacity>
                         <TouchableOpacity 
                           style={{ flex: 1, backgroundColor: 'rgba(56, 189, 248, 0.2)', padding: 8, borderRadius: 6, alignItems: 'center', borderWidth: 1, borderColor: '#38bdf8' }}
@@ -735,6 +781,55 @@ const styles = StyleSheet.create({
   },
   userChipTextActive: {
     color: '#38bdf8',
+    fontWeight: '700',
+  },
+  dropdownTrigger: {
+    backgroundColor: '#f8fafc',
+    borderRadius: Radius.sm,
+    borderWidth: 1.5,
+    borderColor: '#0284c7',
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 10,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  dropdownTriggerText: {
+    color: '#0f172a',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  dropdownMenu: {
+    backgroundColor: '#ffffff',
+    borderRadius: Radius.sm,
+    borderWidth: 1.5,
+    borderColor: '#0284c7',
+    marginBottom: 8,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  dropdownItem: {
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+    backgroundColor: '#ffffff',
+  },
+  dropdownItemActive: {
+    backgroundColor: '#e0f2fe',
+  },
+  dropdownItemText: {
+    color: '#0f172a',
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  dropdownItemTextActive: {
+    color: '#0284c7',
     fontWeight: '700',
   },
 });

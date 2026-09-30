@@ -18,10 +18,16 @@ export const CompactCalendarModal: React.FC<CompactCalendarModalProps> = ({ visi
   const todayDateObj = new Date();
   const todayStr = todayDateObj.toISOString().split('T')[0];
 
-  // Calendar View Month State (default to current year/month)
-  const [currentDate, setCurrentDate] = useState(new Date(2026, 8, 1)); // Sept 2026
+  // Calendar View Month State (defaults to current date)
+  const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<string>(todayStr);
   const [selectedCategory, setSelectedCategory] = useState<'ALL' | CalendarEventType>('ALL');
+
+  // Helper to normalize ISO date string or YYYY-MM-DD string to YYYY-MM-DD
+  const getNormalizedDateStr = (dateInput: string | undefined): string => {
+    if (!dateInput) return '';
+    return dateInput.split('T')[0];
+  };
 
   // Form State
   const [title, setTitle] = useState('');
@@ -95,7 +101,7 @@ export const CompactCalendarModal: React.FC<CompactCalendarModalProps> = ({ visi
     return categoryMatches;
   });
 
-  const selectedDateEvents = filteredEvents.filter((e) => e.eventDate === selectedDate);
+  const selectedDateEvents = filteredEvents.filter((e) => getNormalizedDateStr(e.eventDate) === selectedDate);
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
@@ -148,7 +154,7 @@ export const CompactCalendarModal: React.FC<CompactCalendarModalProps> = ({ visi
 
                   const isToday = item.dateStr === todayStr;
                   const isSelected = item.dateStr === selectedDate;
-                  const dayEvents = calendarEvents.filter((e) => e.eventDate === item.dateStr);
+                  const dayEvents = calendarEvents.filter((e) => getNormalizedDateStr(e.eventDate) === item.dateStr);
 
                   return (
                     <TouchableOpacity

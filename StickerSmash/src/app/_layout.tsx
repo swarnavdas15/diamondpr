@@ -26,7 +26,7 @@ export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
       </Text>
       <TouchableOpacity 
         onPress={retry}
-        style={{ backgroundColor: '#2563eb', paddingHorizontal: 32, paddingVertical: 14, borderRadius: 8, elevation: 2, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 4, shadowOffset: { width: 0, height: 2 } }}
+        style={{ backgroundColor: '#2563eb', paddingHorizontal: 32, paddingVertical: 14, borderRadius: 8, elevation: 2, ...Platform.select({ web: { boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.1)' }, default: { shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 4, shadowOffset: { width: 0, height: 2 } } }) }}
       >
         <Text style={{ color: 'white', fontWeight: 'bold', fontSize: 16 }}>Try Again</Text>
       </TouchableOpacity>
