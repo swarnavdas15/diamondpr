@@ -2,7 +2,7 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Use local network IP instead of localhost so it works on Expo Go on physical devices
-const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5000/api';
+const API_URL = process.env.EXPO_PUBLIC_API_URL || ' https://diamondpr.onrender.com';
 
 export const apiClient = axios.create({
   baseURL: API_URL,
