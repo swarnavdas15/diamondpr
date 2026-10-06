@@ -1,4 +1,5 @@
 import { Platform } from 'react-native';
+import { formatAppDate } from './dateFormatter';
 
 /**
  * Universal Export Utilities for Diamond Flanges ERP
@@ -35,7 +36,7 @@ export const exportToExcel = (payload: ExportDataPayload) => {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.setAttribute('download', `${filename}_${new Date().toISOString().slice(0, 10)}.csv`);
+    link.setAttribute('download', `${filename}_${formatAppDate(new Date())}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -62,7 +63,7 @@ export const exportToPDF = (payload: ExportDataPayload) => {
     return;
   }
 
-  const generatedDate = new Date().toLocaleString();
+  const generatedDate = formatAppDate(new Date());
 
   const html = `
     <!DOCTYPE html>

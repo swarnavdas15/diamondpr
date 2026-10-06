@@ -1,4 +1,5 @@
 import React from 'react';
+import { formatAppDate } from '../utils/dateFormatter';
 import { View, Text, Modal, TouchableOpacity, ScrollView, StyleSheet, useWindowDimensions, Platform, ToastAndroid } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { useERP } from '../context/ERPContext';
@@ -336,7 +337,7 @@ export const OrderOverviewModal: React.FC<OrderOverviewModalProps> = ({ visible,
                     <View key={qlog.id} style={styles.qlogCard}>
                       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                         <Text style={styles.qlogStageText}>{qlog.stage} • <Text style={{ color: Colors.textLight, fontWeight: '800' }}>{qlog.actionLabel}</Text></Text>
-                        <Text style={styles.qlogTimeText}>{new Date(qlog.createdAt).toLocaleDateString()} {new Date(qlog.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</Text>
+                        <Text style={styles.qlogTimeText}>{formatAppDate(qlog.createdAt)} {new Date(qlog.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</Text>
                       </View>
                       <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 }}>
                         <Text style={styles.qlogSubText}>Accumulated: <Text style={{ fontWeight: '800', color: Colors.accentTeal }}>{qlog.accumulatedQty}/{qlog.totalQty} PCS</Text> • Remaining: <Text style={{ fontWeight: '800', color: Colors.industrialOrange }}>{qlog.remainingQty} PCS</Text></Text>

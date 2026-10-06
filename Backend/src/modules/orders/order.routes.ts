@@ -15,6 +15,7 @@ import {
   createClientController,
   createOrderController,
   bulkUploadOrdersController,
+  handleUpdateOrder,
 } from './order.controller';
 import { getDepartmentOrdersController, advanceOrderStageController } from './workflow.controller';
 
@@ -33,6 +34,7 @@ router.post('/bulk-upload', requireRole(['SUPER_ADMIN', 'ADMIN', 'SALES']), uplo
 
 // Order creation & Sales verification
 router.post('/', requireRole(['SUPER_ADMIN', 'ADMIN', 'SALES']), handleCreateOrder);
+router.patch('/:id', requireRole(['SUPER_ADMIN']), handleUpdateOrder);
 router.patch('/:id/sales-workflow', requireRole(['SUPER_ADMIN', 'ADMIN', 'SALES']), handleUpdateSalesWorkflow);
 router.patch('/:id/verify-completion', requireRole(['SUPER_ADMIN', 'ADMIN', 'SALES']), handleVerifyAndCompleteOrder);
 

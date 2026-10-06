@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { formatAppDate } from '../utils/dateFormatter';
 import { View, Text, Modal, TouchableOpacity, ScrollView, TextInput, StyleSheet, Image, useWindowDimensions } from 'react-native';
 import { useERP } from '../context/ERPContext';
 import { DrawingStatus, OrderDrawing } from '../types';
@@ -186,7 +187,7 @@ export const DrawingManagementModal: React.FC<DrawingManagementModalProps> = ({ 
 
                     <View style={styles.metaRow}>
                       <Text style={styles.metaText}>File: <Text style={styles.metaHighlight}>{drw.fileName}</Text> ({drw.fileType} • {drw.fileSize})</Text>
-                      <Text style={styles.metaText}>Uploaded by: <Text style={styles.metaHighlight}>{drw.uploadedBy}</Text> on {new Date(drw.uploadDate).toLocaleDateString()}</Text>
+                      <Text style={styles.metaText}>Uploaded by: <Text style={styles.metaHighlight}>{drw.uploadedBy}</Text> on {formatAppDate(drw.uploadDate)}</Text>
                     </View>
 
                     {drw.reviewRemarks ? (

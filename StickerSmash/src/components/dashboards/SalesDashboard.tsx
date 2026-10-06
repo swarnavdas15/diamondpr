@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { formatAppDate } from '../../utils/dateFormatter';
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, useWindowDimensions } from 'react-native';
 import { useERP } from '../../context/ERPContext';
 import { Colors, StatusColors, Spacing, Radius, Shadows } from '../../theme';
@@ -244,7 +245,7 @@ export const SalesDashboard: React.FC<SalesDashboardProps> = ({
                               <View style={[styles.progressFill, { width: `${progressPct}%` }]} />
                             </View>
                           </View>
-                          <Text style={styles.mobileCardDetail}>Created Date: <Text style={styles.mobileCardVal}>{new Date(ord.createdAt).toLocaleDateString()}</Text></Text>
+                          <Text style={styles.mobileCardDetail}>Created Date: <Text style={styles.mobileCardVal}>{formatAppDate(ord.createdAt)}</Text></Text>
                           <TouchableOpacity
                             style={[styles.viewPipelineBtn, { marginTop: Spacing.xs, alignSelf: 'flex-start' }]}
                             onPress={() => setSelectedOrder(ord)}
@@ -297,7 +298,7 @@ export const SalesDashboard: React.FC<SalesDashboardProps> = ({
                           </Text>
                         </View>
 
-                        <Text style={[styles.tdSmall, { width: 110 }]}>{new Date(ord.createdAt).toLocaleDateString()}</Text>
+                        <Text style={[styles.tdSmall, { width: 110 }]}>{formatAppDate(ord.createdAt)}</Text>
 
                         <View style={{ width: 130 }}>
                           <TouchableOpacity style={styles.viewPipelineBtn} onPress={() => setSelectedOrder(ord)}>

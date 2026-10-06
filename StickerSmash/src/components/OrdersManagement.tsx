@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import { formatAppDate } from '../utils/dateFormatter';
 import {
   View,
   Text,
@@ -29,7 +30,7 @@ export const OrdersManagement: React.FC<OrdersManagementProps> = ({
   onNavigateToQuotations,
   onOpenCreateOrder,
 }) => {
-  const { orders, setSelectedOrder, selectedOrder } = useERP();
+  const { orders, setSelectedOrder, selectedOrder, deleteOrder } = useERP();
   const { currentUser } = useAuth();
   const { width } = useWindowDimensions();
   const isMobile = width < 768;
@@ -169,7 +170,7 @@ export const OrdersManagement: React.FC<OrdersManagementProps> = ({
   const getOrdersExportPayload = (): ExportDataPayload => {
     return {
       title: 'Diamond Flanges ERP - Orders Management Report',
-      subtitle: `Exported on ${new Date().toLocaleDateString()} | Total Orders: ${filteredOrders.length}`,
+      subtitle: `Exported on ${formatAppDate(new Date())} | Total Orders: ${filteredOrders.length}`,
       filename: 'Orders_Management_Report',
       headers: [
         'Order Number',
@@ -200,7 +201,7 @@ export const OrdersManagement: React.FC<OrdersManagementProps> = ({
           o.poNumber || 'N/A',
           o.clientCode,
           o.clientName || 'Masked',
-          new Date(o.createdAt).toLocaleDateString(),
+          formatAppDate(o.createdAt),
           `${o.requiredQuantity} pcs`,
           val ? `₹${val.toLocaleString()}` : 'N/A',
           (o.currentStage || 'SALES').replace(/_/g, ' '),
@@ -530,7 +531,7 @@ export const OrdersManagement: React.FC<OrdersManagementProps> = ({
                     </Text>
 
                     <Text style={[styles.td, { width: 110 }]}>
-                      {new Date(order.createdAt).toLocaleDateString()}
+                      {formatAppDate(order.createdAt)}
                     </Text>
 
                     <Text style={[styles.tdBold, { width: 100, color: Colors.textLight }]}>
@@ -562,13 +563,26 @@ export const OrdersManagement: React.FC<OrdersManagementProps> = ({
                       {order.dispatchRequired && <Text style={styles.deptMiniPill}>DISP</Text>}
                     </View>
 
-                    <View style={{ width: 120, alignItems: 'center', justifyContent: 'center' }}>
+                    <View style={{ width: 120, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 6 }}>
                       <TouchableOpacity
                         style={styles.viewActionBtn}
                         onPress={() => handleViewOrderDetails(order)}
                       >
                         <Text style={styles.viewActionBtnText}>👁️ Details</Text>
                       </TouchableOpacity>
+                      {currentUser?.role === 'SUPER_ADMIN' && (
+                        <TouchableOpacity
+                          style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, borderWidth: 1, borderColor: '#ef4444' }}
+                          onPress={(e) => {
+                            e.stopPropagation();
+                            if (window.confirm(`Delete order ${order.orderNumber}?`)) {
+                              deleteOrder(order.id);
+                            }
+                          }}
+                        >
+                          <Text style={{ color: '#ef4444', fontSize: 11, fontWeight: '700' }}>🗑</Text>
+                        </TouchableOpacity>
+                      )}
                     </View>
                   </TouchableOpacity>
                 );

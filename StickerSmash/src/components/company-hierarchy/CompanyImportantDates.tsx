@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, Modal, TextInput, ScrollView, StyleSheet } from 'react-native';
 import { CompanyImportantDate, CompanyDateType } from '../../types';
 import { Colors, Spacing, Radius, Shadows } from '../../theme';
+import { DatePickerInput } from '../ui/DatePickerInput';
 
 interface CompanyImportantDatesProps {
   companyId: string;
@@ -51,7 +52,7 @@ export const CompanyImportantDates: React.FC<CompanyImportantDatesProps> = ({
       return;
     }
     if (!eventDate.trim()) {
-      setError('Event Date (YYYY-MM-DD) is required.');
+      setError('Event Date is required.');
       return;
     }
 
@@ -181,14 +182,7 @@ export const CompanyImportantDates: React.FC<CompanyImportantDatesProps> = ({
                 })}
               </View>
 
-              <Text style={styles.label}>Event Date (YYYY-MM-DD) *</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="2026-10-15"
-                placeholderTextColor="#94a3b8"
-                value={eventDate}
-                onChangeText={setEventDate}
-              />
+              <DatePickerInput label="Event Date" value={eventDate} onChangeDate={setEventDate} required />
 
               <Text style={styles.label}>Description & Key Details</Text>
               <TextInput

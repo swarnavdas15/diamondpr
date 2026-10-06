@@ -27,6 +27,7 @@ export const CompanyDetailModal: React.FC<CompanyDetailModalProps> = ({
   const { width } = useWindowDimensions();
   const isMobile = width < 768;
   const {
+    clients,
     companyContacts,
     addCompanyContact,
     updateCompanyContact,
@@ -48,11 +49,19 @@ export const CompanyDetailModal: React.FC<CompanyDetailModalProps> = ({
 
   if (!client) return null;
 
+  // Sync client with fresh data
+  const actualClient = clients.find(c => c.id === client.id) || client;
+
   // Filter contacts for this specific company
-  const clientContacts = companyContacts.filter((c) => c.companyId === client.id);
+  const clientContacts = companyContacts.filter((c) => c.companyId === actualClient.id);
+  
+  // Sync selected contact with fresh data
+  const actualSelectedContact = selectedContact 
+    ? clientContacts.find(c => c.id === selectedContact.id) || selectedContact 
+    : null;
 
   // Filter important dates for this specific company
-  const clientDates = companyImportantDates.filter((d) => d.companyId === client.id);
+  const clientDates = companyImportantDates.filter((d) => d.companyId === actualClient.id);
 
   // RBAC Permission Check:
   // Super Admin, Admin, and Sales have full manage capabilities.
@@ -95,7 +104,7 @@ export const CompanyDetailModal: React.FC<CompanyDetailModalProps> = ({
           {/* Header Banner */}
           <View style={styles.header}>
             <View style={styles.headerTitleRow}>
-              <Text style={styles.companyTitle}>{client.companyName}</Text>
+              <Text style={styles.companyTitle}>{actualClient.companyName}</Text>
               <View style={styles.codeBadge}>
                 <Text style={styles.codeBadgeText}>{client.clientCode}</Text>
               </View>
@@ -181,14 +190,14 @@ export const CompanyDetailModal: React.FC<CompanyDetailModalProps> = ({
 
             {activeTab === 'OVERVIEW' && (
               <View style={styles.tabContent}>
-                <CompanyOverview client={client} contacts={clientContacts} />
+                <CompanyOverview client={actualClient} contacts={clientContacts} />
               </View>
             )}
 
             {activeTab === 'IMPORTANT_DATES' && (
               <View style={styles.tabContent}>
                 <CompanyImportantDates
-                  companyId={client.id}
+                  companyId={actualClient.id}
                   importantDates={clientDates}
                   canManage={canManage}
                   onAddImportantDate={addCompanyImportantDate}
@@ -201,7 +210,7 @@ export const CompanyDetailModal: React.FC<CompanyDetailModalProps> = ({
           {/* Add / Edit Contact Form Modal */}
           <ContactFormModal
             visible={formModalVisible}
-            companyId={client.id}
+            companyId={actualClient.id}
             contactToEdit={contactToEdit}
             existingContacts={clientContacts}
             onClose={() => {
@@ -214,7 +223,7 @@ export const CompanyDetailModal: React.FC<CompanyDetailModalProps> = ({
           {/* Node Details Profile Drawer / Modal */}
           <ContactDrawer
             visible={drawerVisible}
-            contact={selectedContact}
+            contact={actualSelectedContact}
             allCompanyContacts={clientContacts}
             canManage={canManage}
             onClose={() => {

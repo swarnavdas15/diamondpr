@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Image } from 'react-native';
 import { CompanyContact } from '../../types';
 import { Colors, Spacing, Radius, Shadows } from '../../theme';
 
@@ -32,8 +32,12 @@ export const OrgNode: React.FC<OrgNodeProps> = ({
         activeOpacity={0.8}
       >
         <View style={styles.topRow}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>{initialLetter}</Text>
+          <View style={[styles.avatar, contact.profileImage && { backgroundColor: 'transparent' }]}>
+            {contact.profileImage ? (
+              <Image source={{ uri: contact.profileImage }} style={{ width: '100%', height: '100%', borderRadius: 16 }} />
+            ) : (
+              <Text style={styles.avatarText}>{initialLetter}</Text>
+            )}
           </View>
           <View style={{ flex: 1 }}>
             <Text style={styles.name} numberOfLines={1}>

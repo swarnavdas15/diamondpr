@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text, Modal, TouchableOpacity, StyleSheet, ScrollView, Linking, useWindowDimensions } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, Modal, TouchableOpacity, StyleSheet, ScrollView, Linking, useWindowDimensions, Image } from 'react-native';
 import { CompanyContact } from '../../types';
 import { Colors, Spacing, Radius, Shadows } from '../../theme';
 
@@ -24,6 +24,8 @@ export const ContactDrawer: React.FC<ContactDrawerProps> = ({
 }) => {
   const { width } = useWindowDimensions();
   const isMobile = width < 768;
+  const [isImageFullscreen, setIsImageFullscreen] = useState(false);
+  
   if (!contact) return null;
 
   // Find manager name
@@ -72,8 +74,14 @@ export const ContactDrawer: React.FC<ContactDrawerProps> = ({
           <ScrollView showsVerticalScrollIndicator={false} style={styles.body}>
             {/* Profile Avatar & Primary Banner */}
             <View style={styles.profileBanner}>
-              <View style={styles.avatar}>
-                <Text style={styles.avatarText}>{initialLetter}</Text>
+              <View style={[styles.avatar, contact.profileImage && { backgroundColor: 'transparent' }]}>
+                {contact.profileImage ? (
+                  <TouchableOpacity onPress={() => setIsImageFullscreen(true)} style={{ width: '100%', height: '100%' }}>
+                    <Image source={{ uri: contact.profileImage }} style={{ width: '100%', height: '100%', borderRadius: 45 }} />
+                  </TouchableOpacity>
+                ) : (
+                  <Text style={styles.avatarText}>{initialLetter}</Text>
+                )}
               </View>
               <Text style={styles.name}>{contact.fullName}</Text>
               <Text style={styles.designation}>{contact.designation}</Text>
@@ -149,8 +157,8 @@ export const ContactDrawer: React.FC<ContactDrawerProps> = ({
 
               <View style={styles.infoRow}>
                 <Text style={styles.infoLabel}>Direct Link:</Text>
-                <TouchableOpacity onPress={handleWhatsApp}>
-                  <Text style={styles.waLinkText}>{waUrl}</Text>
+                <TouchableOpacity onPress={handleWhatsApp} style={{ backgroundColor: '#25D366', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6, flexDirection: 'row', alignItems: 'center' }}>
+                  <Text style={{ color: 'white', fontWeight: 'bold', fontSize: 12 }}>💬 Chat on WP</Text>
                 </TouchableOpacity>
               </View>
 
@@ -199,6 +207,25 @@ export const ContactDrawer: React.FC<ContactDrawerProps> = ({
           </ScrollView>
         </TouchableOpacity>
       </TouchableOpacity>
+
+      {/* Fullscreen Image Modal */}
+      {isImageFullscreen && contact.profileImage && (
+        <Modal transparent animationType="fade" visible={isImageFullscreen} onRequestClose={() => setIsImageFullscreen(false)}>
+          <TouchableOpacity 
+            style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.9)', justifyContent: 'center', alignItems: 'center' }} 
+            activeOpacity={1} 
+            onPress={() => setIsImageFullscreen(false)}
+          >
+            <TouchableOpacity style={{ position: 'absolute', top: 40, right: 30, zIndex: 10 }} onPress={() => setIsImageFullscreen(false)}>
+              <Text style={{ color: 'white', fontSize: 30, fontWeight: 'bold' }}>✕</Text>
+            </TouchableOpacity>
+            <Image 
+              source={{ uri: contact.profileImage }} 
+              style={{ width: '90%', height: '80%', resizeMode: 'contain' }} 
+            />
+          </TouchableOpacity>
+        </Modal>
+      )}
     </Modal>
   );
 };

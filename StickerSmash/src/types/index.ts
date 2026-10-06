@@ -110,6 +110,7 @@ export interface Client {
   address?: string;
   gstNumber?: string;
   panNumber?: string;
+  websiteUrl?: string;
   industry?: string;
   website?: string;
   description?: string;

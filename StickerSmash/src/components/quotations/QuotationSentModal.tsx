@@ -93,14 +93,7 @@ export const QuotationSentModal: React.FC<QuotationSentModalProps> = ({
                 ))}
               </View>
 
-              <Text style={styles.label}>Sent Date *</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="YYYY-MM-DD"
-                placeholderTextColor="#94a3b8"
-                value={sentAt}
-                onChangeText={setSentAt}
-              />
+              <DatePickerInput label="Sent Date" value={sentAt} onChangeDate={setSentAt} required />
 
               <Text style={styles.label}>Communication Notes & Dispatch Ref</Text>
               <TextInput

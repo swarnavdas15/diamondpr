@@ -13,12 +13,12 @@ cloudinary.config({
  * @param filename Original name of the file
  * @returns Cloudinary secure URL
  */
-export const uploadToCloudinary = (fileBuffer: Buffer, filename: string): Promise<string> => {
+export const uploadToCloudinary = (fileBuffer: Buffer, filename: string, resourceType: 'auto' | 'image' | 'raw' = 'auto'): Promise<string> => {
   return new Promise((resolve, reject) => {
     const uploadStream = cloudinary.uploader.upload_stream(
       {
         folder: 'flange_erp_drawings',
-        resource_type: 'auto', // Auto-detects image, raw PDF, CAD files
+        resource_type: resourceType,
         public_id: `${Date.now()}_${filename.replace(/\.[^/.]+$/, '')}`
       },
       (error, result) => {

@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { formatAppDate } from '../../utils/dateFormatter';
 import {
   View,
   Text,
@@ -368,7 +369,7 @@ export const SuperAdminAnalyticsView: React.FC = () => {
             o.qcResult,
             o.dispatchStatus,
             o.requiredQuantity.toString(),
-            new Date(o.createdAt).toLocaleDateString(),
+            formatAppDate(o.createdAt),
           ]),
         };
 
@@ -604,7 +605,7 @@ export const SuperAdminAnalyticsView: React.FC = () => {
         o.qcResult,
         o.dispatchStatus,
         o.requiredQuantity,
-        new Date(o.createdAt).toLocaleDateString(),
+        formatAppDate(o.createdAt),
       ]),
     };
   };

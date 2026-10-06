@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { formatAppDate } from '../../utils/dateFormatter';
 import { View, Text, TouchableOpacity, ScrollView, TextInput, Modal, StyleSheet, useWindowDimensions } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
 import { Role, User } from '../../types';
@@ -68,7 +69,7 @@ export const UsersView: React.FC<UsersViewProps> = ({ onOpenCreateUser }) => {
       });
     }
     return user.createdAt
-      ? new Date(user.createdAt).toLocaleDateString()
+      ? formatAppDate(user.createdAt)
       : '2026-09-25 09:30 AM';
   };
 
@@ -260,7 +261,7 @@ export const UsersView: React.FC<UsersViewProps> = ({ onOpenCreateUser }) => {
             ) : (
               filteredUsers.map((u) => {
                 const deptInfo = ROLE_DEPARTMENTS[u.role] || { label: u.role, department: 'General' };
-                const createdStr = u.createdAt ? new Date(u.createdAt).toLocaleDateString() : '2026-01-15';
+                const createdStr = u.createdAt ? formatAppDate(u.createdAt) : '2026-01-15';
                 const lastLoginStr = getLastLogin(u);
 
                 return (
@@ -359,7 +360,7 @@ export const UsersView: React.FC<UsersViewProps> = ({ onOpenCreateUser }) => {
             ) : (
               filteredUsers.map((u) => {
                 const deptInfo = ROLE_DEPARTMENTS[u.role] || { label: u.role, department: 'General' };
-                const createdStr = u.createdAt ? new Date(u.createdAt).toLocaleDateString() : '2026-01-15';
+                const createdStr = u.createdAt ? formatAppDate(u.createdAt) : '2026-01-15';
                 const lastLoginStr = getLastLogin(u);
 
                 return (

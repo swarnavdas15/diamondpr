@@ -45,6 +45,7 @@ export const QuotationsView: React.FC<QuotationsViewProps> = ({ onOpenCreateQuot
     convertQuotationToOrder,
     markQuotationLost,
     setSelectedOrder,
+    deleteQuotation,
   } = useERP();
   const { currentUser } = useAuth();
   const isSuperAdmin = currentUser?.role === 'SUPER_ADMIN';
@@ -624,6 +625,20 @@ export const QuotationsView: React.FC<QuotationsViewProps> = ({ onOpenCreateQuot
                             <Text style={{ color: '#f59e0b', fontSize: 10, fontWeight: '800' }}>🔓 Unlock</Text>
                           </TouchableOpacity>
                         )}
+                        
+                        {isSuperAdmin && (
+                          <TouchableOpacity
+                            style={{ backgroundColor: 'rgba(239, 68, 68, 0.15)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: Radius.xs, borderWidth: 1, borderColor: '#ef4444', marginLeft: 4 }}
+                            onPress={(e) => {
+                              e.stopPropagation();
+                              if (window.confirm(`Delete quotation ${q.quotationNumber}?`)) {
+                                deleteQuotation(q.id);
+                              }
+                            }}
+                          >
+                            <Text style={{ color: '#ef4444', fontSize: 10, fontWeight: '800' }}>🗑 Delete</Text>
+                          </TouchableOpacity>
+                        )}
                       </View>
                     </View>
                   );
@@ -770,7 +785,7 @@ export const QuotationsView: React.FC<QuotationsViewProps> = ({ onOpenCreateQuot
                 <TextInput style={styles.input} value={editExpVal} onChangeText={setEditExpVal} keyboardType="numeric" />
 
                 <Text style={styles.inputLabel}>Next Follow-Up Date</Text>
-                <TextInput style={styles.input} value={editFollowUpDate} onChangeText={setEditFollowUpDate} placeholder="YYYY-MM-DD" />
+                <DatePickerInput value={editFollowUpDate} onChangeDate={setEditFollowUpDate} />
 
                 <Text style={styles.inputLabel}>Remarks & Notes</Text>
                 <TextInput style={[styles.input, { height: 50 }]} multiline value={editRemarks} onChangeText={setEditRemarks} />
@@ -830,7 +845,7 @@ export const QuotationsView: React.FC<QuotationsViewProps> = ({ onOpenCreateQuot
                 <TextInput style={styles.input} value={lostValue} onChangeText={setLostValue} keyboardType="numeric" />
 
                 <Text style={styles.inputLabel}>Lost Date</Text>
-                <TextInput style={styles.input} value={lostDate} onChangeText={setLostDate} placeholder="YYYY-MM-DD" />
+                <DatePickerInput value={lostDate} onChangeDate={setLostDate} />
 
                 <Text style={styles.inputLabel}>Detailed Lost Remarks & Competitor Feedback</Text>
                 <TextInput style={[styles.input, { height: 60 }]} multiline value={lostRemarks} onChangeText={setLostRemarks} />

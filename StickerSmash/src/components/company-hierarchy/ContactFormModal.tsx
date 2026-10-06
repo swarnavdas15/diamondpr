@@ -5,6 +5,7 @@ import { useERP } from '../../context/ERPContext';
 import { CompanyContact } from '../../types';
 import { Colors, Spacing, Radius, Shadows } from '../../theme';
 import { SearchableDropdown } from '../ui/SearchableDropdown';
+import { PhoneInput } from '../ui/PhoneInput';
 
 interface ContactFormModalProps {
   visible: boolean;
@@ -12,7 +13,7 @@ interface ContactFormModalProps {
   contactToEdit?: CompanyContact | null;
   existingContacts: CompanyContact[];
   onClose: () => void;
-  onSubmit: (data: Omit<CompanyContact, 'id' | 'createdAt'>) => any;
+  onSubmit: (data: Omit<CompanyContact, 'id' | 'createdAt'>) => Promise<any> | void;
 }
 
 const DEPARTMENTS = [
@@ -39,6 +40,7 @@ export const ContactFormModal: React.FC<ContactFormModalProps> = ({
   const [fullName, setFullName] = useState('');
   const [designation, setDesignation] = useState('');
   const [department, setDepartment] = useState(DEPARTMENTS[0]);
+  const [isCustomDept, setIsCustomDept] = useState(false);
   const [email, setEmail] = useState('');
   const [mobile, setMobile] = useState('');
   const [whatsapp, setWhatsapp] = useState('');
@@ -66,6 +68,7 @@ export const ContactFormModal: React.FC<ContactFormModalProps> = ({
     setFullName('');
     setDesignation('');
     setDepartment(DEPARTMENTS[0]);
+    setIsCustomDept(false);
     setEmail('');
     setMobile('');
     setWhatsapp('');
@@ -79,7 +82,9 @@ export const ContactFormModal: React.FC<ContactFormModalProps> = ({
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setFullName(contactToEdit.fullName);
       setDesignation(contactToEdit.designation);
-      setDepartment(contactToEdit.department || DEPARTMENTS[0]);
+      const editDept = contactToEdit.department || DEPARTMENTS[0];
+      setDepartment(editDept);
+      setIsCustomDept(!DEPARTMENTS.includes(editDept));
       setEmail(contactToEdit.email || '');
       setMobile(contactToEdit.mobile || '');
       setWhatsapp(contactToEdit.whatsapp || '');
@@ -104,27 +109,38 @@ export const ContactFormModal: React.FC<ContactFormModalProps> = ({
       setError('Mobile Number is required.');
       return;
     }
+    if (isCustomDept && !department.trim()) {
+      setError('Please specify the custom department name.');
+      return;
+    }
 
     // Standardize WhatsApp number (digits only or raw string)
     const cleanWa = whatsapp.trim() || mobile.replace(/\D/g, '');
 
-    try {
-      await onSubmit({
-        companyId,
-        fullName: fullName.trim(),
-        designation: designation.trim(),
-        department,
-        email: email.trim(),
-        mobile: mobile.trim(),
-        whatsapp: cleanWa,
-        reportsToId: reportsToId || undefined,
-        notes: notes.trim(),
-      });
+    const savedContact = await onSubmit({
+      companyId,
+      fullName: fullName.trim(),
+      designation: designation.trim(),
+      department,
+      email: email.trim(),
+      mobile: mobile.trim(),
+      whatsapp: cleanWa,
+      reportsToId: reportsToId || undefined,
+      notes: notes.trim(),
+    });
 
-      handleClose();
-    } catch (err: any) {
-      setError(err.message || 'Failed to save contact.');
+    if (profileImageUri && !profileImageUri.startsWith('http')) {
+      const contactId = contactToEdit ? contactToEdit.id : savedContact?.id;
+      if (contactId) {
+        let filename = profileImageUri.split('/').pop() || 'profile.jpg';
+        if (!/\.(jpg|jpeg|png|webp)$/i.test(filename)) {
+          filename = `${filename}.jpg`;
+        }
+        await uploadCompanyContactProfileImage(contactId, profileImageUri, filename, 'image/jpeg');
+      }
     }
+
+    handleClose();
   };
 
   const handleClose = () => {
@@ -152,6 +168,15 @@ export const ContactFormModal: React.FC<ContactFormModalProps> = ({
 
           <ScrollView style={styles.formScroll} showsVerticalScrollIndicator={false}>
             {/* Full Name */}
+            
+            <Text style={styles.label}>Contact Profile Image</Text>
+            <TouchableOpacity style={styles.imagePickerBtn} onPress={pickImage}>
+              {profileImageUri || (contactToEdit?.profileImage) ? (
+                <Image source={{ uri: profileImageUri || contactToEdit?.profileImage }} style={styles.previewImage} />
+              ) : (
+                <Text style={styles.imagePickerText}>+ Select Image</Text>
+              )}
+            </TouchableOpacity>
 
             <Text style={styles.label}>Full Name *</Text>
             <TextInput
@@ -180,15 +205,38 @@ export const ContactFormModal: React.FC<ContactFormModalProps> = ({
                   {DEPARTMENTS.map((dept) => (
                     <TouchableOpacity
                       key={dept}
-                      style={[styles.deptChip, department === dept && styles.deptChipActive]}
-                      onPress={() => setDepartment(dept)}
+                      style={[styles.deptChip, !isCustomDept && department === dept && styles.deptChipActive]}
+                      onPress={() => {
+                        setIsCustomDept(false);
+                        setDepartment(dept);
+                      }}
                     >
-                      <Text style={[styles.deptChipText, department === dept && styles.deptChipTextActive]}>
+                      <Text style={[styles.deptChipText, !isCustomDept && department === dept && styles.deptChipTextActive]}>
                         {dept}
                       </Text>
                     </TouchableOpacity>
                   ))}
+                  <TouchableOpacity
+                    style={[styles.deptChip, isCustomDept && styles.deptChipActive]}
+                    onPress={() => {
+                      setIsCustomDept(true);
+                      setDepartment('');
+                    }}
+                  >
+                    <Text style={[styles.deptChipText, isCustomDept && styles.deptChipTextActive]}>
+                      + Custom
+                    </Text>
+                  </TouchableOpacity>
                 </ScrollView>
+                {isCustomDept && (
+                  <TextInput
+                    style={[styles.input, { marginTop: 8 }]}
+                    placeholder="Enter custom department name"
+                    placeholderTextColor="#94a3b8"
+                    value={department}
+                    onChangeText={setDepartment}
+                  />
+                )}
               </View>
             </View>
 
@@ -196,22 +244,16 @@ export const ContactFormModal: React.FC<ContactFormModalProps> = ({
             <View style={styles.row}>
               <View style={styles.flex1}>
                 <Text style={styles.label}>Mobile Number *</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="+91 98765 43210"
-                  placeholderTextColor="#94a3b8"
-                  keyboardType="phone-pad"
+                <PhoneInput
+                  placeholder="98765 43210"
                   value={mobile}
                   onChangeText={setMobile}
                 />
               </View>
               <View style={styles.flex1}>
                 <Text style={styles.label}>WhatsApp Number</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="919876543210"
-                  placeholderTextColor="#94a3b8"
-                  keyboardType="phone-pad"
+                <PhoneInput
+                  placeholder="98765 43210"
                   value={whatsapp}
                   onChangeText={setWhatsapp}
                 />
@@ -293,6 +335,30 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.borderDark,
     ...Shadows.md,
+  },
+  imagePickerBtn: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: Colors.inputBg,
+    borderWidth: 1,
+    borderColor: Colors.borderDark,
+    borderStyle: 'dashed',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: Spacing.md,
+    overflow: 'hidden',
+  },
+  imagePickerText: {
+    color: Colors.accentTeal,
+    fontSize: 10,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  previewImage: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
   },
   header: {
     flexDirection: 'row',
@@ -434,28 +500,5 @@ const styles = StyleSheet.create({
     color: Colors.white,
     fontSize: 14,
     fontWeight: '800',
-  },
-  imagePickerBtn: {
-    backgroundColor: Colors.inputBg,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: Colors.borderDark,
-    borderStyle: 'dashed',
-    height: 80,
-    width: 80,
-    justifyContent: 'center',
-    alignItems: 'center',
-    overflow: 'hidden',
-    marginBottom: 8,
-  },
-  previewImage: {
-    width: '100%',
-    height: '100%',
-  },
-  imagePickerText: {
-    color: Colors.accentTeal,
-    fontSize: 11,
-    fontWeight: '600',
-    textAlign: 'center',
   },
 });

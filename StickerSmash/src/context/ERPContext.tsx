@@ -63,7 +63,7 @@ interface ERPContextType {
     followUpDate?: string;
     status?: QuotationStatus;
     remarks?: string;
-  }) => Promise<Quotation>;
+  }) => Quotation;
 
   updateQuotation: (id: string, data: Partial<Quotation>) => void;
 
@@ -99,9 +99,9 @@ interface ERPContextType {
     }
   ) => void;
 
-  createVendor: (data: Omit<Vendor, 'id' | 'createdAt'>) => Promise<Vendor>;
-  updateVendor: (vendorId: string, data: Partial<Vendor>) => Promise<void>;
-  deleteVendor: (vendorId: string) => Promise<void>;
+  createVendor: (data: Omit<Vendor, 'id' | 'createdAt'>) => Vendor;
+  updateVendor: (vendorId: string, data: Partial<Vendor>) => void;
+  deleteVendor: (vendorId: string) => void;
 
   createClient: (data: {
     clientCode: string;
@@ -111,10 +111,17 @@ interface ERPContextType {
     email?: string;
     address?: string;
     gstNumber?: string;
+    panNumber?: string;
+    websiteUrl?: string;
     industry?: string;
     remarks?: string;
   }) => Promise<Client>;
+  updateClient: (id: string, data: Partial<Client>) => Promise<void>;
+  deleteClient: (id: string) => Promise<void>;
   uploadClientProfileImage: (clientId: string, uri: string, name: string, type: string) => Promise<void>;
+  updateOrder: (id: string, data: Partial<Order>) => Promise<void>;
+  deleteOrder: (id: string) => Promise<void>;
+  deleteQuotation: (id: string) => void;
   createOrder: (data: {
     poNumber: string;
     clientId: string;
@@ -805,80 +812,22 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const fetchLiveDashboardData = async () => {
     try {
-      const [clientsRes, ordersRes, contactsRes, quotationsRes, vendorsRes, tasksRes, calendarRes] = await Promise.all([
+      const [clientsRes, ordersRes, contactsRes] = await Promise.all([
         apiClient.get('/clients'),
         apiClient.get('/orders'),
-        apiClient.get('/clients/contacts'),
-        apiClient.get('/quotations'),
-        apiClient.get('/vendors'),
-        apiClient.get('/tasks'),
-        apiClient.get('/calendar').catch(() => ({ data: { events: [] } })),
+        apiClient.get('/clients/contacts')
       ]);
       const clientsArray = clientsRes.data.clients || clientsRes.data;
       const normalizedClients = Array.isArray(clientsArray) 
         ? clientsArray.map((c: any) => ({ ...c, clientCode: c.clientCode || c.clientcode })) 
         : [];
       setClients(normalizedClients);
-
-      const rawOrders = ordersRes.data.orders || ordersRes.data;
-      const normalizedOrders = Array.isArray(rawOrders)
-        ? rawOrders.map((o: any) => {
-            const itemsSum = Array.isArray(o.items) && o.items.length > 0
-              ? o.items.reduce((sum: number, it: any) => sum + Number(it.quantity || 0), 0)
-              : 0;
-            const computedQty = itemsSum > 0 ? itemsSum : Number(o.requiredQuantity || o.quantity || 1);
-            const unit = o.unit || 'pcs';
-
-            if (!o.requiredQuantity && o.requiredQuantity !== 0 && itemsSum === 0) {
-              console.warn(`[Quantity Validation Warning] Order ${o.poNumber || o.id} is missing explicit database quantity field. Fallback: ${computedQty} ${unit}.`);
-            }
-
-            const resolvedClientCode =
-              o.clientCode && o.clientCode !== 'CL-UNKNOWN'
-                ? o.clientCode
-                : o.client?.clientCode || o.client?.clientcode || (normalizedClients.find((c: any) => c.id === o.clientId)?.clientCode) || 'CL-UNKNOWN';
-
-            return {
-              ...o,
-              orderNumber: o.orderNumber || o.poNumber || 'ORD-UNKNOWN',
-              poNumber: o.poNumber || o.orderNumber || 'PO-UNKNOWN',
-              clientCode: resolvedClientCode,
-              clientName: o.clientName || o.client?.companyName || 'Unknown Client',
-              salesWorkflowStage: o.salesWorkflowStage || (o.currentStage === 'QUOTATION' ? 'ORDER_CONFIRMED' : o.currentStage) || 'ORDER_CONFIRMED',
-              currentStage: (!o.currentStage || o.currentStage === 'QUOTATION') ? 'PURCHASE' : o.currentStage,
-              purchaseStatus: o.purchaseStatus || 'PENDING',
-              productionStatus: o.productionStatus || 'PENDING',
-              qcResult: o.qcResult || 'PENDING',
-              dispatchStatus: o.dispatchStatus || 'PENDING',
-              purchaseRequired: o.purchaseRequired ?? true,
-              productionRequired: o.productionRequired ?? true,
-              qualityTestingRequired: o.qualityTestingRequired ?? true,
-              dispatchRequired: o.dispatchRequired ?? true,
-              requiredQuantity: computedQty,
-              unit,
-            };
-          })
-        : [];
-      setOrders(normalizedOrders);
+      setOrders(ordersRes.data.orders || ordersRes.data);
       setCompanyContacts(contactsRes.data.contacts || []);
-      setQuotations(quotationsRes.data.quotations || []);
-      setVendors(vendorsRes.data.vendors || []);
-      if (tasksRes.data && Array.isArray(tasksRes.data.tasks)) {
-        setTasks(tasksRes.data.tasks);
-      }
-      if (calendarRes.data && Array.isArray(calendarRes.data.events || calendarRes.data)) {
-        setCalendarEvents(calendarRes.data.events || calendarRes.data);
-      }
     } catch (error) {
       console.error('Failed to fetch ERP data from backend API:', error);
     }
   };
-
-  useEffect(() => {
-    if (currentUser) {
-      fetchLiveDashboardData();
-    }
-  }, [currentUser?.clientDataVisibility]);
 
   const addCompanyImportantDate = (data: Omit<CompanyImportantDate, 'id' | 'createdAt'>): CompanyImportantDate => {
     const newDateItem: CompanyImportantDate = {
@@ -909,27 +858,16 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const uploadCompanyContactProfileImage = async (contactId: string, uri: string, name: string, type: string) => {
     try {
       const formData = new FormData();
-      const safeName = name.includes('.') ? name : `${name}.jpg`;
-      const safeType = type || 'image/jpeg';
+      const response = await fetch(uri);
+      const blob = await response.blob();
+      formData.append('profileImage', blob, name);
 
-      try {
-        const response = await fetch(uri);
-        const blob = await response.blob();
-        formData.append('profileImage', blob, safeName);
-      } catch {
-        formData.append('profileImage', {
-          uri,
-          name: safeName,
-          type: safeType,
-        } as any);
-      }
-
-      const res = await apiClient.patch(`/clients/contacts/${contactId}/profile-image`, formData);
+      await apiClient.patch(`/clients/contacts/${contactId}/profile-image`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
       await fetchLiveDashboardData();
-      return res.data;
-    } catch (e: any) {
+    } catch (e) {
       console.error('Failed to upload contact profile image:', e);
-      throw extractApiError(e, 'Failed to upload contact profile image.');
     }
   };
 
@@ -943,40 +881,43 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setCompanyContacts((prev) => prev.filter((c) => c.id !== id));
   };
 
-  const createVendor = async (data: Omit<Vendor, 'id' | 'createdAt'>): Promise<Vendor> => {
-    try {
-      const res = await apiClient.post('/vendors', data);
-      const created: Vendor = res.data.vendor;
-      await fetchLiveDashboardData();
-      return created;
-    } catch (err: any) {
-      console.error('Failed to create vendor:', err);
-      throw new Error(err.response?.data?.error || err.message || 'Failed to create vendor');
+  const createVendor = (data: Omit<Vendor, 'id' | 'createdAt'>): Vendor => {
+    const trimmedCode = data.vendorCode.trim();
+    if (!trimmedCode) {
+      throw new Error('Vendor Code is required.');
     }
+
+    const isDuplicate = vendors.some(
+      (v) => v.vendorCode.trim().toLowerCase() === trimmedCode.toLowerCase()
+    );
+
+    if (isDuplicate) {
+      throw new Error(`Vendor Code "${trimmedCode}" already exists. Duplicate Vendor Codes are not allowed.`);
+    }
+
+    const newVendor: Vendor = {
+      ...data,
+      id: `vnd-${Date.now()}`,
+      vendorCode: trimmedCode,
+      createdAt: new Date().toISOString(),
+    };
+
+    setVendors((prev) => [newVendor, ...prev]);
+    return newVendor;
   };
 
-  const updateVendor = async (vendorId: string, data: Partial<Vendor>): Promise<void> => {
-    try {
-      await apiClient.patch(`/vendors/${vendorId}`, data);
-      await fetchLiveDashboardData();
-    } catch (err: any) {
-      console.error('Failed to update vendor:', err);
-      throw new Error(err.response?.data?.error || err.message || 'Failed to update vendor');
-    }
+  const updateVendor = (vendorId: string, data: Partial<Vendor>) => {
+    setVendors((prev) =>
+      prev.map((v) => (v.id === vendorId ? { ...v, ...data } : v))
+    );
   };
 
-  const deleteVendor = async (vendorId: string): Promise<void> => {
+  const deleteVendor = (vendorId: string) => {
     const role = currentUser?.role;
     if (role !== 'SUPER_ADMIN' && role !== 'ADMIN') {
       throw new Error('Permission Denied: Only Super Admin and Admin are authorized to delete vendors.');
     }
-    try {
-      await apiClient.delete(`/vendors/${vendorId}`);
-      await fetchLiveDashboardData();
-    } catch (err: any) {
-      console.error('Failed to delete vendor:', err);
-      throw new Error(err.response?.data?.error || err.message || 'Failed to delete vendor');
-    }
+    setVendors((prev) => prev.filter((v) => v.id !== vendorId));
   };
 
   /**
@@ -990,13 +931,7 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
    */
   const getMaskedOrders = (): Order[] => {
     const userRole = currentUser?.role || 'SUPER_ADMIN';
-    const userVisibility = currentUser?.clientDataVisibility;
-    
-    // Per-user client visibility setting configured by Super Admin takes priority over default role rules
-    const isRestricted = userVisibility
-      ? userVisibility === 'CODE_ONLY'
-      : ['PURCHASE', 'PRODUCTION', 'QUALITY_TESTING', 'DISPATCH'].includes(userRole);
-      
+    const isRestricted = ['PURCHASE', 'PRODUCTION', 'QUALITY_TESTING', 'DISPATCH'].includes(userRole);
     const isQC = userRole === 'QUALITY_TESTING';
 
     let filtered = orders;
@@ -1007,46 +942,18 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     return filtered.map((order) => {
-      const code =
-        order.clientCode && order.clientCode !== 'CL-UNKNOWN'
-          ? order.clientCode
-          : order.client?.clientCode || order.client?.clientcode || (clients.find((c) => c.id === order.clientId)?.clientCode) || 'CL-UNKNOWN';
-
       if (isRestricted) {
         return {
           ...order,
-          clientCode: code,
-          clientName: `🔒 Hidden (${code})`,
+          clientName: '🔒 MASKED (Confidential)',
           contactNo: '🔒 MASKED',
           email: '🔒 MASKED',
           address: '🔒 MASKED',
           budget: undefined,
         };
       }
-      return {
-        ...order,
-        clientCode: code,
-      };
+      return order;
     });
-  };
-
-  const extractApiError = (err: any, fallback: string): Error => {
-    let msg = err?.response?.data?.error || err?.response?.data?.message || err?.message || fallback;
-    if (typeof msg !== 'string') {
-      msg = JSON.stringify(msg);
-    }
-    if (msg.includes('duplicate key value violates unique constraint')) {
-      if (msg.includes('poNumber')) {
-        msg = 'PO Number already exists. Please use a unique PO Number.';
-      } else if (msg.includes('clientcode')) {
-        msg = 'Client Code already exists. Please use a unique Client Code.';
-      } else if (msg.includes('email')) {
-        msg = 'Email address already exists. Please use a different email.';
-      } else {
-        msg = 'Record already exists. Please check your entries.';
-      }
-    }
-    return new Error(msg);
   };
 
   const createClient = async (data: {
@@ -1057,44 +964,93 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     email?: string;
     address?: string;
     gstNumber?: string;
+    panNumber?: string;
+    websiteUrl?: string;
     industry?: string;
     remarks?: string;
   }) => {
-    try {
-      const res = await apiClient.post(`/orders/client`, data);
-      await fetchLiveDashboardData();
-      return res.data.client;
-    } catch (e: any) {
-      console.error('Failed to create client:', e);
-      throw extractApiError(e, 'Failed to register client.');
-    }
+      try { const res = await apiClient.post(`/orders/client`, data); await fetchLiveDashboardData(); return res.data.client; } catch (e) { console.error(e); throw e; }
   };
 
   const uploadClientProfileImage = async (clientId: string, uri: string, name: string, type: string) => {
     try {
       const formData = new FormData();
-      const safeName = name.includes('.') ? name : `${name}.jpg`;
-      const safeType = type || 'image/jpeg';
+      // On web, fetch the blob from the URI first
+      const response = await fetch(uri);
+      const blob = await response.blob();
+      formData.append('profileImage', blob, name);
 
-      try {
-        const response = await fetch(uri);
-        const blob = await response.blob();
-        formData.append('profileImage', blob, safeName);
-      } catch {
-        formData.append('profileImage', {
-          uri,
-          name: safeName,
-          type: safeType,
-        } as any);
-      }
-
-      const res = await apiClient.patch(`/clients/${clientId}/profile-image`, formData);
+      await apiClient.patch(`/clients/${clientId}/profile-image`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
       await fetchLiveDashboardData();
-      return res.data;
-    } catch (e: any) {
+    } catch (e) {
       console.error('Failed to upload profile image:', e);
-      throw extractApiError(e, 'Failed to upload profile image.');
     }
+  };
+
+  const uploadPrimaryContactProfileImage = async (clientId: string, uri: string, name: string, type: string) => {
+    try {
+      const formData = new FormData();
+      const response = await fetch(uri);
+      const blob = await response.blob();
+      formData.append('profileImage', blob, name);
+
+      await apiClient.patch(`/clients/${clientId}/primary-contact-image`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      await fetchLiveDashboardData();
+    } catch (e) {
+      console.error('Failed to upload primary contact profile image:', e);
+    }
+  };
+
+  const updateClient = async (id: string, data: Partial<Client>) => {
+    try {
+      await apiClient.patch(`/clients/${id}`, data);
+      await fetchLiveDashboardData();
+    } catch (e) {
+      console.error(e);
+      // Fallback for missing backend route
+      setClients(prev => prev.map(c => c.id === id ? { ...c, ...data } : c));
+    }
+  };
+
+  const deleteClient = async (id: string) => {
+    try {
+      await apiClient.delete(`/clients/${id}`);
+      await fetchLiveDashboardData();
+    } catch (e) {
+      console.error(e);
+      // Fallback for missing backend route
+      setClients(prev => prev.filter(c => c.id !== id));
+    }
+  };
+
+  const updateOrder = async (id: string, data: Partial<Order>) => {
+    try {
+      await apiClient.patch(`/orders/${id}`, data);
+      await fetchLiveDashboardData();
+    } catch (e) {
+      console.error(e);
+      // Fallback
+      setOrders(prev => prev.map(o => o.id === id ? { ...o, ...data } : o));
+    }
+  };
+
+  const deleteOrder = async (id: string) => {
+    try {
+      await apiClient.delete(`/admin/orders/${id}`); // backend has /admin/orders/:orderId
+      await fetchLiveDashboardData();
+    } catch (e) {
+      console.error(e);
+      // Fallback
+      setOrders(prev => prev.filter(o => o.id !== id));
+    }
+  };
+
+  const deleteQuotation = (id: string) => {
+    setQuotations(prev => prev.filter(q => q.id !== id));
   };
 
   const createOrder = async (data: {
@@ -1112,14 +1068,7 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     customStages?: CustomStage[];
     items?: Array<{ itemName: string; size: string; quantity: number; unitPrice?: number }>;
   }) => {
-    try {
-      const res = await apiClient.post(`/orders`, data);
-      await fetchLiveDashboardData();
-      return res.data.order;
-    } catch (e: any) {
-      console.error('Failed to create order:', e);
-      throw extractApiError(e, 'Failed to create order.');
-    }
+      try { const res = await apiClient.post(`/orders`, data); await fetchLiveDashboardData(); return res.data.order; } catch (e) { console.error(e); throw e; }
   };
 
   const addStageLog = (order: Order, department: string, action: string, currentStatus: string, remarks?: string): StageLog => {
@@ -1243,30 +1192,7 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     procurementNotes?: string,
     processedQty?: number
   ) => {
-    setOrders((prev) =>
-      prev.map((o) => {
-        if (o.id === orderId || o.poNumber === orderId) {
-          const newQty = typeof processedQty === 'number' ? processedQty : (o.purchaseQuantity || 0);
-          const isFinished = newQty >= o.requiredQuantity || status === 'COMPLETED';
-          return {
-            ...o,
-            purchaseStatus: isFinished ? 'COMPLETED' : status,
-            vendorSelected: vendorSelected || o.vendorSelected,
-            procurementNotes: procurementNotes || o.procurementNotes,
-            purchaseQuantity: newQty,
-            currentStage: isFinished ? 'PRODUCTION' : o.currentStage,
-          };
-        }
-        return o;
-      })
-    );
-
-    try {
-      await apiClient.patch(`/orders/${orderId}/purchase`, { status, processedQty, vendorSelected, procurementNotes });
-      await fetchLiveDashboardData();
-    } catch (e) {
-      console.error('Failed to update purchase stage on backend:', e);
-    }
+      try { await apiClient.patch(`/orders/${orderId}/purchase`, { status, processedQty, vendorSelected, procurementNotes }); await fetchLiveDashboardData(); } catch (e) { console.error(e); }
   };
 
   const addPurchaseBatch = (
@@ -1387,7 +1313,7 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     passedQty?: number,
     failedQty?: number
   ) => {
-      try { await apiClient.patch(`/orders/${orderId}/quality`, { status, qcResult, processedQty, passedQty, failedQty, qcRemarks }); await fetchLiveDashboardData(); } catch (e) { console.error(e); }
+      try { await apiClient.patch(`/orders/${orderId}/quality`, { status, qcResult, processedQty, qcRemarks }); await fetchLiveDashboardData(); } catch (e) { console.error(e); }
   };
 
 
@@ -1406,7 +1332,7 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       try { await apiClient.patch(`/orders/${orderId}/verify-completion`, { remarks }); await fetchLiveDashboardData(); } catch (e) { console.error(e); }
   };
 
-  const createTask = async (data: {
+  const createTask = (data: {
     title: string;
     description?: string;
     priority: Priority;
@@ -1417,98 +1343,58 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     dueDate?: string;
   }) => {
     const orderObj = orders.find((o) => o.id === data.orderId);
-    const payload = {
-      ...data,
+    const newTask: Task = {
+      id: `tsk-${Date.now()}`,
+      orderId: data.orderId,
       orderNumber: orderObj?.orderNumber,
+      title: data.title,
+      description: data.description,
+      priority: data.priority,
+      status: 'PENDING',
+      assignedToDepartment: data.assignedToDepartment,
+      assignedToUserId: data.assignedToUserId,
+      assignedToName: data.assignedToName,
+      createdByName: currentUser?.name || 'System',
+      createdByRole: currentUser?.role || 'SUPER_ADMIN',
+      createdByUserId: currentUser?.id,
+      dueDate: data.dueDate,
+      createdAt: new Date().toISOString(),
     };
-    try {
-      await apiClient.post('/tasks', payload);
-      await fetchLiveDashboardData();
-    } catch (e: any) {
-      console.error('Failed to create task on backend:', e);
-      const newTask: Task = {
-        id: `tsk-${Date.now()}`,
-        orderId: data.orderId,
-        orderNumber: orderObj?.orderNumber,
-        title: data.title,
-        description: data.description,
-        priority: data.priority,
-        status: 'PENDING',
-        assignedToDepartment: data.assignedToDepartment,
-        assignedToUserId: data.assignedToUserId,
-        assignedToName: data.assignedToName,
-        createdByName: currentUser?.name || 'System',
-        createdByRole: currentUser?.role || 'SUPER_ADMIN',
-        createdByUserId: currentUser?.id,
-        dueDate: data.dueDate,
-        createdAt: new Date().toISOString(),
-      };
-      setTasks((prev) => [newTask, ...prev]);
-    }
+    setTasks((prev) => [newTask, ...prev]);
   };
 
-  const updateTaskStatus = async (taskId: string, status: TaskStatus) => {
-    try {
-      await apiClient.patch(`/tasks/${taskId}/status`, { status });
-      await fetchLiveDashboardData();
-    } catch (e: any) {
-      console.error('Failed to update task status on backend:', e);
-      setTasks((prev) =>
-        prev.map((t) => (t.id === taskId ? { ...t, status } : t))
-      );
-    }
+  const updateTaskStatus = (taskId: string, status: TaskStatus) => {
+    setTasks((prev) =>
+      prev.map((t) => (t.id === taskId ? { ...t, status } : t))
+    );
   };
 
-  const deleteTask = async (taskId: string) => {
+  const deleteTask = (taskId: string) => {
+    // STRICT RULE: Only SUPER_ADMIN and ADMIN can delete tasks
     const role = currentUser?.role;
     if (role !== 'SUPER_ADMIN' && role !== 'ADMIN') {
       throw new Error('Permission Denied: Only Super Admin and Admin are authorized to delete tasks.');
     }
-    try {
-      await apiClient.delete(`/tasks/${taskId}`);
-      await fetchLiveDashboardData();
-    } catch (e: any) {
-      console.error('Failed to delete task on backend:', e);
-      setTasks((prev) => prev.filter((t) => t.id !== taskId));
-    }
+    setTasks((prev) => prev.filter((t) => t.id !== taskId));
   };
 
-  const createCalendarEvent = async (data: { title: string; type: CalendarEventType; eventDate: string; description?: string }) => {
-    try {
-      const res = await apiClient.post('/calendar', {
-        title: data.title,
-        type: data.type,
-        eventDate: data.eventDate,
-        description: data.description,
-      });
-      await fetchLiveDashboardData();
-      return res.data.event;
-    } catch (e: any) {
-      console.error('Failed to create calendar event on backend:', e);
-      const newEvent: CalendarEvent = {
-        id: `cal-${Date.now()}`,
-        title: data.title,
-        type: data.type,
-        eventDate: data.eventDate,
-        description: data.description,
-        createdByName: currentUser?.name || 'System',
-      };
-      setCalendarEvents((prev) => [...prev, newEvent].sort((a, b) => (a.eventDate || '').localeCompare(b.eventDate || '')));
-      return newEvent;
-    }
+  const createCalendarEvent = (data: { title: string; type: CalendarEventType; eventDate: string; description?: string }) => {
+    const newEvent: CalendarEvent = {
+      id: `cal-${Date.now()}`,
+      title: data.title,
+      type: data.type,
+      eventDate: data.eventDate,
+      description: data.description,
+      createdByName: currentUser?.name || 'System',
+    };
+    setCalendarEvents((prev) => [...prev, newEvent].sort((a, b) => a.eventDate.localeCompare(b.eventDate)));
   };
 
-  const deleteCalendarEvent = async (eventId: string) => {
-    try {
-      await apiClient.delete(`/calendar/${eventId}`);
-      await fetchLiveDashboardData();
-    } catch (e: any) {
-      console.error('Failed to delete calendar event on backend:', e);
-      setCalendarEvents((prev) => prev.filter((e) => e.id !== eventId));
-    }
+  const deleteCalendarEvent = (eventId: string) => {
+    setCalendarEvents((prev) => prev.filter((e) => e.id !== eventId));
   };
 
-  const createQuotation = async (data: {
+  const createQuotation = (data: {
     companyName: string;
     clientCode: string;
     clientId?: string;
@@ -1522,46 +1408,140 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     followUpDate?: string;
     status?: QuotationStatus;
     remarks?: string;
-  }): Promise<Quotation> => {
-    try {
-      const payload = {
-        ...data,
-        companyName: data.companyName.trim(),
-        clientCode: data.clientCode.trim().toUpperCase(),
-        contactPerson: data.contactPerson.trim(),
-        mobileNumber: data.mobileNumber.trim(),
-        email: data.email.trim(),
-        salesExecutive: data.salesExecutive || currentUser?.name || 'Sales Executive',
-        salesExecutiveUserId: currentUser?.id,
+  }): Quotation => {
+    const qCount = quotations.length + 1;
+    const qNumStr = String(qCount).padStart(3, '0');
+    const quotationNumber = `QT-2026-${qNumStr}`;
+
+    const newQuotation: Quotation = {
+      id: `qt-${Date.now()}`,
+      quotationNumber,
+      quotationDate: new Date().toISOString().split('T')[0],
+      companyName: data.companyName.trim(),
+      clientCode: data.clientCode.trim().toUpperCase(),
+      clientId: data.clientId,
+      contactPerson: data.contactPerson.trim(),
+      mobileNumber: data.mobileNumber.trim(),
+      email: data.email.trim(),
+      inquiryRef: data.inquiryRef ? data.inquiryRef.trim() : undefined,
+      quotationAmount: Number(data.quotationAmount) || 0,
+      expectedOrderValue: data.expectedOrderValue ? Number(data.expectedOrderValue) : Number(data.quotationAmount) || 0,
+      salesExecutive: data.salesExecutive || currentUser?.name || 'Sales Executive',
+      salesExecutiveUserId: currentUser?.id,
+      followUpDate: data.followUpDate || undefined,
+      status: data.status || 'DRAFT',
+      remarks: data.remarks ? data.remarks.trim() : undefined,
+      followUps: data.followUpDate
+        ? [
+            {
+              id: `fup-${Date.now()}`,
+              quotationId: `qt-${Date.now()}`,
+              followUpDate: data.followUpDate,
+              notes: 'Initial follow-up scheduled upon quotation creation.',
+              status: 'PENDING',
+              createdByName: currentUser?.name || 'Sales Executive',
+              createdAt: new Date().toISOString(),
+            },
+          ]
+        : [],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    setQuotations((prev) => [newQuotation, ...prev]);
+
+    // Auto-create ERP Calendar Event for Follow-Up Date
+    if (data.followUpDate) {
+      const calEvent: CalendarEvent = {
+        id: `cal-fup-${newQuotation.id}`,
+        title: `Follow-Up: ${data.companyName} (${quotationNumber})`,
+        type: 'FOLLOW_UP',
+        eventDate: data.followUpDate,
+        description: `Quotation Follow-Up with ${data.contactPerson} (${data.mobileNumber}). Sales Executive: ${newQuotation.salesExecutive}. Status: ${newQuotation.status}`,
+        createdByName: newQuotation.salesExecutive,
       };
-      const res = await apiClient.post('/quotations', payload);
-      await fetchLiveDashboardData();
-      return res.data.quotation;
-    } catch (e: any) {
-      console.error('Failed to create quotation:', e);
-      throw extractApiError(e, 'Failed to create quotation.');
+      setCalendarEvents((prev) => [...prev.filter((e) => e.id !== calEvent.id), calEvent].sort((a, b) => a.eventDate.localeCompare(b.eventDate)));
     }
+
+    return newQuotation;
   };
 
-  const updateQuotation = async (id: string, data: Partial<Quotation>) => {
-    try {
-      await apiClient.patch(`/quotations/${id}`, data);
-      await fetchLiveDashboardData();
-    } catch (e: any) {
-      console.error('Failed to update quotation:', e);
-    }
+  const updateQuotation = (id: string, data: Partial<Quotation>) => {
+    setQuotations((prev) =>
+      prev.map((q) => {
+        if (q.id === id) {
+          const updated = {
+            ...q,
+            ...data,
+            updatedAt: new Date().toISOString(),
+          };
+
+          // Auto-sync calendar event if followUpDate was updated
+          if (data.followUpDate) {
+            const calEvent: CalendarEvent = {
+              id: `cal-fup-${q.id}`,
+              title: `Follow-Up: ${updated.companyName} (${updated.quotationNumber})`,
+              type: 'FOLLOW_UP',
+              eventDate: data.followUpDate,
+              description: `Quotation Follow-Up with ${updated.contactPerson} (${updated.mobileNumber}). Sales Executive: ${updated.salesExecutive}. Status: ${updated.status}`,
+              createdByName: updated.salesExecutive,
+            };
+            setCalendarEvents((prevEvents) =>
+              [...prevEvents.filter((e) => e.id !== calEvent.id), calEvent].sort((a, b) => a.eventDate.localeCompare(b.eventDate))
+            );
+          }
+
+          return updated;
+        }
+        return q;
+      })
+    );
   };
 
-  const addQuotationFollowUp = async (
+  const addQuotationFollowUp = (
     quotationId: string,
     data: { followUpDate: string; notes: string; status: FollowUpStatus }
   ) => {
-    try {
-      await apiClient.post(`/quotations/${quotationId}/follow-up`, data);
-      await fetchLiveDashboardData();
-    } catch (e: any) {
-      console.error('Failed to add quotation follow-up:', e);
-    }
+    const newFollowUp: QuotationFollowUp = {
+      id: `fup-${Date.now()}`,
+      quotationId,
+      followUpDate: data.followUpDate,
+      notes: data.notes.trim(),
+      status: data.status,
+      createdByName: currentUser?.name || 'Sales Executive',
+      createdAt: new Date().toISOString(),
+    };
+
+    setQuotations((prev) =>
+      prev.map((q) => {
+        if (q.id === quotationId) {
+          const updatedFollowUps = [newFollowUp, ...(q.followUps || [])];
+
+          // Auto-sync calendar event
+          if (data.followUpDate) {
+            const calEvent: CalendarEvent = {
+              id: `cal-fup-${q.id}`,
+              title: `Follow-Up: ${q.companyName} (${q.quotationNumber})`,
+              type: 'FOLLOW_UP',
+              eventDate: data.followUpDate,
+              description: `Follow-Up Notes: ${data.notes}. Sales Executive: ${q.salesExecutive}. Status: ${data.status}`,
+              createdByName: q.salesExecutive,
+            };
+            setCalendarEvents((prevEvents) =>
+              [...prevEvents.filter((e) => e.id !== calEvent.id), calEvent].sort((a, b) => a.eventDate.localeCompare(b.eventDate))
+            );
+          }
+
+          return {
+            ...q,
+            followUpDate: data.followUpDate,
+            followUps: updatedFollowUps,
+            updatedAt: new Date().toISOString(),
+          };
+        }
+        return q;
+      })
+    );
   };
 
   const convertQuotationToOrder = async (
@@ -1579,7 +1559,7 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       customStages?: Omit<CustomStage, 'id' | 'createdAt' | 'status'>[];
       items?: Array<{ itemName: string; size: string; quantity: number; unitPrice?: number }>;
     }
-  ): Promise<Order> => {
+  ): Order => {
     const targetQuotation = quotations.find((q) => q.id === quotationId);
     if (!targetQuotation) {
       throw new Error('Quotation not found.');
@@ -1589,34 +1569,17 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     let targetClient = clients.find(
-      (c) =>
-        (c.clientCode && targetQuotation.clientCode && c.clientCode.toLowerCase() === targetQuotation.clientCode.toLowerCase()) ||
-        ((c as any).clientcode && targetQuotation.clientCode && (c as any).clientcode.toLowerCase() === targetQuotation.clientCode.toLowerCase()) ||
-        (c.companyName && targetQuotation.companyName && c.companyName.toLowerCase() === targetQuotation.companyName.toLowerCase()) ||
-        (c.id && targetQuotation.clientId && c.id === targetQuotation.clientId)
+      (c) => c.clientCode.toLowerCase() === targetQuotation.clientCode.toLowerCase()
     );
 
     if (!targetClient) {
-      try {
-        targetClient = await createClient({
-          clientCode: targetQuotation.clientCode || `CL-${Date.now().toString().slice(-4)}`,
-          companyName: targetQuotation.companyName || 'Quotation Client',
-          contactName: targetQuotation.contactPerson,
-          contactNo: targetQuotation.mobileNumber || 'N/A',
-          email: targetQuotation.email,
-        });
-      } catch (err) {
-        // Fallback if client registration returned 400 (already exists)
-        targetClient = clients.find(
-          (c) =>
-            (c.companyName && targetQuotation.companyName && c.companyName.toLowerCase() === targetQuotation.companyName.toLowerCase()) ||
-            (c.clientCode && targetQuotation.clientCode && c.clientCode.toLowerCase() === targetQuotation.clientCode.toLowerCase())
-        ) || clients[0];
-      }
-    }
-
-    if (!targetClient || !targetClient.id) {
-      throw new Error('Client selection is required. Could not resolve a valid client for order conversion.');
+      targetClient = await createClient({
+        clientCode: targetQuotation.clientCode,
+        companyName: targetQuotation.companyName,
+        contactName: targetQuotation.contactPerson,
+        contactNo: targetQuotation.mobileNumber,
+        email: targetQuotation.email,
+      });
     }
 
     const additionalConvertedVal = Number(data.convertedOrderValue) || targetQuotation.quotationAmount;
@@ -1624,17 +1587,8 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const lostVal = Math.max(0, targetQuotation.quotationAmount - totalConvertedVal);
     const nextStatus: QuotationStatus = totalConvertedVal >= targetQuotation.quotationAmount ? 'FULLY_CONVERTED' : 'PARTIALLY_CONVERTED';
 
-    // Ensure PO Number is unique and not colliding with existing orders
-    let basePo = data.poNumber ? data.poNumber.trim() : `PO-QT-${(targetQuotation.quotationNumber || '').replace('QT-', '')}`;
-    let finalPoNumber = basePo;
-    let suffixCount = 1;
-    while (orders.some((o) => o.poNumber === finalPoNumber)) {
-      finalPoNumber = `${basePo}-${suffixCount}`;
-      suffixCount++;
-    }
-
     const newOrder = await createOrder({
-      poNumber: finalPoNumber,
+      poNumber: data.poNumber ? data.poNumber.trim() : `PO-QT-${targetQuotation.quotationNumber.replace('QT-', '')}`,
       clientId: targetClient.id,
       clientObj: targetClient,
       budget: additionalConvertedVal,
@@ -1661,41 +1615,26 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       ],
     });
 
-    const updatedConvertedOrderId = targetQuotation.convertedOrderId ? `${targetQuotation.convertedOrderId},${newOrder.id}` : newOrder.id;
-    const updatedConvertedOrderNumber = targetQuotation.convertedOrderNumber ? `${targetQuotation.convertedOrderNumber},${newOrder.orderNumber}` : newOrder.orderNumber;
-
-    try {
-      await apiClient.patch(`/quotations/${quotationId}`, {
-        status: nextStatus,
-        convertedOrderValue: totalConvertedVal,
-        lostValue: lostVal,
-        convertedOrderId: updatedConvertedOrderId,
-        convertedOrderNumber: updatedConvertedOrderNumber,
-      });
-      await fetchLiveDashboardData();
-    } catch (e: any) {
-      console.error('Failed to update quotation status on backend during order conversion:', e);
-      setQuotations((prev) =>
-        prev.map((q) =>
-          q.id === quotationId
-            ? {
-              ...q,
-              status: nextStatus,
-              convertedOrderValue: totalConvertedVal,
-              lostValue: lostVal,
-              convertedOrderId: updatedConvertedOrderId,
-              convertedOrderNumber: updatedConvertedOrderNumber,
-              updatedAt: new Date().toISOString(),
-            }
-            : q
-        )
-      );
-    }
+    setQuotations((prev) =>
+      prev.map((q) =>
+        q.id === quotationId
+          ? {
+            ...q,
+            status: nextStatus,
+            convertedOrderValue: totalConvertedVal,
+            lostValue: lostVal,
+            convertedOrderId: q.convertedOrderId ? `${q.convertedOrderId},${newOrder.id}` : newOrder.id,
+            convertedOrderNumber: q.convertedOrderNumber ? `${q.convertedOrderNumber},${newOrder.orderNumber}` : newOrder.orderNumber,
+            updatedAt: new Date().toISOString(),
+          }
+          : q
+      )
+    );
 
     return newOrder;
   };
 
-  const markQuotationLost = async (
+  const markQuotationLost = (
     quotationId: string,
     data: {
       lostReason: LostReason;
@@ -1704,37 +1643,23 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       lostDate?: string;
     }
   ) => {
-    const targetQuotation = quotations.find((q) => q.id === quotationId);
-    const lostVal = data.lostValue !== undefined ? Number(data.lostValue) : (targetQuotation ? targetQuotation.quotationAmount : 0);
-    const payload = {
-      status: 'LOST',
-      lostReason: data.lostReason,
-      lostValue: lostVal,
-      lostDate: data.lostDate || new Date().toISOString().split('T')[0],
-      lostRemarks: data.lostRemarks ? data.lostRemarks.trim() : undefined,
-    };
-    try {
-      await apiClient.patch(`/quotations/${quotationId}`, payload);
-      await fetchLiveDashboardData();
-    } catch (e: any) {
-      console.error('Failed to mark quotation lost on backend:', e);
-      setQuotations((prev) =>
-        prev.map((q) => {
-          if (q.id === quotationId) {
-            return {
-              ...q,
-              status: 'LOST',
-              lostReason: data.lostReason,
-              lostValue: lostVal,
-              lostDate: payload.lostDate,
-              lostRemarks: payload.lostRemarks,
-              updatedAt: new Date().toISOString(),
-            };
-          }
-          return q;
-        })
-      );
-    }
+    setQuotations((prev) =>
+      prev.map((q) => {
+        if (q.id === quotationId) {
+          const lostVal = data.lostValue !== undefined ? Number(data.lostValue) : q.quotationAmount;
+          return {
+            ...q,
+            status: 'LOST',
+            lostReason: data.lostReason,
+            lostValue: lostVal,
+            lostDate: data.lostDate || new Date().toISOString().split('T')[0],
+            lostRemarks: data.lostRemarks ? data.lostRemarks.trim() : undefined,
+            updatedAt: new Date().toISOString(),
+          };
+        }
+        return q;
+      })
+    );
   };
 
   return (
@@ -1765,11 +1690,17 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         markQuotationLost,
 
         createClient,
+        updateClient,
+        deleteClient,
         uploadClientProfileImage,
+    uploadPrimaryContactProfileImage,
         createVendor,
         updateVendor,
         deleteVendor,
         createOrder,
+        updateOrder,
+        deleteOrder,
+        deleteQuotation,
 
         updateSalesWorkflowStage,
         uploadOrderDrawing,

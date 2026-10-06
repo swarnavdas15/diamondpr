@@ -1,7 +1,10 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { formatAppDate } from '../../utils/dateFormatter';
+import { View, Text, StyleSheet, Image, TouchableOpacity, ActivityIndicator } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { Client, CompanyContact } from '../../types';
 import { Colors, Spacing, Radius, Shadows } from '../../theme';
+import { useERP } from '../../context/ERPContext';
 
 interface CompanyOverviewProps {
   client: Client;
@@ -9,16 +12,53 @@ interface CompanyOverviewProps {
 }
 
 export const CompanyOverview: React.FC<CompanyOverviewProps> = ({ client, contacts }) => {
+  const { uploadClientProfileImage } = useERP();
+  const [isUploading, setIsUploading] = React.useState(false);
+  
   const companyContactsCount = contacts.length;
   const initialLetter = client.companyName ? client.companyName.charAt(0).toUpperCase() : 'C';
+
+  const handlePickImage = async () => {
+    try {
+      let result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        setIsUploading(true);
+        const uri = result.assets[0].uri;
+        let filename = uri.split('/').pop() || 'logo.jpg';
+        if (!/\.(jpg|jpeg|png|webp)$/i.test(filename)) {
+          filename = `${filename}.jpg`;
+        }
+        await uploadClientProfileImage(client.id, uri, filename, 'image/jpeg');
+      }
+    } catch (e) {
+      console.error('Failed to upload image', e);
+    } finally {
+      setIsUploading(false);
+    }
+  };
 
   return (
     <View style={styles.container}>
       {/* Header Banner Card */}
       <View style={styles.headerCard}>
-        <View style={styles.logoBadge}>
-          <Text style={styles.logoBadgeText}>{initialLetter}</Text>
-        </View>
+        <TouchableOpacity style={styles.logoBadge} onPress={handlePickImage} activeOpacity={0.8}>
+          {isUploading ? (
+            <ActivityIndicator size="small" color={Colors.white} />
+          ) : client.profileImage ? (
+            <Image source={{ uri: client.profileImage }} style={styles.profileImage} />
+          ) : (
+            <Text style={styles.logoBadgeText}>{initialLetter}</Text>
+          )}
+          <View style={styles.editOverlay}>
+            <Text style={styles.editOverlayText}>✏️</Text>
+          </View>
+        </TouchableOpacity>
 
         <View style={{ flex: 1 }}>
           <View style={styles.titleRow}>
@@ -41,11 +81,11 @@ export const CompanyOverview: React.FC<CompanyOverviewProps> = ({ client, contac
           <Text style={styles.cardHeaderTitle}>📜 Tax & Registration</Text>
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>GST Number:</Text>
-            <Text style={styles.infoValHighlight}>{client.gstNumber || '27AAACA12341Z5'}</Text>
+            <Text style={styles.infoValHighlight}>{client.gstNumber || 'N/A'}</Text>
           </View>
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>PAN Number:</Text>
-            <Text style={styles.infoVal}>{client.panNumber || 'AAACA12341'}</Text>
+            <Text style={styles.infoVal}>{client.panNumber || 'N/A'}</Text>
           </View>
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Client Code:</Text>
@@ -59,7 +99,7 @@ export const CompanyOverview: React.FC<CompanyOverviewProps> = ({ client, contac
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Website:</Text>
             <Text style={[styles.infoVal, { color: Colors.roles.SALES }]}>
-              {client.website || `www.${client.clientCode.toLowerCase()}.example.com`}
+              {client.websiteUrl || client.website || 'N/A'}
             </Text>
           </View>
           <View style={styles.infoRow}>
@@ -88,7 +128,7 @@ export const CompanyOverview: React.FC<CompanyOverviewProps> = ({ client, contac
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Registered Date:</Text>
             <Text style={styles.infoVal}>
-              {client.createdAt ? new Date(client.createdAt).toLocaleDateString() : 'Sep 2026'}
+              {client.createdAt ? formatAppDate(client.createdAt) : 'Sep 2026'}
             </Text>
           </View>
         </View>
@@ -134,6 +174,28 @@ const styles = StyleSheet.create({
     color: Colors.white,
     fontSize: 24,
     fontWeight: '800',
+  },
+  profileImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 28,
+  },
+  editOverlay: {
+    position: 'absolute',
+    bottom: -2,
+    right: -2,
+    backgroundColor: Colors.white,
+    borderRadius: 12,
+    width: 22,
+    height: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: Colors.borderDark,
+    ...Shadows.sm,
+  },
+  editOverlayText: {
+    fontSize: 10,
   },
   titleRow: {
     flexDirection: 'row',

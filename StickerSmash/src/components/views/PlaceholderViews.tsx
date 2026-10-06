@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, Modal, TouchableOpacity, ScrollView, TextInput, StyleSheet, Platform, useWindowDimensions, Image } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, TextInput, StyleSheet, Platform, useWindowDimensions, Image } from 'react-native';
 import { useERP } from '../../context/ERPContext';
 import { useAuth } from '../../context/AuthContext';
 import { Colors, Spacing, Radius, Shadows } from '../../theme';
@@ -19,7 +19,8 @@ import { Client } from '../../types';
 
 // 1. Client Directory View
 export const ClientDirectoryView: React.FC<PlaceholderProps> = ({ onOpenCreateClient, onOpenCreateOrder }) => {
-  const { clients, orders, setSelectedOrder } = useERP();
+  const { clients, orders, setSelectedOrder, deleteClient } = useERP();
+  const { currentUser } = useAuth();
   const [selectedClientForModal, setSelectedClientForModal] = useState<Client | null>(null);
   const { width } = useWindowDimensions();
   const isMobile = width < 768;
@@ -88,6 +89,7 @@ export const ClientDirectoryView: React.FC<PlaceholderProps> = ({ onOpenCreateCl
               <Text style={[styles.th, { width: 180 }]}>Email</Text>
               <Text style={[styles.th, { width: 140 }]}>GST Number</Text>
               <Text style={[styles.th, { width: 160 }]}>Org Hierarchy</Text>
+              {currentUser?.role === 'SUPER_ADMIN' && <Text style={[styles.th, { width: 100 }]}>Actions</Text>}
             </View>
 
             {clients.map((c) => (
@@ -132,6 +134,22 @@ export const ClientDirectoryView: React.FC<PlaceholderProps> = ({ onOpenCreateCl
                     </Text>
                   </TouchableOpacity>
                 </View>
+
+                {currentUser?.role === 'SUPER_ADMIN' && (
+                  <View style={{ width: 100, flexDirection: 'row', gap: 8, paddingHorizontal: 12 }}>
+                    <TouchableOpacity
+                      style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)', padding: 6, borderRadius: 4 }}
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        if (window.confirm(`Are you sure you want to delete ${c.companyName}?`)) {
+                          deleteClient(c.id);
+                        }
+                      }}
+                    >
+                      <Text style={{ color: '#ef4444', fontSize: 12, fontWeight: '800' }}>🗑 Delete</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
               </TouchableOpacity>
             ))}
           </View>
@@ -164,7 +182,7 @@ export const ProjectsView: React.FC<PlaceholderProps> = () => {
                 <Text style={styles.projectSub}>PO Number: {ord.poNumber} • Required Qty: {ord.requiredQuantity} pcs</Text>
               </View>
               <View style={styles.stageTag}>
-                <Text style={styles.stageTagText}>{(ord.salesWorkflowStage || ord.currentStage || 'REQUIREMENT_RECEIVED').replace(/_/g, ' ')}</Text>
+                <Text style={styles.stageTagText}>{(ord.salesWorkflowStage || 'INITIATION').replace(/_/g, ' ')}</Text>
               </View>
             </View>
             <Text style={styles.specText}>Technical Spec: {ord.technicalRequirements || 'Standard Flange Spec'}</Text>
@@ -261,182 +279,178 @@ export const VendorsView: React.FC = () => {
       />
 
       {/* Vendor Details View Modal */}
-      <Modal visible={!!vendorToView} transparent animationType="fade" onRequestClose={() => setVendorToView(null)}>
+      {vendorToView && (
         <View style={styles.viewModalOverlay}>
           <TouchableOpacity style={styles.modalBackdropTouch} activeOpacity={1} onPress={() => setVendorToView(null)} />
-          {vendorToView && (
-            <View style={styles.viewModalCard}>
-              {/* Clean, Unclipped Header */}
-              <View style={styles.viewModalHeader}>
-                <View style={styles.viewModalHeaderTitleRow}>
-                  <Text style={styles.viewModalIcon}>🏭</Text>
-                  <View style={{ flex: 1 }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                      <Text style={styles.viewModalTitle}>Supplier Vendor Details</Text>
-                      <View style={styles.codeBadge}>
-                        <Text style={styles.codeBadgeText}>{vendorToView.vendorCode}</Text>
-                      </View>
-                      <View
-                        style={[
-                          styles.statusPill,
-                          {
-                            backgroundColor: vendorToView.status === 'ACTIVE' ? 'rgba(34, 197, 94, 0.12)' : 'rgba(239, 68, 68, 0.12)',
-                            borderColor: vendorToView.status === 'ACTIVE' ? Colors.successBright : '#ef4444',
-                          },
-                        ]}
-                      >
-                        <Text
-                          style={[
-                            styles.statusPillText,
-                            { color: vendorToView.status === 'ACTIVE' ? Colors.successBright : '#ef4444' },
-                          ]}
-                        >
-                          ● {vendorToView.status}
-                        </Text>
-                      </View>
+          <View style={styles.viewModalCard}>
+            {/* Clean, Unclipped Header */}
+            <View style={styles.viewModalHeader}>
+              <View style={styles.viewModalHeaderTitleRow}>
+                <Text style={styles.viewModalIcon}>🏭</Text>
+                <View>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <Text style={styles.viewModalTitle}>Supplier Vendor Details</Text>
+                    <View style={styles.codeBadge}>
+                      <Text style={styles.codeBadgeText}>{vendorToView.vendorCode}</Text>
                     </View>
-                    <Text style={styles.viewModalSub}>Approved ERP Raw Material & Service Provider</Text>
                   </View>
+                  <Text style={styles.viewModalSub}>Approved ERP Raw Material & Service Provider</Text>
                 </View>
-
-                <TouchableOpacity style={styles.iconCloseBtn} onPress={() => setVendorToView(null)}>
-                  <Text style={styles.iconCloseText}>✕</Text>
-                </TouchableOpacity>
               </View>
 
-              {/* Scrollable Organised Detail Cards */}
-              <ScrollView
-                style={styles.viewModalScrollView}
-                contentContainerStyle={styles.viewModalScrollContent}
-                showsVerticalScrollIndicator={true}
-              >
-                {/* Card 1: Identity & Tax Credentials */}
-                <View style={styles.detailSectionCard}>
-                  <Text style={styles.sectionCardTitle}>🏢 Supplier Identity & Tax Info</Text>
-
-                  <Text style={styles.vendorMainName}>{vendorToView.vendorName}</Text>
-                  {vendorToView.companyName ? (
-                    <Text style={styles.vendorSubCompany}>Legal Entity: {vendorToView.companyName}</Text>
-                  ) : null}
-
-                  <View style={styles.infoGridTwoCol}>
-                    <View style={styles.infoBoxItem}>
-                      <Text style={styles.infoBoxLabel}>GST Identification No.</Text>
-                      <Text style={styles.infoBoxValCode}>{vendorToView.gstNumber || 'N/A'}</Text>
-                    </View>
-
-                    <View style={styles.infoBoxItem}>
-                      <Text style={styles.infoBoxLabel}>PAN Card Number</Text>
-                      <Text style={styles.infoBoxValCode}>{vendorToView.panNumber || 'N/A'}</Text>
-                    </View>
-                  </View>
-                </View>
-
-                {/* Card 2: Contact & Communication */}
-                <View style={styles.detailSectionCard}>
-                  <Text style={styles.sectionCardTitle}>📞 Key Contact Person & Communication</Text>
-
-                  <View style={styles.infoGridTwoCol}>
-                    <View style={styles.infoItemRow}>
-                      <Text style={styles.infoFieldLabel}>Contact Person:</Text>
-                      <Text style={styles.infoFieldValBold}>{vendorToView.contactPerson || 'N/A'}</Text>
-                    </View>
-
-                    <View style={styles.infoItemRow}>
-                      <Text style={styles.infoFieldLabel}>Mobile Number:</Text>
-                      <Text style={styles.infoFieldValTeal}>{vendorToView.mobileNumber || 'N/A'}</Text>
-                    </View>
-
-                    <View style={styles.infoItemRow}>
-                      <Text style={styles.infoFieldLabel}>Alt. Phone:</Text>
-                      <Text style={styles.infoFieldVal}>{vendorToView.alternateMobile || 'N/A'}</Text>
-                    </View>
-
-                    <View style={styles.infoItemRow}>
-                      <Text style={styles.infoFieldLabel}>Email Address:</Text>
-                      <Text style={styles.infoFieldVal}>{vendorToView.email || 'N/A'}</Text>
-                    </View>
-                  </View>
-
-                  {vendorToView.website ? (
-                    <View style={[styles.infoItemRow, { marginTop: 6 }]}>
-                      <Text style={styles.infoFieldLabel}>Official Website:</Text>
-                      <Text style={[styles.infoFieldVal, { color: '#0284c7' }]}>{vendorToView.website}</Text>
-                    </View>
-                  ) : null}
-                </View>
-
-                {/* Card 3: Material Sourcing & Commercials */}
-                <View style={styles.detailSectionCard}>
-                  <Text style={styles.sectionCardTitle}>📦 Material Sourcing & Commercial Terms</Text>
-
-                  <View style={styles.materialBanner}>
-                    <Text style={styles.materialBannerLabel}>Primary Material Supplied:</Text>
-                    <Text style={styles.materialBannerVal}>{vendorToView.materialSupplied || 'N/A'}</Text>
-                  </View>
-
-                  <View style={styles.infoGridThreeCol}>
-                    <View style={styles.infoBoxItem}>
-                      <Text style={styles.infoBoxLabel}>Category</Text>
-                      <Text style={styles.infoBoxValText}>{vendorToView.vendorCategory || 'General'}</Text>
-                    </View>
-
-                    <View style={styles.infoBoxItem}>
-                      <Text style={styles.infoBoxLabel}>Payment Terms</Text>
-                      <Text style={styles.infoBoxValText}>{vendorToView.paymentTerms || 'Net 30'}</Text>
-                    </View>
-
-                    <View style={styles.infoBoxItem}>
-                      <Text style={styles.infoBoxLabel}>Lead Time</Text>
-                      <Text style={styles.infoBoxValText}>{vendorToView.leadTime || '7 Days'}</Text>
-                    </View>
-                  </View>
-                </View>
-
-                {/* Card 4: Factory Address & Remarks */}
-                <View style={styles.detailSectionCard}>
-                  <Text style={styles.sectionCardTitle}>📍 Registered Factory Address & Remarks</Text>
-
-                  <View style={{ gap: 6, marginTop: 4 }}>
-                    <Text style={styles.infoFieldLabel}>Address:</Text>
-                    <Text style={styles.addressTextVal}>
-                      {[vendorToView.addressLine1, vendorToView.addressLine2, vendorToView.city, vendorToView.state, vendorToView.pinCode, vendorToView.country]
-                        .filter(Boolean)
-                        .join(', ') || 'No address registered.'}
-                    </Text>
-
-                    {vendorToView.remarks ? (
-                      <View style={{ marginTop: 6 }}>
-                        <Text style={styles.infoFieldLabel}>Operational Remarks:</Text>
-                        <Text style={styles.remarksTextVal}>{vendorToView.remarks}</Text>
-                      </View>
-                    ) : null}
-                  </View>
-                </View>
-              </ScrollView>
-
-              {/* Footer Action Buttons */}
-              <View style={styles.viewModalFooterRow}>
-                <TouchableOpacity
-                  style={styles.editModalBtn}
-                  onPress={() => {
-                    const targetVendor = vendorToView;
-                    setVendorToView(null);
-                    setVendorToEdit(targetVendor);
-                    setCreateModalVisible(true);
-                  }}
-                >
-                  <Text style={styles.editModalBtnText}>✏️ Edit Vendor</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity style={styles.closeModalBtnNew} onPress={() => setVendorToView(null)}>
-                  <Text style={styles.closeModalBtnTextNew}>Close</Text>
-                </TouchableOpacity>
-              </View>
+              <TouchableOpacity style={styles.iconCloseBtn} onPress={() => setVendorToView(null)}>
+                <Text style={styles.iconCloseText}>✕</Text>
+              </TouchableOpacity>
             </View>
-          )}
+
+            {/* Scrollable Organised Detail Cards */}
+            <ScrollView style={{ maxHeight: 460 }} showsVerticalScrollIndicator={true} nestedScrollEnabled={true}>
+              {/* Card 1: Identity & Tax Credentials */}
+              <View style={styles.detailSectionCard}>
+                <View style={styles.sectionHeaderRow}>
+                  <Text style={styles.sectionCardTitle}>🏢 Supplier Identity & Tax Info</Text>
+                  <View
+                    style={[
+                      styles.statusPill,
+                      {
+                        backgroundColor: vendorToView.status === 'ACTIVE' ? 'rgba(34, 197, 94, 0.12)' : 'rgba(239, 68, 68, 0.12)',
+                        borderColor: vendorToView.status === 'ACTIVE' ? Colors.successBright : '#ef4444',
+                      },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.statusPillText,
+                        { color: vendorToView.status === 'ACTIVE' ? Colors.successBright : '#ef4444' },
+                      ]}
+                    >
+                      ● {vendorToView.status}
+                    </Text>
+                  </View>
+                </View>
+
+                <Text style={styles.vendorMainName}>{vendorToView.vendorName}</Text>
+                {vendorToView.companyName ? (
+                  <Text style={styles.vendorSubCompany}>Legal Entity: {vendorToView.companyName}</Text>
+                ) : null}
+
+                <View style={styles.infoGridTwoCol}>
+                  <View style={styles.infoBoxItem}>
+                    <Text style={styles.infoBoxLabel}>GST Identification No.</Text>
+                    <Text style={styles.infoBoxValCode}>{vendorToView.gstNumber || 'N/A'}</Text>
+                  </View>
+
+                  <View style={styles.infoBoxItem}>
+                    <Text style={styles.infoBoxLabel}>PAN Card Number</Text>
+                    <Text style={styles.infoBoxValCode}>{vendorToView.panNumber || 'N/A'}</Text>
+                  </View>
+                </View>
+              </View>
+
+              {/* Card 2: Contact & Communication */}
+              <View style={styles.detailSectionCard}>
+                <Text style={styles.sectionCardTitle}>📞 Key Contact Person & Communication</Text>
+
+                <View style={styles.infoGridTwoCol}>
+                  <View style={styles.infoItemRow}>
+                    <Text style={styles.infoFieldLabel}>Contact Person:</Text>
+                    <Text style={styles.infoFieldValBold}>{vendorToView.contactPerson || 'N/A'}</Text>
+                  </View>
+
+                  <View style={styles.infoItemRow}>
+                    <Text style={styles.infoFieldLabel}>Mobile Number:</Text>
+                    <Text style={styles.infoFieldValTeal}>{vendorToView.mobileNumber || 'N/A'}</Text>
+                  </View>
+
+                  <View style={styles.infoItemRow}>
+                    <Text style={styles.infoFieldLabel}>Alt. Phone:</Text>
+                    <Text style={styles.infoFieldVal}>{vendorToView.alternateMobile || 'N/A'}</Text>
+                  </View>
+
+                  <View style={styles.infoItemRow}>
+                    <Text style={styles.infoFieldLabel}>Email Address:</Text>
+                    <Text style={styles.infoFieldVal}>{vendorToView.email || 'N/A'}</Text>
+                  </View>
+                </View>
+
+                {vendorToView.website ? (
+                  <View style={[styles.infoItemRow, { marginTop: 6 }]}>
+                    <Text style={styles.infoFieldLabel}>Official Website:</Text>
+                    <Text style={[styles.infoFieldVal, { color: '#0284c7' }]}>{vendorToView.website}</Text>
+                  </View>
+                ) : null}
+              </View>
+
+              {/* Card 3: Material Sourcing & Commercials */}
+              <View style={styles.detailSectionCard}>
+                <Text style={styles.sectionCardTitle}>📦 Material Sourcing & Commercial Terms</Text>
+
+                <View style={styles.materialBanner}>
+                  <Text style={styles.materialBannerLabel}>Primary Material Supplied:</Text>
+                  <Text style={styles.materialBannerVal}>{vendorToView.materialSupplied || 'N/A'}</Text>
+                </View>
+
+                <View style={styles.infoGridThreeCol}>
+                  <View style={styles.infoBoxItem}>
+                    <Text style={styles.infoBoxLabel}>Category</Text>
+                    <Text style={styles.infoBoxValText}>{vendorToView.vendorCategory || 'General'}</Text>
+                  </View>
+
+                  <View style={styles.infoBoxItem}>
+                    <Text style={styles.infoBoxLabel}>Payment Terms</Text>
+                    <Text style={styles.infoBoxValText}>{vendorToView.paymentTerms || 'Net 30'}</Text>
+                  </View>
+
+                  <View style={styles.infoBoxItem}>
+                    <Text style={styles.infoBoxLabel}>Lead Time</Text>
+                    <Text style={styles.infoBoxValText}>{vendorToView.leadTime || '7 Days'}</Text>
+                  </View>
+                </View>
+              </View>
+
+              {/* Card 4: Factory Address & Remarks */}
+              <View style={styles.detailSectionCard}>
+                <Text style={styles.sectionCardTitle}>📍 Registered Factory Address & Remarks</Text>
+
+                <View style={{ gap: 6, marginTop: 4 }}>
+                  <Text style={styles.infoFieldLabel}>Address:</Text>
+                  <Text style={styles.addressTextVal}>
+                    {[vendorToView.addressLine1, vendorToView.addressLine2, vendorToView.city, vendorToView.state, vendorToView.pinCode, vendorToView.country]
+                      .filter(Boolean)
+                      .join(', ') || 'No address registered.'}
+                  </Text>
+
+                  {vendorToView.remarks ? (
+                    <View style={{ marginTop: 6 }}>
+                      <Text style={styles.infoFieldLabel}>Operational Remarks:</Text>
+                      <Text style={styles.remarksTextVal}>{vendorToView.remarks}</Text>
+                    </View>
+                  ) : null}
+                </View>
+              </View>
+            </ScrollView>
+
+            {/* Footer Action Buttons */}
+            <View style={styles.viewModalFooterRow}>
+              <TouchableOpacity
+                style={styles.editModalBtn}
+                onPress={() => {
+                  const targetVendor = vendorToView;
+                  setVendorToView(null);
+                  setVendorToEdit(targetVendor);
+                  setCreateModalVisible(true);
+                }}
+              >
+                <Text style={styles.editModalBtnText}>✏️ Edit Vendor</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity style={styles.closeModalBtnNew} onPress={() => setVendorToView(null)}>
+                <Text style={styles.closeModalBtnTextNew}>Close</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
         </View>
-      </Modal>
+      )}
 
       {/* Top Banner */}
       <View style={styles.topBanner}>
@@ -627,225 +641,22 @@ export { QuotationsView } from './QuotationsView';
 
 // 7. Settings View
 export const SettingsView: React.FC = () => {
-  const { users, currentUser, updateUser } = useAuth();
-  const { width } = useWindowDimensions();
-  const isMobile = width < 768;
-
-  const [searchQuery, setSearchQuery] = useState('');
-  const [successMsg, setSuccessMsg] = useState('');
-  const [errorMsg, setErrorMsg] = useState('');
-
-  const filteredUsers = users.filter((u) => {
-    // Super Admin is the governing authority and always has unmasked access; exclude from target list
-    if (u.role === 'SUPER_ADMIN') return false;
-    if (!searchQuery.trim()) return true;
-    const q = searchQuery.toLowerCase();
-    return (
-      u.name.toLowerCase().includes(q) ||
-      u.email.toLowerCase().includes(q) ||
-      u.role.toLowerCase().includes(q) ||
-      (u.username || '').toLowerCase().includes(q)
-    );
-  });
-
-  const handleToggleVisibility = async (userId: string, targetVisibility: 'FULL' | 'CODE_ONLY') => {
-    try {
-      setErrorMsg('');
-      setSuccessMsg('');
-      await updateUser(userId, { clientDataVisibility: targetVisibility });
-      const targetUser = users.find((u) => u.id === userId);
-      setSuccessMsg(
-        `Updated status for ${targetUser?.name || 'User'} to ${
-          targetVisibility === 'FULL' ? 'UNMASKED (Full Client Details Visible)' : 'MASKED (Client Code Only Visible)'
-        }`
-      );
-      setTimeout(() => setSuccessMsg(''), 3000);
-    } catch (err: any) {
-      setErrorMsg(err.message || 'Failed to update user client visibility');
-    }
-  };
-
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      {/* Top Banner */}
-      <View style={[styles.topBanner, isMobile && styles.topBannerMobile]}>
+      <View style={styles.topBanner}>
         <View>
           <Text style={styles.title}>ERP System & Data Security Settings</Text>
-          <Text style={styles.subTitle}>
-            Configure plant security parameters, per-user client data visibility (Mask vs Unmask), and privacy rules.
-          </Text>
+          <Text style={styles.subTitle}>Configure plant security parameters, client data visibility, and system rules.</Text>
         </View>
       </View>
 
-      {/* Notice Banners */}
-      {successMsg ? (
-        <View style={{ backgroundColor: 'rgba(34, 197, 94, 0.15)', borderColor: '#22c55e', borderWidth: 1, padding: 12, borderRadius: 8, marginBottom: 12 }}>
-          <Text style={{ color: '#22c55e', fontWeight: '800', fontSize: 12 }}>✓ {successMsg}</Text>
-        </View>
-      ) : null}
-
-      {errorMsg ? (
-        <View style={{ backgroundColor: 'rgba(239, 68, 68, 0.15)', borderColor: '#ef4444', borderWidth: 1, padding: 12, borderRadius: 8, marginBottom: 12 }}>
-          <Text style={{ color: '#ef4444', fontWeight: '800', fontSize: 12 }}>✕ {errorMsg}</Text>
-        </View>
-      ) : null}
-
-      {/* Per-User Client Data Visibility Authority Control */}
       <View style={styles.card}>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, flexWrap: 'wrap', gap: 8 }}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.cardTitle}>🛡️ Per-User Client Data Visibility (Mask / Unmask Authority)</Text>
-            <Text style={{ color: Colors.accentTeal, fontSize: 11, marginTop: 2 }}>
-              Super Admin Authority: Select "Mask" (Only Client Code visible) or "Unmask" (Client Code & Full Client Info visible) per user.
-            </Text>
-          </View>
-          <View style={{ width: isMobile ? '100%' : 260 }}>
-            <TextInput
-              style={{
-                backgroundColor: Colors.inputBg,
-                borderWidth: 1,
-                borderColor: Colors.borderDark,
-                borderRadius: 8,
-                paddingHorizontal: 10,
-                paddingVertical: 6,
-                color: Colors.textLight,
-                fontSize: 12,
-              }}
-              placeholder="🔍 Search user by name, role..."
-              placeholderTextColor="#94a3b8"
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-            />
-          </View>
+        <Text style={styles.cardTitle}>System Configuration</Text>
+        <View style={styles.settingItem}>
+          <Text style={styles.settingTitle}>Strict Client Data Masking Policy</Text>
+          <Text style={styles.settingSub}>Enforces masking of client names & contacts for Purchase, Production, Quality, and Dispatch roles.</Text>
+          <View style={styles.badgeActive}><Text style={styles.badgeText}>ENABLED (STRICT)</Text></View>
         </View>
-
-        {/* User Visibility Table */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          <View style={styles.table}>
-            <View style={styles.thRow}>
-              <Text style={[styles.th, { width: 180 }]}>User / Account</Text>
-              <Text style={[styles.th, { width: 120 }]}>Department Role</Text>
-              <Text style={[styles.th, { width: 220 }]}>Current Data Access</Text>
-              <Text style={[styles.th, { width: 260 }]}>Super Admin Authority Switch</Text>
-            </View>
-
-            {filteredUsers.map((u) => {
-              // Default fallback: Super Admin / Admin / Sales -> FULL, rest -> CODE_ONLY
-              const currentVisibility = u.clientDataVisibility
-                ? u.clientDataVisibility
-                : ['SUPER_ADMIN', 'ADMIN', 'SALES'].includes(u.role)
-                ? 'FULL'
-                : 'CODE_ONLY';
-
-              const isUnmasked = currentVisibility === 'FULL';
-
-              return (
-                <View key={u.id} style={styles.trRow}>
-                  {/* User Name & Email */}
-                  <View style={{ width: 180 }}>
-                    <Text style={{ color: Colors.textLight, fontWeight: '800', fontSize: 13 }} numberOfLines={1}>
-                      {u.name}
-                    </Text>
-                    <Text style={{ color: '#94a3b8', fontSize: 10 }} numberOfLines={1}>
-                      {u.email}
-                    </Text>
-                  </View>
-
-                  {/* Role Badge */}
-                  <View style={{ width: 120 }}>
-                    <View
-                      style={{
-                        backgroundColor: 'rgba(56, 189, 248, 0.12)',
-                        borderWidth: 1,
-                        borderColor: '#38bdf8',
-                        paddingHorizontal: 6,
-                        paddingVertical: 2,
-                        borderRadius: 4,
-                        alignSelf: 'flex-start',
-                      }}
-                    >
-                      <Text style={{ color: '#38bdf8', fontSize: 10, fontWeight: '800' }}>
-                        {u.role.replace(/_/g, ' ')}
-                      </Text>
-                    </View>
-                  </View>
-
-                  {/* Visibility Status Badge */}
-                  <View style={{ width: 220 }}>
-                    {isUnmasked ? (
-                      <View
-                        style={{
-                          backgroundColor: 'rgba(34, 197, 94, 0.15)',
-                          borderColor: '#22c55e',
-                          borderWidth: 1,
-                          paddingHorizontal: 8,
-                          paddingVertical: 4,
-                          borderRadius: 6,
-                          alignSelf: 'flex-start',
-                        }}
-                      >
-                        <Text style={{ color: '#22c55e', fontSize: 10, fontWeight: '800' }}>
-                          🟢 UNMASKED (Full Info Visible)
-                        </Text>
-                      </View>
-                    ) : (
-                      <View
-                        style={{
-                          backgroundColor: 'rgba(249, 115, 22, 0.15)',
-                          borderColor: '#f97316',
-                          borderWidth: 1,
-                          paddingHorizontal: 8,
-                          paddingVertical: 4,
-                          borderRadius: 6,
-                          alignSelf: 'flex-start',
-                        }}
-                      >
-                        <Text style={{ color: '#f97316', fontSize: 10, fontWeight: '800' }}>
-                          🔒 MASKED (Client Code Only)
-                        </Text>
-                      </View>
-                    )}
-                  </View>
-
-                  {/* Toggle Authority Control Buttons */}
-                  <View style={{ width: 260, flexDirection: 'row', gap: 6 }}>
-                    <TouchableOpacity
-                      style={{
-                        backgroundColor: isUnmasked ? '#22c55e' : Colors.inputBg,
-                        borderWidth: 1,
-                        borderColor: isUnmasked ? '#22c55e' : Colors.borderDark,
-                        paddingHorizontal: 12,
-                        paddingVertical: 6,
-                        borderRadius: 6,
-                      }}
-                      onPress={() => handleToggleVisibility(u.id, 'FULL')}
-                    >
-                      <Text style={{ color: isUnmasked ? '#ffffff' : Colors.textLight, fontSize: 11, fontWeight: '800' }}>
-                        🔓 Unmask
-                      </Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                      style={{
-                        backgroundColor: !isUnmasked ? '#f97316' : Colors.inputBg,
-                        borderWidth: 1,
-                        borderColor: !isUnmasked ? '#f97316' : Colors.borderDark,
-                        paddingHorizontal: 12,
-                        paddingVertical: 6,
-                        borderRadius: 6,
-                      }}
-                      onPress={() => handleToggleVisibility(u.id, 'CODE_ONLY')}
-                    >
-                      <Text style={{ color: !isUnmasked ? '#ffffff' : Colors.textLight, fontSize: 11, fontWeight: '800' }}>
-                        🔒 Mask
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              );
-            })}
-          </View>
-        </ScrollView>
       </View>
     </ScrollView>
   );
@@ -1122,37 +933,27 @@ const styles = StyleSheet.create({
     bottom: 0,
   },
   viewModalOverlay: {
-    flex: 1,
-    position: Platform.OS === 'web' ? ('fixed' as any) : 'absolute',
+    position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(15, 23, 42, 0.65)',
+    backgroundColor: 'rgba(15, 23, 42, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
-    zIndex: 99999,
+    zIndex: 9999,
     padding: 16,
   },
   viewModalCard: {
     width: '100%',
-    maxWidth: 640,
-    maxHeight: '85%',
+    maxWidth: 580,
+    maxHeight: '90%',
     backgroundColor: '#ffffff',
     borderRadius: Radius.xl,
-    padding: 22,
+    padding: 20,
     borderWidth: 1,
-    borderColor: '#cbd5e1',
-    flexDirection: 'column',
+    borderColor: '#e2e8f0',
     ...Shadows.md,
-    elevation: 10,
-  },
-  viewModalScrollView: {
-    flexShrink: 1,
-    marginVertical: 10,
-  },
-  viewModalScrollContent: {
-    paddingBottom: 10,
   },
   viewModalHeader: {
     flexDirection: 'row',

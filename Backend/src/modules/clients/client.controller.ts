@@ -4,7 +4,7 @@ import * as clientService from './client.service';
 
 export const handleCreateClient = async (req: AuthRequest, res: Response) => {
   try {
-    const { companyName, contactName, contactNo, email, address, gstNumber } = req.body;
+    const { companyName, contactName, contactNo, email, address, gstNumber, panNumber, websiteUrl } = req.body;
     if (!companyName || !contactNo) {
       return res.status(400).json({ error: 'Company name and contact number are required' });
     }
@@ -17,6 +17,8 @@ export const handleCreateClient = async (req: AuthRequest, res: Response) => {
       email,
       address,
       gstNumber,
+      panNumber,
+      websiteUrl,
       createdById,
     });
 
@@ -31,8 +33,28 @@ export const handleListClients = async (req: AuthRequest, res: Response) => {
     const clients = await clientService.listClients();
     return res.status(200).json({ clients });
   } catch (err: any) {
-    console.error('Error in handleListClients:', err);
+    console.error('List clients error:', err);
     return res.status(500).json({ error: err.message || 'Failed to fetch clients' });
+  }
+};
+
+export const handleUpdateClient = async (req: AuthRequest, res: Response) => {
+  try {
+    const id = req.params.id as string;
+    const client = await clientService.updateClient(id, req.body);
+    return res.status(200).json({ message: 'Client updated successfully', client });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message || 'Failed to update client' });
+  }
+};
+
+export const handleDeleteClient = async (req: AuthRequest, res: Response) => {
+  try {
+    const id = req.params.id as string;
+    await clientService.deleteClient(id);
+    return res.status(200).json({ message: 'Client deleted successfully' });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message || 'Failed to delete client' });
   }
 };
 
@@ -45,7 +67,7 @@ export const handleUploadProfileImage = async (req: AuthRequest, res: Response) 
       return res.status(400).json({ error: 'No image file uploaded' });
     }
 
-    const cloudinaryUrl = await uploadToCloudinary(req.file.buffer, req.file.originalname);
+    const cloudinaryUrl = await uploadToCloudinary(req.file.buffer, req.file.originalname, 'image');
     
     // Save to database
     const updatedClient = await clientService.updateClientProfileImage(id, cloudinaryUrl);
@@ -56,8 +78,28 @@ export const handleUploadProfileImage = async (req: AuthRequest, res: Response) 
       client: updatedClient 
     });
   } catch (err: any) {
-    console.error('Error in handleUploadProfileImage:', err);
     return res.status(500).json({ error: err.message || 'Failed to upload image' });
+  }
+};
+
+export const handleUploadPrimaryContactProfileImage = async (req: AuthRequest, res: Response) => {
+  try {
+    const clientId = req.params.id as string;
+    if (!req.file) {
+      return res.status(400).json({ error: 'No image file uploaded' });
+    }
+
+    const cloudinaryUrl = await uploadToCloudinary(req.file.buffer, req.file.originalname, 'image');
+    
+    // Save to database
+    await clientService.updatePrimaryContactProfileImage(clientId, cloudinaryUrl);
+
+    return res.status(200).json({ 
+      message: 'Primary contact image uploaded successfully', 
+      profileImage: cloudinaryUrl,
+    });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message || 'Failed to upload primary contact image' });
   }
 };
 
@@ -72,7 +114,6 @@ export const handleCreateCompanyContact = async (req: AuthRequest, res: Response
     });
     return res.status(201).json({ message: 'Contact created', contact });
   } catch (err: any) {
-    console.error('Error in handleCreateCompanyContact:', err);
     return res.status(400).json({ error: err.message || 'Failed to create contact' });
   }
 };
@@ -82,7 +123,7 @@ export const handleListCompanyContacts = async (req: AuthRequest, res: Response)
     const contacts = await clientService.listCompanyContacts();
     return res.status(200).json({ contacts });
   } catch (err: any) {
-    console.error('Error in handleListCompanyContacts:', err);
+    console.error('List contacts error:', err);
     return res.status(500).json({ error: err.message || 'Failed to list contacts' });
   }
 };
@@ -94,7 +135,7 @@ export const handleUploadContactProfileImage = async (req: AuthRequest, res: Res
       return res.status(400).json({ error: 'No image file uploaded' });
     }
 
-    const cloudinaryUrl = await uploadToCloudinary(req.file.buffer, req.file.originalname);
+    const cloudinaryUrl = await uploadToCloudinary(req.file.buffer, req.file.originalname, 'image');
     const updatedContact = await clientService.updateCompanyContactProfileImage(id, cloudinaryUrl);
 
     return res.status(200).json({ 

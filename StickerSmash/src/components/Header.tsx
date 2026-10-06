@@ -1,4 +1,5 @@
 import React from 'react';
+import { formatAppDate } from '../utils/dateFormatter';
 import { View, Text, TouchableOpacity, StyleSheet, useWindowDimensions, Platform } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import { Role } from '../types';
@@ -16,11 +17,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenCalendar, onToggleSidebar 
 
   if (!currentUser) return null;
 
-  const todayStr = new Date().toLocaleDateString('en-US', {
-    weekday: 'short',
-    month: 'short',
-    day: 'numeric',
-  });
+  const todayStr = formatAppDate(new Date());
 
   const getRoleBadgeColor = (role: Role) => {
     return (Colors.roles as any)[role] || Colors.accentTeal;

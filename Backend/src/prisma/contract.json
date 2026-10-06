@@ -4,10 +4,6 @@
   "target": "postgres",
   "profileHash": "3916f444a8a17ad749191acf9e08dad97d1a327b88c2f1d45d12f240296aa8b2",
   "roots": {
-    "CalendarEvent": {
-      "model": "CalendarEvent",
-      "namespace": "public"
-    },
     "Client": {
       "model": "Client",
       "namespace": "public"
@@ -32,14 +28,6 @@
       "model": "OrderItem",
       "namespace": "public"
     },
-    "Quotation": {
-      "model": "Quotation",
-      "namespace": "public"
-    },
-    "QuotationFollowUp": {
-      "model": "QuotationFollowUp",
-      "namespace": "public"
-    },
     "StageLog": {
       "model": "StageLog",
       "namespace": "public"
@@ -50,10 +38,6 @@
     },
     "User": {
       "model": "User",
-      "namespace": "public"
-    },
-    "Vendor": {
-      "model": "Vendor",
       "namespace": "public"
     }
   },
@@ -175,90 +159,6 @@
           }
         },
         "models": {
-          "CalendarEvent": {
-            "fields": {
-              "createdAt": {
-                "nullable": false,
-                "type": {
-                  "codecId": "pg/timestamptz-string@1",
-                  "kind": "scalar"
-                }
-              },
-              "createdByName": {
-                "nullable": true,
-                "type": {
-                  "codecId": "pg/text@1",
-                  "kind": "scalar"
-                }
-              },
-              "description": {
-                "nullable": true,
-                "type": {
-                  "codecId": "pg/text@1",
-                  "kind": "scalar"
-                }
-              },
-              "eventDate": {
-                "nullable": false,
-                "type": {
-                  "codecId": "pg/text@1",
-                  "kind": "scalar"
-                }
-              },
-              "id": {
-                "nullable": false,
-                "type": {
-                  "codecId": "sql/char@1",
-                  "kind": "scalar",
-                  "typeParams": {
-                    "length": 36
-                  }
-                }
-              },
-              "title": {
-                "nullable": false,
-                "type": {
-                  "codecId": "pg/text@1",
-                  "kind": "scalar"
-                }
-              },
-              "type": {
-                "nullable": false,
-                "type": {
-                  "codecId": "pg/text@1",
-                  "kind": "scalar"
-                }
-              }
-            },
-            "relations": {},
-            "storage": {
-              "fields": {
-                "createdAt": {
-                  "column": "createdAt"
-                },
-                "createdByName": {
-                  "column": "createdByName"
-                },
-                "description": {
-                  "column": "description"
-                },
-                "eventDate": {
-                  "column": "eventDate"
-                },
-                "id": {
-                  "column": "id"
-                },
-                "title": {
-                  "column": "title"
-                },
-                "type": {
-                  "column": "type"
-                }
-              },
-              "namespaceId": "public",
-              "table": "CalendarEvent"
-            }
-          },
           "Client": {
             "fields": {
               "address": {
@@ -351,6 +251,13 @@
                   "kind": "scalar"
                 }
               },
+              "panNumber": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
               "profileImage": {
                 "nullable": true,
                 "type": {
@@ -359,6 +266,13 @@
                 }
               },
               "remarks": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "websiteUrl": {
                 "nullable": true,
                 "type": {
                   "codecId": "pg/text@1",
@@ -452,11 +366,17 @@
                 "isDeleted": {
                   "column": "isDeleted"
                 },
+                "panNumber": {
+                  "column": "panNumber"
+                },
                 "profileImage": {
                   "column": "profileImage"
                 },
                 "remarks": {
                   "column": "remarks"
+                },
+                "websiteUrl": {
+                  "column": "websiteUrl"
                 }
               },
               "namespaceId": "public",
@@ -567,7 +487,7 @@
               }
             },
             "relations": {
-              "company": {
+              "client": {
                 "cardinality": "N:1",
                 "nullable": false,
                 "on": {
@@ -855,13 +775,6 @@
                   "kind": "scalar"
                 }
               },
-              "clientCode": {
-                "nullable": true,
-                "type": {
-                  "codecId": "pg/text@1",
-                  "kind": "scalar"
-                }
-              },
               "clientId": {
                 "nullable": false,
                 "type": {
@@ -870,13 +783,6 @@
                   "typeParams": {
                     "length": 36
                   }
-                }
-              },
-              "clientName": {
-                "nullable": true,
-                "type": {
-                  "codecId": "pg/text@1",
-                  "kind": "scalar"
                 }
               },
               "createdAt": {
@@ -909,34 +815,6 @@
                   "plane": "domain"
                 }
               },
-              "dispatchNotes": {
-                "nullable": true,
-                "type": {
-                  "codecId": "pg/text@1",
-                  "kind": "scalar"
-                }
-              },
-              "dispatchQuantity": {
-                "nullable": false,
-                "type": {
-                  "codecId": "pg/int4@1",
-                  "kind": "scalar"
-                }
-              },
-              "dispatchRequired": {
-                "nullable": false,
-                "type": {
-                  "codecId": "pg/bool@1",
-                  "kind": "scalar"
-                }
-              },
-              "dispatchStatus": {
-                "nullable": false,
-                "type": {
-                  "codecId": "pg/text@1",
-                  "kind": "scalar"
-                }
-              },
               "id": {
                 "nullable": false,
                 "type": {
@@ -954,27 +832,6 @@
                   "kind": "scalar"
                 }
               },
-              "logisticsEntry": {
-                "nullable": true,
-                "type": {
-                  "codecId": "pg/text@1",
-                  "kind": "scalar"
-                }
-              },
-              "materialRequirements": {
-                "nullable": true,
-                "type": {
-                  "codecId": "pg/text@1",
-                  "kind": "scalar"
-                }
-              },
-              "orderNumber": {
-                "nullable": true,
-                "type": {
-                  "codecId": "pg/text@1",
-                  "kind": "scalar"
-                }
-              },
               "poNumber": {
                 "nullable": false,
                 "type": {
@@ -982,126 +839,7 @@
                   "kind": "scalar"
                 }
               },
-              "procurementNotes": {
-                "nullable": true,
-                "type": {
-                  "codecId": "pg/text@1",
-                  "kind": "scalar"
-                }
-              },
-              "productionQuantity": {
-                "nullable": false,
-                "type": {
-                  "codecId": "pg/int4@1",
-                  "kind": "scalar"
-                }
-              },
-              "productionRequired": {
-                "nullable": false,
-                "type": {
-                  "codecId": "pg/bool@1",
-                  "kind": "scalar"
-                }
-              },
-              "productionStatus": {
-                "nullable": false,
-                "type": {
-                  "codecId": "pg/text@1",
-                  "kind": "scalar"
-                }
-              },
-              "purchaseQuantity": {
-                "nullable": false,
-                "type": {
-                  "codecId": "pg/int4@1",
-                  "kind": "scalar"
-                }
-              },
-              "purchaseRequired": {
-                "nullable": false,
-                "type": {
-                  "codecId": "pg/bool@1",
-                  "kind": "scalar"
-                }
-              },
-              "purchaseStatus": {
-                "nullable": false,
-                "type": {
-                  "codecId": "pg/text@1",
-                  "kind": "scalar"
-                }
-              },
-              "qcFailedQuantity": {
-                "nullable": false,
-                "type": {
-                  "codecId": "pg/int4@1",
-                  "kind": "scalar"
-                }
-              },
-              "qcPassedQuantity": {
-                "nullable": false,
-                "type": {
-                  "codecId": "pg/int4@1",
-                  "kind": "scalar"
-                }
-              },
-              "qcQuantity": {
-                "nullable": false,
-                "type": {
-                  "codecId": "pg/int4@1",
-                  "kind": "scalar"
-                }
-              },
-              "qcRemarks": {
-                "nullable": true,
-                "type": {
-                  "codecId": "pg/text@1",
-                  "kind": "scalar"
-                }
-              },
-              "qcResult": {
-                "nullable": true,
-                "type": {
-                  "codecId": "pg/text@1",
-                  "kind": "scalar"
-                }
-              },
-              "qualityStatus": {
-                "nullable": false,
-                "type": {
-                  "codecId": "pg/text@1",
-                  "kind": "scalar"
-                }
-              },
-              "qualityTestingRequired": {
-                "nullable": false,
-                "type": {
-                  "codecId": "pg/bool@1",
-                  "kind": "scalar"
-                }
-              },
-              "requiredQuantity": {
-                "nullable": false,
-                "type": {
-                  "codecId": "pg/int4@1",
-                  "kind": "scalar"
-                }
-              },
               "requirements": {
-                "nullable": true,
-                "type": {
-                  "codecId": "pg/text@1",
-                  "kind": "scalar"
-                }
-              },
-              "reworkQuantity": {
-                "nullable": false,
-                "type": {
-                  "codecId": "pg/int4@1",
-                  "kind": "scalar"
-                }
-              },
-              "shopFloorNotes": {
                 "nullable": true,
                 "type": {
                   "codecId": "pg/text@1",
@@ -1115,38 +853,10 @@
                   "kind": "scalar"
                 }
               },
-              "technicalRequirements": {
-                "nullable": true,
-                "type": {
-                  "codecId": "pg/text@1",
-                  "kind": "scalar"
-                }
-              },
-              "transportRef": {
-                "nullable": true,
-                "type": {
-                  "codecId": "pg/text@1",
-                  "kind": "scalar"
-                }
-              },
-              "unit": {
-                "nullable": false,
-                "type": {
-                  "codecId": "pg/text@1",
-                  "kind": "scalar"
-                }
-              },
               "updatedAt": {
                 "nullable": false,
                 "type": {
                   "codecId": "pg/timestamptz-string@1",
-                  "kind": "scalar"
-                }
-              },
-              "vendorSelected": {
-                "nullable": true,
-                "type": {
-                  "codecId": "pg/text@1",
                   "kind": "scalar"
                 }
               }
@@ -1265,14 +975,8 @@
                 "budget": {
                   "column": "budget"
                 },
-                "clientCode": {
-                  "column": "clientCode"
-                },
                 "clientId": {
                   "column": "clientId"
-                },
-                "clientName": {
-                  "column": "clientName"
                 },
                 "createdAt": {
                   "column": "createdAt"
@@ -1283,107 +987,23 @@
                 "currentStage": {
                   "column": "currentStage"
                 },
-                "dispatchNotes": {
-                  "column": "dispatchNotes"
-                },
-                "dispatchQuantity": {
-                  "column": "dispatchQuantity"
-                },
-                "dispatchRequired": {
-                  "column": "dispatchRequired"
-                },
-                "dispatchStatus": {
-                  "column": "dispatchStatus"
-                },
                 "id": {
                   "column": "id"
                 },
                 "isDeleted": {
                   "column": "isDeleted"
                 },
-                "logisticsEntry": {
-                  "column": "logisticsEntry"
-                },
-                "materialRequirements": {
-                  "column": "materialRequirements"
-                },
-                "orderNumber": {
-                  "column": "orderNumber"
-                },
                 "poNumber": {
                   "column": "poNumber"
-                },
-                "procurementNotes": {
-                  "column": "procurementNotes"
-                },
-                "productionQuantity": {
-                  "column": "productionQuantity"
-                },
-                "productionRequired": {
-                  "column": "productionRequired"
-                },
-                "productionStatus": {
-                  "column": "productionStatus"
-                },
-                "purchaseQuantity": {
-                  "column": "purchaseQuantity"
-                },
-                "purchaseRequired": {
-                  "column": "purchaseRequired"
-                },
-                "purchaseStatus": {
-                  "column": "purchaseStatus"
-                },
-                "qcFailedQuantity": {
-                  "column": "qcFailedQuantity"
-                },
-                "qcPassedQuantity": {
-                  "column": "qcPassedQuantity"
-                },
-                "qcQuantity": {
-                  "column": "qcQuantity"
-                },
-                "qcRemarks": {
-                  "column": "qcRemarks"
-                },
-                "qcResult": {
-                  "column": "qcResult"
-                },
-                "qualityStatus": {
-                  "column": "qualityStatus"
-                },
-                "qualityTestingRequired": {
-                  "column": "qualityTestingRequired"
-                },
-                "requiredQuantity": {
-                  "column": "requiredQuantity"
                 },
                 "requirements": {
                   "column": "requirements"
                 },
-                "reworkQuantity": {
-                  "column": "reworkQuantity"
-                },
-                "shopFloorNotes": {
-                  "column": "shopFloorNotes"
-                },
                 "stageSequence": {
                   "column": "stageSequence"
                 },
-                "technicalRequirements": {
-                  "column": "technicalRequirements"
-                },
-                "transportRef": {
-                  "column": "transportRef"
-                },
-                "unit": {
-                  "column": "unit"
-                },
                 "updatedAt": {
                   "column": "updatedAt"
-                },
-                "vendorSelected": {
-                  "column": "vendorSelected"
                 }
               },
               "namespaceId": "public",
@@ -1482,486 +1102,6 @@
               },
               "namespaceId": "public",
               "table": "OrderItem"
-            }
-          },
-          "Quotation": {
-            "fields": {
-              "clientCode": {
-                "nullable": false,
-                "type": {
-                  "codecId": "pg/text@1",
-                  "kind": "scalar"
-                }
-              },
-              "clientId": {
-                "nullable": true,
-                "type": {
-                  "codecId": "sql/char@1",
-                  "kind": "scalar",
-                  "typeParams": {
-                    "length": 36
-                  }
-                }
-              },
-              "companyName": {
-                "nullable": false,
-                "type": {
-                  "codecId": "pg/text@1",
-                  "kind": "scalar"
-                }
-              },
-              "competitorName": {
-                "nullable": true,
-                "type": {
-                  "codecId": "pg/text@1",
-                  "kind": "scalar"
-                }
-              },
-              "contactPerson": {
-                "nullable": false,
-                "type": {
-                  "codecId": "pg/text@1",
-                  "kind": "scalar"
-                }
-              },
-              "convertedOrderId": {
-                "nullable": true,
-                "type": {
-                  "codecId": "pg/text@1",
-                  "kind": "scalar"
-                }
-              },
-              "convertedOrderNumber": {
-                "nullable": true,
-                "type": {
-                  "codecId": "pg/text@1",
-                  "kind": "scalar"
-                }
-              },
-              "convertedOrderValue": {
-                "nullable": true,
-                "type": {
-                  "codecId": "pg/int8@1",
-                  "kind": "scalar"
-                }
-              },
-              "createdAt": {
-                "nullable": false,
-                "type": {
-                  "codecId": "pg/timestamptz-string@1",
-                  "kind": "scalar"
-                }
-              },
-              "email": {
-                "nullable": false,
-                "type": {
-                  "codecId": "pg/text@1",
-                  "kind": "scalar"
-                }
-              },
-              "expectedClosureDate": {
-                "nullable": true,
-                "type": {
-                  "codecId": "pg/text@1",
-                  "kind": "scalar"
-                }
-              },
-              "expectedOrderValue": {
-                "nullable": true,
-                "type": {
-                  "codecId": "pg/int8@1",
-                  "kind": "scalar"
-                }
-              },
-              "followUpDate": {
-                "nullable": true,
-                "type": {
-                  "codecId": "pg/text@1",
-                  "kind": "scalar"
-                }
-              },
-              "id": {
-                "nullable": false,
-                "type": {
-                  "codecId": "sql/char@1",
-                  "kind": "scalar",
-                  "typeParams": {
-                    "length": 36
-                  }
-                }
-              },
-              "inquiryRef": {
-                "nullable": true,
-                "type": {
-                  "codecId": "pg/text@1",
-                  "kind": "scalar"
-                }
-              },
-              "isDeleted": {
-                "nullable": false,
-                "type": {
-                  "codecId": "pg/int4@1",
-                  "kind": "scalar"
-                }
-              },
-              "isLocked": {
-                "nullable": false,
-                "type": {
-                  "codecId": "pg/bool@1",
-                  "kind": "scalar"
-                }
-              },
-              "lostDate": {
-                "nullable": true,
-                "type": {
-                  "codecId": "pg/text@1",
-                  "kind": "scalar"
-                }
-              },
-              "lostReason": {
-                "nullable": true,
-                "type": {
-                  "codecId": "pg/text@1",
-                  "kind": "scalar"
-                }
-              },
-              "lostRemarks": {
-                "nullable": true,
-                "type": {
-                  "codecId": "pg/text@1",
-                  "kind": "scalar"
-                }
-              },
-              "lostValue": {
-                "nullable": true,
-                "type": {
-                  "codecId": "pg/int8@1",
-                  "kind": "scalar"
-                }
-              },
-              "mobileNumber": {
-                "nullable": false,
-                "type": {
-                  "codecId": "pg/text@1",
-                  "kind": "scalar"
-                }
-              },
-              "negotiationDate": {
-                "nullable": true,
-                "type": {
-                  "codecId": "pg/text@1",
-                  "kind": "scalar"
-                }
-              },
-              "quotationAmount": {
-                "nullable": false,
-                "type": {
-                  "codecId": "pg/int8@1",
-                  "kind": "scalar"
-                }
-              },
-              "quotationDate": {
-                "nullable": false,
-                "type": {
-                  "codecId": "pg/timestamptz-string@1",
-                  "kind": "scalar"
-                }
-              },
-              "quotationNumber": {
-                "nullable": false,
-                "type": {
-                  "codecId": "pg/text@1",
-                  "kind": "scalar"
-                }
-              },
-              "remarks": {
-                "nullable": true,
-                "type": {
-                  "codecId": "pg/text@1",
-                  "kind": "scalar"
-                }
-              },
-              "salesExecutive": {
-                "nullable": false,
-                "type": {
-                  "codecId": "pg/text@1",
-                  "kind": "scalar"
-                }
-              },
-              "salesExecutiveUserId": {
-                "nullable": true,
-                "type": {
-                  "codecId": "sql/char@1",
-                  "kind": "scalar",
-                  "typeParams": {
-                    "length": 36
-                  }
-                }
-              },
-              "sentAt": {
-                "nullable": true,
-                "type": {
-                  "codecId": "pg/text@1",
-                  "kind": "scalar"
-                }
-              },
-              "sentNotes": {
-                "nullable": true,
-                "type": {
-                  "codecId": "pg/text@1",
-                  "kind": "scalar"
-                }
-              },
-              "sentVia": {
-                "nullable": true,
-                "type": {
-                  "codecId": "pg/text@1",
-                  "kind": "scalar"
-                }
-              },
-              "status": {
-                "nullable": false,
-                "type": {
-                  "codecId": "pg/text@1",
-                  "kind": "scalar"
-                }
-              },
-              "updatedAt": {
-                "nullable": false,
-                "type": {
-                  "codecId": "pg/timestamptz-string@1",
-                  "kind": "scalar"
-                }
-              }
-            },
-            "relations": {
-              "followUps": {
-                "cardinality": "1:N",
-                "on": {
-                  "localFields": [
-                    "id"
-                  ],
-                  "targetFields": [
-                    "quotationId"
-                  ]
-                },
-                "to": {
-                  "model": "QuotationFollowUp",
-                  "namespace": "public"
-                }
-              }
-            },
-            "storage": {
-              "fields": {
-                "clientCode": {
-                  "column": "clientCode"
-                },
-                "clientId": {
-                  "column": "clientId"
-                },
-                "companyName": {
-                  "column": "companyName"
-                },
-                "competitorName": {
-                  "column": "competitorName"
-                },
-                "contactPerson": {
-                  "column": "contactPerson"
-                },
-                "convertedOrderId": {
-                  "column": "convertedOrderId"
-                },
-                "convertedOrderNumber": {
-                  "column": "convertedOrderNumber"
-                },
-                "convertedOrderValue": {
-                  "column": "convertedOrderValue"
-                },
-                "createdAt": {
-                  "column": "createdAt"
-                },
-                "email": {
-                  "column": "email"
-                },
-                "expectedClosureDate": {
-                  "column": "expectedClosureDate"
-                },
-                "expectedOrderValue": {
-                  "column": "expectedOrderValue"
-                },
-                "followUpDate": {
-                  "column": "followUpDate"
-                },
-                "id": {
-                  "column": "id"
-                },
-                "inquiryRef": {
-                  "column": "inquiryRef"
-                },
-                "isDeleted": {
-                  "column": "isDeleted"
-                },
-                "isLocked": {
-                  "column": "isLocked"
-                },
-                "lostDate": {
-                  "column": "lostDate"
-                },
-                "lostReason": {
-                  "column": "lostReason"
-                },
-                "lostRemarks": {
-                  "column": "lostRemarks"
-                },
-                "lostValue": {
-                  "column": "lostValue"
-                },
-                "mobileNumber": {
-                  "column": "mobileNumber"
-                },
-                "negotiationDate": {
-                  "column": "negotiationDate"
-                },
-                "quotationAmount": {
-                  "column": "quotationAmount"
-                },
-                "quotationDate": {
-                  "column": "quotationDate"
-                },
-                "quotationNumber": {
-                  "column": "quotationNumber"
-                },
-                "remarks": {
-                  "column": "remarks"
-                },
-                "salesExecutive": {
-                  "column": "salesExecutive"
-                },
-                "salesExecutiveUserId": {
-                  "column": "salesExecutiveUserId"
-                },
-                "sentAt": {
-                  "column": "sentAt"
-                },
-                "sentNotes": {
-                  "column": "sentNotes"
-                },
-                "sentVia": {
-                  "column": "sentVia"
-                },
-                "status": {
-                  "column": "status"
-                },
-                "updatedAt": {
-                  "column": "updatedAt"
-                }
-              },
-              "namespaceId": "public",
-              "table": "Quotation"
-            }
-          },
-          "QuotationFollowUp": {
-            "fields": {
-              "createdAt": {
-                "nullable": false,
-                "type": {
-                  "codecId": "pg/timestamptz-string@1",
-                  "kind": "scalar"
-                }
-              },
-              "createdByName": {
-                "nullable": false,
-                "type": {
-                  "codecId": "pg/text@1",
-                  "kind": "scalar"
-                }
-              },
-              "followUpDate": {
-                "nullable": false,
-                "type": {
-                  "codecId": "pg/text@1",
-                  "kind": "scalar"
-                }
-              },
-              "id": {
-                "nullable": false,
-                "type": {
-                  "codecId": "sql/char@1",
-                  "kind": "scalar",
-                  "typeParams": {
-                    "length": 36
-                  }
-                }
-              },
-              "notes": {
-                "nullable": false,
-                "type": {
-                  "codecId": "pg/text@1",
-                  "kind": "scalar"
-                }
-              },
-              "quotationId": {
-                "nullable": false,
-                "type": {
-                  "codecId": "sql/char@1",
-                  "kind": "scalar",
-                  "typeParams": {
-                    "length": 36
-                  }
-                }
-              },
-              "status": {
-                "nullable": false,
-                "type": {
-                  "codecId": "pg/text@1",
-                  "kind": "scalar"
-                }
-              }
-            },
-            "relations": {
-              "quotation": {
-                "cardinality": "N:1",
-                "nullable": false,
-                "on": {
-                  "localFields": [
-                    "quotationId"
-                  ],
-                  "targetFields": [
-                    "id"
-                  ]
-                },
-                "to": {
-                  "model": "Quotation",
-                  "namespace": "public"
-                }
-              }
-            },
-            "storage": {
-              "fields": {
-                "createdAt": {
-                  "column": "createdAt"
-                },
-                "createdByName": {
-                  "column": "createdByName"
-                },
-                "followUpDate": {
-                  "column": "followUpDate"
-                },
-                "id": {
-                  "column": "id"
-                },
-                "notes": {
-                  "column": "notes"
-                },
-                "quotationId": {
-                  "column": "quotationId"
-                },
-                "status": {
-                  "column": "status"
-                }
-              },
-              "namespaceId": "public",
-              "table": "QuotationFollowUp"
             }
           },
           "StageLog": {
@@ -2075,31 +1215,7 @@
           },
           "Task": {
             "fields": {
-              "assignedToDepartment": {
-                "nullable": true,
-                "type": {
-                  "codecId": "pg/text@1",
-                  "kind": "scalar"
-                }
-              },
               "assignedToId": {
-                "nullable": true,
-                "type": {
-                  "codecId": "sql/char@1",
-                  "kind": "scalar",
-                  "typeParams": {
-                    "length": 36
-                  }
-                }
-              },
-              "assignedToName": {
-                "nullable": true,
-                "type": {
-                  "codecId": "pg/text@1",
-                  "kind": "scalar"
-                }
-              },
-              "assignedToUserId": {
                 "nullable": true,
                 "type": {
                   "codecId": "sql/char@1",
@@ -2126,30 +1242,6 @@
                   }
                 }
               },
-              "createdByName": {
-                "nullable": true,
-                "type": {
-                  "codecId": "pg/text@1",
-                  "kind": "scalar"
-                }
-              },
-              "createdByRole": {
-                "nullable": true,
-                "type": {
-                  "codecId": "pg/text@1",
-                  "kind": "scalar"
-                }
-              },
-              "createdByUserId": {
-                "nullable": true,
-                "type": {
-                  "codecId": "sql/char@1",
-                  "kind": "scalar",
-                  "typeParams": {
-                    "length": 36
-                  }
-                }
-              },
               "description": {
                 "nullable": true,
                 "type": {
@@ -2160,7 +1252,7 @@
               "dueDate": {
                 "nullable": true,
                 "type": {
-                  "codecId": "pg/text@1",
+                  "codecId": "pg/timestamp-string@1",
                   "kind": "scalar"
                 }
               },
@@ -2191,18 +1283,17 @@
                   }
                 }
               },
-              "orderNumber": {
-                "nullable": true,
-                "type": {
-                  "codecId": "pg/text@1",
-                  "kind": "scalar"
-                }
-              },
               "priority": {
                 "nullable": false,
                 "type": {
                   "codecId": "pg/text@1",
                   "kind": "scalar"
+                },
+                "valueSet": {
+                  "entityKind": "enum",
+                  "entityName": "Priority",
+                  "namespaceId": "public",
+                  "plane": "domain"
                 }
               },
               "status": {
@@ -2210,6 +1301,12 @@
                 "type": {
                   "codecId": "pg/text@1",
                   "kind": "scalar"
+                },
+                "valueSet": {
+                  "entityKind": "enum",
+                  "entityName": "TaskStatus",
+                  "namespaceId": "public",
+                  "plane": "domain"
                 }
               },
               "title": {
@@ -2272,32 +1369,14 @@
             },
             "storage": {
               "fields": {
-                "assignedToDepartment": {
-                  "column": "assignedToDepartment"
-                },
                 "assignedToId": {
                   "column": "assignedToId"
-                },
-                "assignedToName": {
-                  "column": "assignedToName"
-                },
-                "assignedToUserId": {
-                  "column": "assignedToUserId"
                 },
                 "createdAt": {
                   "column": "createdAt"
                 },
                 "createdById": {
                   "column": "createdById"
-                },
-                "createdByName": {
-                  "column": "createdByName"
-                },
-                "createdByRole": {
-                  "column": "createdByRole"
-                },
-                "createdByUserId": {
-                  "column": "createdByUserId"
                 },
                 "description": {
                   "column": "description"
@@ -2313,9 +1392,6 @@
                 },
                 "orderId": {
                   "column": "orderId"
-                },
-                "orderNumber": {
-                  "column": "orderNumber"
                 },
                 "priority": {
                   "column": "priority"
@@ -2333,13 +1409,6 @@
           },
           "User": {
             "fields": {
-              "clientDataVisibility": {
-                "nullable": true,
-                "type": {
-                  "codecId": "pg/text@1",
-                  "kind": "scalar"
-                }
-              },
               "createdAt": {
                 "nullable": false,
                 "type": {
@@ -2557,9 +1626,6 @@
             },
             "storage": {
               "fields": {
-                "clientDataVisibility": {
-                  "column": "clientDataVisibility"
-                },
                 "createdAt": {
                   "column": "createdAt"
                 },
@@ -2606,290 +1672,6 @@
               "namespaceId": "public",
               "table": "User"
             }
-          },
-          "Vendor": {
-            "fields": {
-              "addressLine1": {
-                "nullable": true,
-                "type": {
-                  "codecId": "pg/text@1",
-                  "kind": "scalar"
-                }
-              },
-              "addressLine2": {
-                "nullable": true,
-                "type": {
-                  "codecId": "pg/text@1",
-                  "kind": "scalar"
-                }
-              },
-              "alternateMobile": {
-                "nullable": true,
-                "type": {
-                  "codecId": "pg/text@1",
-                  "kind": "scalar"
-                }
-              },
-              "city": {
-                "nullable": true,
-                "type": {
-                  "codecId": "pg/text@1",
-                  "kind": "scalar"
-                }
-              },
-              "companyName": {
-                "nullable": true,
-                "type": {
-                  "codecId": "pg/text@1",
-                  "kind": "scalar"
-                }
-              },
-              "contactPerson": {
-                "nullable": false,
-                "type": {
-                  "codecId": "pg/text@1",
-                  "kind": "scalar"
-                }
-              },
-              "country": {
-                "nullable": true,
-                "type": {
-                  "codecId": "pg/text@1",
-                  "kind": "scalar"
-                }
-              },
-              "createdAt": {
-                "nullable": false,
-                "type": {
-                  "codecId": "pg/timestamptz-string@1",
-                  "kind": "scalar"
-                }
-              },
-              "email": {
-                "nullable": false,
-                "type": {
-                  "codecId": "pg/text@1",
-                  "kind": "scalar"
-                }
-              },
-              "gstNumber": {
-                "nullable": true,
-                "type": {
-                  "codecId": "pg/text@1",
-                  "kind": "scalar"
-                }
-              },
-              "id": {
-                "nullable": false,
-                "type": {
-                  "codecId": "sql/char@1",
-                  "kind": "scalar",
-                  "typeParams": {
-                    "length": 36
-                  }
-                }
-              },
-              "isDeleted": {
-                "nullable": false,
-                "type": {
-                  "codecId": "pg/int4@1",
-                  "kind": "scalar"
-                }
-              },
-              "leadTime": {
-                "nullable": true,
-                "type": {
-                  "codecId": "pg/text@1",
-                  "kind": "scalar"
-                }
-              },
-              "materialSupplied": {
-                "nullable": false,
-                "type": {
-                  "codecId": "pg/text@1",
-                  "kind": "scalar"
-                }
-              },
-              "mobileNumber": {
-                "nullable": false,
-                "type": {
-                  "codecId": "pg/text@1",
-                  "kind": "scalar"
-                }
-              },
-              "notes": {
-                "nullable": true,
-                "type": {
-                  "codecId": "pg/text@1",
-                  "kind": "scalar"
-                }
-              },
-              "panNumber": {
-                "nullable": true,
-                "type": {
-                  "codecId": "pg/text@1",
-                  "kind": "scalar"
-                }
-              },
-              "paymentTerms": {
-                "nullable": true,
-                "type": {
-                  "codecId": "pg/text@1",
-                  "kind": "scalar"
-                }
-              },
-              "pinCode": {
-                "nullable": true,
-                "type": {
-                  "codecId": "pg/text@1",
-                  "kind": "scalar"
-                }
-              },
-              "remarks": {
-                "nullable": true,
-                "type": {
-                  "codecId": "pg/text@1",
-                  "kind": "scalar"
-                }
-              },
-              "state": {
-                "nullable": true,
-                "type": {
-                  "codecId": "pg/text@1",
-                  "kind": "scalar"
-                }
-              },
-              "status": {
-                "nullable": false,
-                "type": {
-                  "codecId": "pg/text@1",
-                  "kind": "scalar"
-                }
-              },
-              "updatedAt": {
-                "nullable": false,
-                "type": {
-                  "codecId": "pg/timestamptz-string@1",
-                  "kind": "scalar"
-                }
-              },
-              "vendorCategory": {
-                "nullable": true,
-                "type": {
-                  "codecId": "pg/text@1",
-                  "kind": "scalar"
-                }
-              },
-              "vendorCode": {
-                "nullable": false,
-                "type": {
-                  "codecId": "pg/text@1",
-                  "kind": "scalar"
-                }
-              },
-              "vendorName": {
-                "nullable": false,
-                "type": {
-                  "codecId": "pg/text@1",
-                  "kind": "scalar"
-                }
-              },
-              "website": {
-                "nullable": true,
-                "type": {
-                  "codecId": "pg/text@1",
-                  "kind": "scalar"
-                }
-              }
-            },
-            "relations": {},
-            "storage": {
-              "fields": {
-                "addressLine1": {
-                  "column": "addressLine1"
-                },
-                "addressLine2": {
-                  "column": "addressLine2"
-                },
-                "alternateMobile": {
-                  "column": "alternateMobile"
-                },
-                "city": {
-                  "column": "city"
-                },
-                "companyName": {
-                  "column": "companyName"
-                },
-                "contactPerson": {
-                  "column": "contactPerson"
-                },
-                "country": {
-                  "column": "country"
-                },
-                "createdAt": {
-                  "column": "createdAt"
-                },
-                "email": {
-                  "column": "email"
-                },
-                "gstNumber": {
-                  "column": "gstNumber"
-                },
-                "id": {
-                  "column": "id"
-                },
-                "isDeleted": {
-                  "column": "isDeleted"
-                },
-                "leadTime": {
-                  "column": "leadTime"
-                },
-                "materialSupplied": {
-                  "column": "materialSupplied"
-                },
-                "mobileNumber": {
-                  "column": "mobileNumber"
-                },
-                "notes": {
-                  "column": "notes"
-                },
-                "panNumber": {
-                  "column": "panNumber"
-                },
-                "paymentTerms": {
-                  "column": "paymentTerms"
-                },
-                "pinCode": {
-                  "column": "pinCode"
-                },
-                "remarks": {
-                  "column": "remarks"
-                },
-                "state": {
-                  "column": "state"
-                },
-                "status": {
-                  "column": "status"
-                },
-                "updatedAt": {
-                  "column": "updatedAt"
-                },
-                "vendorCategory": {
-                  "column": "vendorCategory"
-                },
-                "vendorCode": {
-                  "column": "vendorCode"
-                },
-                "vendorName": {
-                  "column": "vendorName"
-                },
-                "website": {
-                  "column": "website"
-                }
-              },
-              "namespaceId": "public",
-              "table": "Vendor"
-            }
           }
         }
       }
@@ -2900,64 +1682,6 @@
       "public": {
         "entries": {
           "table": {
-            "CalendarEvent": {
-              "columns": {
-                "createdAt": {
-                  "codecId": "pg/timestamptz-string@1",
-                  "default": {
-                    "expression": "now()",
-                    "kind": "function"
-                  },
-                  "nativeType": "timestamptz",
-                  "nullable": false
-                },
-                "createdByName": {
-                  "codecId": "pg/text@1",
-                  "nativeType": "text",
-                  "nullable": true
-                },
-                "description": {
-                  "codecId": "pg/text@1",
-                  "nativeType": "text",
-                  "nullable": true
-                },
-                "eventDate": {
-                  "codecId": "pg/text@1",
-                  "nativeType": "text",
-                  "nullable": false
-                },
-                "id": {
-                  "codecId": "sql/char@1",
-                  "nativeType": "character",
-                  "nullable": false,
-                  "typeParams": {
-                    "length": 36
-                  }
-                },
-                "title": {
-                  "codecId": "pg/text@1",
-                  "nativeType": "text",
-                  "nullable": false
-                },
-                "type": {
-                  "codecId": "pg/text@1",
-                  "default": {
-                    "kind": "literal",
-                    "value": "MEETING"
-                  },
-                  "nativeType": "text",
-                  "nullable": false
-                }
-              },
-              "foreignKeys": [],
-              "indexes": [],
-              "primaryKey": {
-                "columns": [
-                  "id"
-                ]
-              },
-              "uniques": []
-            },
             "Client": {
               "columns": {
                 "address": {
@@ -3034,12 +1758,22 @@
                   "nativeType": "int4",
                   "nullable": false
                 },
+                "panNumber": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
+                },
                 "profileImage": {
                   "codecId": "pg/text@1",
                   "nativeType": "text",
                   "nullable": true
                 },
                 "remarks": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
+                },
+                "websiteUrl": {
                   "codecId": "pg/text@1",
                   "nativeType": "text",
                   "nullable": true
@@ -3273,11 +2007,6 @@
                   "nativeType": "int8",
                   "nullable": true
                 },
-                "clientCode": {
-                  "codecId": "pg/text@1",
-                  "nativeType": "text",
-                  "nullable": true
-                },
                 "clientId": {
                   "codecId": "sql/char@1",
                   "nativeType": "character",
@@ -3285,11 +2014,6 @@
                   "typeParams": {
                     "length": 36
                   }
-                },
-                "clientName": {
-                  "codecId": "pg/text@1",
-                  "nativeType": "text",
-                  "nullable": true
                 },
                 "createdAt": {
                   "codecId": "pg/timestamptz-string@1",
@@ -3323,38 +2047,6 @@
                     "plane": "storage"
                   }
                 },
-                "dispatchNotes": {
-                  "codecId": "pg/text@1",
-                  "nativeType": "text",
-                  "nullable": true
-                },
-                "dispatchQuantity": {
-                  "codecId": "pg/int4@1",
-                  "default": {
-                    "kind": "literal",
-                    "value": 0
-                  },
-                  "nativeType": "int4",
-                  "nullable": false
-                },
-                "dispatchRequired": {
-                  "codecId": "pg/bool@1",
-                  "default": {
-                    "kind": "literal",
-                    "value": true
-                  },
-                  "nativeType": "bool",
-                  "nullable": false
-                },
-                "dispatchStatus": {
-                  "codecId": "pg/text@1",
-                  "default": {
-                    "kind": "literal",
-                    "value": "PENDING"
-                  },
-                  "nativeType": "text",
-                  "nullable": false
-                },
                 "id": {
                   "codecId": "sql/char@1",
                   "nativeType": "character",
@@ -3372,164 +2064,12 @@
                   "nativeType": "int4",
                   "nullable": false
                 },
-                "logisticsEntry": {
-                  "codecId": "pg/text@1",
-                  "nativeType": "text",
-                  "nullable": true
-                },
-                "materialRequirements": {
-                  "codecId": "pg/text@1",
-                  "nativeType": "text",
-                  "nullable": true
-                },
-                "orderNumber": {
-                  "codecId": "pg/text@1",
-                  "nativeType": "text",
-                  "nullable": true
-                },
                 "poNumber": {
                   "codecId": "pg/text@1",
                   "nativeType": "text",
                   "nullable": false
                 },
-                "procurementNotes": {
-                  "codecId": "pg/text@1",
-                  "nativeType": "text",
-                  "nullable": true
-                },
-                "productionQuantity": {
-                  "codecId": "pg/int4@1",
-                  "default": {
-                    "kind": "literal",
-                    "value": 0
-                  },
-                  "nativeType": "int4",
-                  "nullable": false
-                },
-                "productionRequired": {
-                  "codecId": "pg/bool@1",
-                  "default": {
-                    "kind": "literal",
-                    "value": true
-                  },
-                  "nativeType": "bool",
-                  "nullable": false
-                },
-                "productionStatus": {
-                  "codecId": "pg/text@1",
-                  "default": {
-                    "kind": "literal",
-                    "value": "PENDING"
-                  },
-                  "nativeType": "text",
-                  "nullable": false
-                },
-                "purchaseQuantity": {
-                  "codecId": "pg/int4@1",
-                  "default": {
-                    "kind": "literal",
-                    "value": 0
-                  },
-                  "nativeType": "int4",
-                  "nullable": false
-                },
-                "purchaseRequired": {
-                  "codecId": "pg/bool@1",
-                  "default": {
-                    "kind": "literal",
-                    "value": true
-                  },
-                  "nativeType": "bool",
-                  "nullable": false
-                },
-                "purchaseStatus": {
-                  "codecId": "pg/text@1",
-                  "default": {
-                    "kind": "literal",
-                    "value": "PENDING"
-                  },
-                  "nativeType": "text",
-                  "nullable": false
-                },
-                "qcFailedQuantity": {
-                  "codecId": "pg/int4@1",
-                  "default": {
-                    "kind": "literal",
-                    "value": 0
-                  },
-                  "nativeType": "int4",
-                  "nullable": false
-                },
-                "qcPassedQuantity": {
-                  "codecId": "pg/int4@1",
-                  "default": {
-                    "kind": "literal",
-                    "value": 0
-                  },
-                  "nativeType": "int4",
-                  "nullable": false
-                },
-                "qcQuantity": {
-                  "codecId": "pg/int4@1",
-                  "default": {
-                    "kind": "literal",
-                    "value": 0
-                  },
-                  "nativeType": "int4",
-                  "nullable": false
-                },
-                "qcRemarks": {
-                  "codecId": "pg/text@1",
-                  "nativeType": "text",
-                  "nullable": true
-                },
-                "qcResult": {
-                  "codecId": "pg/text@1",
-                  "nativeType": "text",
-                  "nullable": true
-                },
-                "qualityStatus": {
-                  "codecId": "pg/text@1",
-                  "default": {
-                    "kind": "literal",
-                    "value": "PENDING"
-                  },
-                  "nativeType": "text",
-                  "nullable": false
-                },
-                "qualityTestingRequired": {
-                  "codecId": "pg/bool@1",
-                  "default": {
-                    "kind": "literal",
-                    "value": true
-                  },
-                  "nativeType": "bool",
-                  "nullable": false
-                },
-                "requiredQuantity": {
-                  "codecId": "pg/int4@1",
-                  "default": {
-                    "kind": "literal",
-                    "value": 1
-                  },
-                  "nativeType": "int4",
-                  "nullable": false
-                },
                 "requirements": {
-                  "codecId": "pg/text@1",
-                  "nativeType": "text",
-                  "nullable": true
-                },
-                "reworkQuantity": {
-                  "codecId": "pg/int4@1",
-                  "default": {
-                    "kind": "literal",
-                    "value": 0
-                  },
-                  "nativeType": "int4",
-                  "nullable": false
-                },
-                "shopFloorNotes": {
                   "codecId": "pg/text@1",
                   "nativeType": "text",
                   "nullable": true
@@ -3539,34 +2079,10 @@
                   "nativeType": "text",
                   "nullable": true
                 },
-                "technicalRequirements": {
-                  "codecId": "pg/text@1",
-                  "nativeType": "text",
-                  "nullable": true
-                },
-                "transportRef": {
-                  "codecId": "pg/text@1",
-                  "nativeType": "text",
-                  "nullable": true
-                },
-                "unit": {
-                  "codecId": "pg/text@1",
-                  "default": {
-                    "kind": "literal",
-                    "value": "pcs"
-                  },
-                  "nativeType": "text",
-                  "nullable": false
-                },
                 "updatedAt": {
                   "codecId": "pg/timestamptz-string@1",
                   "nativeType": "timestamptz",
                   "nullable": false
-                },
-                "vendorSelected": {
-                  "codecId": "pg/text@1",
-                  "nativeType": "text",
-                  "nullable": true
                 }
               },
               "foreignKeys": [],
@@ -3621,284 +2137,6 @@
                   "codecId": "pg/int8@1",
                   "nativeType": "int8",
                   "nullable": true
-                }
-              },
-              "foreignKeys": [],
-              "indexes": [],
-              "primaryKey": {
-                "columns": [
-                  "id"
-                ]
-              },
-              "uniques": []
-            },
-            "Quotation": {
-              "columns": {
-                "clientCode": {
-                  "codecId": "pg/text@1",
-                  "nativeType": "text",
-                  "nullable": false
-                },
-                "clientId": {
-                  "codecId": "sql/char@1",
-                  "nativeType": "character",
-                  "nullable": true,
-                  "typeParams": {
-                    "length": 36
-                  }
-                },
-                "companyName": {
-                  "codecId": "pg/text@1",
-                  "nativeType": "text",
-                  "nullable": false
-                },
-                "competitorName": {
-                  "codecId": "pg/text@1",
-                  "nativeType": "text",
-                  "nullable": true
-                },
-                "contactPerson": {
-                  "codecId": "pg/text@1",
-                  "nativeType": "text",
-                  "nullable": false
-                },
-                "convertedOrderId": {
-                  "codecId": "pg/text@1",
-                  "nativeType": "text",
-                  "nullable": true
-                },
-                "convertedOrderNumber": {
-                  "codecId": "pg/text@1",
-                  "nativeType": "text",
-                  "nullable": true
-                },
-                "convertedOrderValue": {
-                  "codecId": "pg/int8@1",
-                  "nativeType": "int8",
-                  "nullable": true
-                },
-                "createdAt": {
-                  "codecId": "pg/timestamptz-string@1",
-                  "default": {
-                    "expression": "now()",
-                    "kind": "function"
-                  },
-                  "nativeType": "timestamptz",
-                  "nullable": false
-                },
-                "email": {
-                  "codecId": "pg/text@1",
-                  "nativeType": "text",
-                  "nullable": false
-                },
-                "expectedClosureDate": {
-                  "codecId": "pg/text@1",
-                  "nativeType": "text",
-                  "nullable": true
-                },
-                "expectedOrderValue": {
-                  "codecId": "pg/int8@1",
-                  "nativeType": "int8",
-                  "nullable": true
-                },
-                "followUpDate": {
-                  "codecId": "pg/text@1",
-                  "nativeType": "text",
-                  "nullable": true
-                },
-                "id": {
-                  "codecId": "sql/char@1",
-                  "nativeType": "character",
-                  "nullable": false,
-                  "typeParams": {
-                    "length": 36
-                  }
-                },
-                "inquiryRef": {
-                  "codecId": "pg/text@1",
-                  "nativeType": "text",
-                  "nullable": true
-                },
-                "isDeleted": {
-                  "codecId": "pg/int4@1",
-                  "default": {
-                    "kind": "literal",
-                    "value": 0
-                  },
-                  "nativeType": "int4",
-                  "nullable": false
-                },
-                "isLocked": {
-                  "codecId": "pg/bool@1",
-                  "default": {
-                    "kind": "literal",
-                    "value": false
-                  },
-                  "nativeType": "bool",
-                  "nullable": false
-                },
-                "lostDate": {
-                  "codecId": "pg/text@1",
-                  "nativeType": "text",
-                  "nullable": true
-                },
-                "lostReason": {
-                  "codecId": "pg/text@1",
-                  "nativeType": "text",
-                  "nullable": true
-                },
-                "lostRemarks": {
-                  "codecId": "pg/text@1",
-                  "nativeType": "text",
-                  "nullable": true
-                },
-                "lostValue": {
-                  "codecId": "pg/int8@1",
-                  "nativeType": "int8",
-                  "nullable": true
-                },
-                "mobileNumber": {
-                  "codecId": "pg/text@1",
-                  "nativeType": "text",
-                  "nullable": false
-                },
-                "negotiationDate": {
-                  "codecId": "pg/text@1",
-                  "nativeType": "text",
-                  "nullable": true
-                },
-                "quotationAmount": {
-                  "codecId": "pg/int8@1",
-                  "nativeType": "int8",
-                  "nullable": false
-                },
-                "quotationDate": {
-                  "codecId": "pg/timestamptz-string@1",
-                  "default": {
-                    "expression": "now()",
-                    "kind": "function"
-                  },
-                  "nativeType": "timestamptz",
-                  "nullable": false
-                },
-                "quotationNumber": {
-                  "codecId": "pg/text@1",
-                  "nativeType": "text",
-                  "nullable": false
-                },
-                "remarks": {
-                  "codecId": "pg/text@1",
-                  "nativeType": "text",
-                  "nullable": true
-                },
-                "salesExecutive": {
-                  "codecId": "pg/text@1",
-                  "nativeType": "text",
-                  "nullable": false
-                },
-                "salesExecutiveUserId": {
-                  "codecId": "sql/char@1",
-                  "nativeType": "character",
-                  "nullable": true,
-                  "typeParams": {
-                    "length": 36
-                  }
-                },
-                "sentAt": {
-                  "codecId": "pg/text@1",
-                  "nativeType": "text",
-                  "nullable": true
-                },
-                "sentNotes": {
-                  "codecId": "pg/text@1",
-                  "nativeType": "text",
-                  "nullable": true
-                },
-                "sentVia": {
-                  "codecId": "pg/text@1",
-                  "nativeType": "text",
-                  "nullable": true
-                },
-                "status": {
-                  "codecId": "pg/text@1",
-                  "default": {
-                    "kind": "literal",
-                    "value": "SENT"
-                  },
-                  "nativeType": "text",
-                  "nullable": false
-                },
-                "updatedAt": {
-                  "codecId": "pg/timestamptz-string@1",
-                  "nativeType": "timestamptz",
-                  "nullable": false
-                }
-              },
-              "foreignKeys": [],
-              "indexes": [],
-              "primaryKey": {
-                "columns": [
-                  "id"
-                ]
-              },
-              "uniques": [
-                {
-                  "columns": [
-                    "quotationNumber"
-                  ]
-                }
-              ]
-            },
-            "QuotationFollowUp": {
-              "columns": {
-                "createdAt": {
-                  "codecId": "pg/timestamptz-string@1",
-                  "default": {
-                    "expression": "now()",
-                    "kind": "function"
-                  },
-                  "nativeType": "timestamptz",
-                  "nullable": false
-                },
-                "createdByName": {
-                  "codecId": "pg/text@1",
-                  "nativeType": "text",
-                  "nullable": false
-                },
-                "followUpDate": {
-                  "codecId": "pg/text@1",
-                  "nativeType": "text",
-                  "nullable": false
-                },
-                "id": {
-                  "codecId": "sql/char@1",
-                  "nativeType": "character",
-                  "nullable": false,
-                  "typeParams": {
-                    "length": 36
-                  }
-                },
-                "notes": {
-                  "codecId": "pg/text@1",
-                  "nativeType": "text",
-                  "nullable": false
-                },
-                "quotationId": {
-                  "codecId": "sql/char@1",
-                  "nativeType": "character",
-                  "nullable": false,
-                  "typeParams": {
-                    "length": 36
-                  }
-                },
-                "status": {
-                  "codecId": "pg/text@1",
-                  "default": {
-                    "kind": "literal",
-                    "value": "PENDING"
-                  },
-                  "nativeType": "text",
-                  "nullable": false
                 }
               },
               "foreignKeys": [],
@@ -3974,26 +2212,20 @@
               "uniques": []
             },
             "Task": {
+              "checks": [
+                {
+                  "expression": "\"priority\" IN ('LOW', 'MEDIUM', 'HIGH', 'URGENT')",
+                  "name": "Task_priority_check_8918b779",
+                  "prefix": "Task_priority_check"
+                },
+                {
+                  "expression": "\"status\" IN ('PENDING', 'IN_PROGRESS', 'COMPLETED')",
+                  "name": "Task_status_check_c95d195d",
+                  "prefix": "Task_status_check"
+                }
+              ],
               "columns": {
-                "assignedToDepartment": {
-                  "codecId": "pg/text@1",
-                  "nativeType": "text",
-                  "nullable": true
-                },
                 "assignedToId": {
-                  "codecId": "sql/char@1",
-                  "nativeType": "character",
-                  "nullable": true,
-                  "typeParams": {
-                    "length": 36
-                  }
-                },
-                "assignedToName": {
-                  "codecId": "pg/text@1",
-                  "nativeType": "text",
-                  "nullable": true
-                },
-                "assignedToUserId": {
                   "codecId": "sql/char@1",
                   "nativeType": "character",
                   "nullable": true,
@@ -4018,32 +2250,14 @@
                     "length": 36
                   }
                 },
-                "createdByName": {
-                  "codecId": "pg/text@1",
-                  "nativeType": "text",
-                  "nullable": true
-                },
-                "createdByRole": {
-                  "codecId": "pg/text@1",
-                  "nativeType": "text",
-                  "nullable": true
-                },
-                "createdByUserId": {
-                  "codecId": "sql/char@1",
-                  "nativeType": "character",
-                  "nullable": true,
-                  "typeParams": {
-                    "length": 36
-                  }
-                },
                 "description": {
                   "codecId": "pg/text@1",
                   "nativeType": "text",
                   "nullable": true
                 },
                 "dueDate": {
-                  "codecId": "pg/text@1",
-                  "nativeType": "text",
+                  "codecId": "pg/timestamp-string@1",
+                  "nativeType": "timestamp",
                   "nullable": true
                 },
                 "id": {
@@ -4071,11 +2285,6 @@
                     "length": 36
                   }
                 },
-                "orderNumber": {
-                  "codecId": "pg/text@1",
-                  "nativeType": "text",
-                  "nullable": true
-                },
                 "priority": {
                   "codecId": "pg/text@1",
                   "default": {
@@ -4083,7 +2292,13 @@
                     "value": "MEDIUM"
                   },
                   "nativeType": "text",
-                  "nullable": false
+                  "nullable": false,
+                  "valueSet": {
+                    "entityKind": "valueSet",
+                    "entityName": "Priority",
+                    "namespaceId": "public",
+                    "plane": "storage"
+                  }
                 },
                 "status": {
                   "codecId": "pg/text@1",
@@ -4092,7 +2307,13 @@
                     "value": "PENDING"
                   },
                   "nativeType": "text",
-                  "nullable": false
+                  "nullable": false,
+                  "valueSet": {
+                    "entityKind": "valueSet",
+                    "entityName": "TaskStatus",
+                    "namespaceId": "public",
+                    "plane": "storage"
+                  }
                 },
                 "title": {
                   "codecId": "pg/text@1",
@@ -4118,11 +2339,6 @@
                 }
               ],
               "columns": {
-                "clientDataVisibility": {
-                  "codecId": "pg/text@1",
-                  "nativeType": "text",
-                  "nullable": true
-                },
                 "createdAt": {
                   "codecId": "pg/timestamptz-string@1",
                   "default": {
@@ -4238,174 +2454,6 @@
                   ]
                 }
               ]
-            },
-            "Vendor": {
-              "columns": {
-                "addressLine1": {
-                  "codecId": "pg/text@1",
-                  "nativeType": "text",
-                  "nullable": true
-                },
-                "addressLine2": {
-                  "codecId": "pg/text@1",
-                  "nativeType": "text",
-                  "nullable": true
-                },
-                "alternateMobile": {
-                  "codecId": "pg/text@1",
-                  "nativeType": "text",
-                  "nullable": true
-                },
-                "city": {
-                  "codecId": "pg/text@1",
-                  "nativeType": "text",
-                  "nullable": true
-                },
-                "companyName": {
-                  "codecId": "pg/text@1",
-                  "nativeType": "text",
-                  "nullable": true
-                },
-                "contactPerson": {
-                  "codecId": "pg/text@1",
-                  "nativeType": "text",
-                  "nullable": false
-                },
-                "country": {
-                  "codecId": "pg/text@1",
-                  "nativeType": "text",
-                  "nullable": true
-                },
-                "createdAt": {
-                  "codecId": "pg/timestamptz-string@1",
-                  "default": {
-                    "expression": "now()",
-                    "kind": "function"
-                  },
-                  "nativeType": "timestamptz",
-                  "nullable": false
-                },
-                "email": {
-                  "codecId": "pg/text@1",
-                  "nativeType": "text",
-                  "nullable": false
-                },
-                "gstNumber": {
-                  "codecId": "pg/text@1",
-                  "nativeType": "text",
-                  "nullable": true
-                },
-                "id": {
-                  "codecId": "sql/char@1",
-                  "nativeType": "character",
-                  "nullable": false,
-                  "typeParams": {
-                    "length": 36
-                  }
-                },
-                "isDeleted": {
-                  "codecId": "pg/int4@1",
-                  "default": {
-                    "kind": "literal",
-                    "value": 0
-                  },
-                  "nativeType": "int4",
-                  "nullable": false
-                },
-                "leadTime": {
-                  "codecId": "pg/text@1",
-                  "nativeType": "text",
-                  "nullable": true
-                },
-                "materialSupplied": {
-                  "codecId": "pg/text@1",
-                  "nativeType": "text",
-                  "nullable": false
-                },
-                "mobileNumber": {
-                  "codecId": "pg/text@1",
-                  "nativeType": "text",
-                  "nullable": false
-                },
-                "notes": {
-                  "codecId": "pg/text@1",
-                  "nativeType": "text",
-                  "nullable": true
-                },
-                "panNumber": {
-                  "codecId": "pg/text@1",
-                  "nativeType": "text",
-                  "nullable": true
-                },
-                "paymentTerms": {
-                  "codecId": "pg/text@1",
-                  "nativeType": "text",
-                  "nullable": true
-                },
-                "pinCode": {
-                  "codecId": "pg/text@1",
-                  "nativeType": "text",
-                  "nullable": true
-                },
-                "remarks": {
-                  "codecId": "pg/text@1",
-                  "nativeType": "text",
-                  "nullable": true
-                },
-                "state": {
-                  "codecId": "pg/text@1",
-                  "nativeType": "text",
-                  "nullable": true
-                },
-                "status": {
-                  "codecId": "pg/text@1",
-                  "default": {
-                    "kind": "literal",
-                    "value": "ACTIVE"
-                  },
-                  "nativeType": "text",
-                  "nullable": false
-                },
-                "updatedAt": {
-                  "codecId": "pg/timestamptz-string@1",
-                  "nativeType": "timestamptz",
-                  "nullable": false
-                },
-                "vendorCategory": {
-                  "codecId": "pg/text@1",
-                  "nativeType": "text",
-                  "nullable": true
-                },
-                "vendorCode": {
-                  "codecId": "pg/text@1",
-                  "nativeType": "text",
-                  "nullable": false
-                },
-                "vendorName": {
-                  "codecId": "pg/text@1",
-                  "nativeType": "text",
-                  "nullable": false
-                },
-                "website": {
-                  "codecId": "pg/text@1",
-                  "nativeType": "text",
-                  "nullable": true
-                }
-              },
-              "foreignKeys": [],
-              "indexes": [],
-              "primaryKey": {
-                "columns": [
-                  "id"
-                ]
-              },
-              "uniques": [
-                {
-                  "columns": [
-                    "vendorCode"
-                  ]
-                }
-              ]
             }
           },
           "valueSet": {
@@ -4458,23 +2506,12 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "68fe5e7688c3a822e254275e75d87628cc77e935e5b585b3efaa36f59a892800"
+    "storageHash": "16cf400d7471168f16d9440d6b6e93319b50b748cf459ee713f7891da245fe39"
   },
   "execution": {
-    "executionHash": "be0f6ea16b97b9f73fac5a2be296f26261de0eb5558a2af00ad9e723288cc35f",
+    "executionHash": "6c7ae69ea788bc8801c23e2e7743592b119cd3be8f33eae54010992e70a85b78",
     "mutations": {
       "defaults": [
-        {
-          "onCreate": {
-            "id": "uuidv7",
-            "kind": "generator"
-          },
-          "ref": {
-            "column": "id",
-            "namespace": "public",
-            "table": "CalendarEvent"
-          }
-        },
         {
           "onCreate": {
             "id": "uuidv7",
@@ -4564,43 +2601,6 @@
           "ref": {
             "column": "id",
             "namespace": "public",
-            "table": "Quotation"
-          }
-        },
-        {
-          "onCreate": {
-            "id": "timestampNow",
-            "kind": "generator"
-          },
-          "onUpdate": {
-            "id": "timestampNow",
-            "kind": "generator"
-          },
-          "ref": {
-            "column": "updatedAt",
-            "namespace": "public",
-            "table": "Quotation"
-          }
-        },
-        {
-          "onCreate": {
-            "id": "uuidv7",
-            "kind": "generator"
-          },
-          "ref": {
-            "column": "id",
-            "namespace": "public",
-            "table": "QuotationFollowUp"
-          }
-        },
-        {
-          "onCreate": {
-            "id": "uuidv7",
-            "kind": "generator"
-          },
-          "ref": {
-            "column": "id",
-            "namespace": "public",
             "table": "StageLog"
           }
         },
@@ -4639,32 +2639,6 @@
             "column": "updatedAt",
             "namespace": "public",
             "table": "User"
-          }
-        },
-        {
-          "onCreate": {
-            "id": "uuidv7",
-            "kind": "generator"
-          },
-          "ref": {
-            "column": "id",
-            "namespace": "public",
-            "table": "Vendor"
-          }
-        },
-        {
-          "onCreate": {
-            "id": "timestampNow",
-            "kind": "generator"
-          },
-          "onUpdate": {
-            "id": "timestampNow",
-            "kind": "generator"
-          },
-          "ref": {
-            "column": "updatedAt",
-            "namespace": "public",
-            "table": "Vendor"
           }
         }
       ]

@@ -92,23 +92,9 @@ export const QuotationFollowUpModal: React.FC<QuotationFollowUpModalProps> = ({
             <View style={styles.formGroup}>
               {isNegotiation ? (
                 <>
-                  <Text style={styles.label}>Negotiation Date *</Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="YYYY-MM-DD"
-                    placeholderTextColor="#94a3b8"
-                    value={negotiationDate}
-                    onChangeText={setNegotiationDate}
-                  />
+                  <DatePickerInput label="Negotiation Date" value={negotiationDate} onChangeDate={setNegotiationDate} required />
 
-                  <Text style={styles.label}>Follow-Up Date *</Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="YYYY-MM-DD"
-                    placeholderTextColor="#94a3b8"
-                    value={followUpDate}
-                    onChangeText={setFollowUpDate}
-                  />
+                  <DatePickerInput label="Follow-Up Date" value={followUpDate} onChangeDate={setFollowUpDate} required />
 
                   <Text style={styles.label}>Revised Discussion Notes & Terms</Text>
                   <TextInput
@@ -120,27 +106,13 @@ export const QuotationFollowUpModal: React.FC<QuotationFollowUpModalProps> = ({
                     onChangeText={setNotes}
                   />
 
-                  <Text style={styles.label}>Expected Order Closure Date</Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="YYYY-MM-DD"
-                    placeholderTextColor="#94a3b8"
-                    value={expectedClosureDate}
-                    onChangeText={setExpectedClosureDate}
-                  />
+                  <DatePickerInput label="Expected Order Closure Date" value={expectedClosureDate} onChangeDate={setExpectedClosureDate} />
                 </>
               ) : (
                 <>
                   <View style={{ flexDirection: 'row', gap: Spacing.sm }}>
                     <View style={{ flex: 1 }}>
-                      <Text style={styles.label}>Follow-Up Date *</Text>
-                      <TextInput
-                        style={styles.input}
-                        placeholder="YYYY-MM-DD"
-                        placeholderTextColor="#94a3b8"
-                        value={followUpDate}
-                        onChangeText={setFollowUpDate}
-                      />
+                      <DatePickerInput label="Follow-Up Date" value={followUpDate} onChangeDate={setFollowUpDate} required />
                     </View>
 
                     <View style={{ width: 140 }}>

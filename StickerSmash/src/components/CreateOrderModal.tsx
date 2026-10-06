@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, Modal, TouchableOpacity, TextInput, ScrollView, StyleSheet, Platform, useWindowDimensions } from 'react-native';
+import * as XLSX from 'xlsx';
 import { useERP } from '../context/ERPContext';
 import { useAuth } from '../context/AuthContext';
 import { Colors, Spacing, Radius, Shadows } from '../theme';
@@ -112,6 +113,70 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ visible, onC
     setCustomStages((prev) => prev.filter((s) => s.id !== id));
   };
 
+  const processExcelData = (data: any[]) => {
+    let successCount = 0;
+    let errCount = 0;
+    data.forEach((row) => {
+      // Find client using either clientCode or companyName
+      const client = clients.find(c => 
+        (row.ClientCode && c.clientCode.toLowerCase() === String(row.ClientCode).toLowerCase()) || 
+        (row.ClientCode && c.companyName.toLowerCase() === String(row.ClientCode).toLowerCase())
+      );
+
+      if (!client) {
+        errCount++;
+        return;
+      }
+      try {
+        createOrder({
+          poNumber: row.PONumber ? String(row.PONumber) : `PO-EXCEL-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+          clientId: client.id,
+          budget: row.Budget ? parseFloat(row.Budget) : undefined,
+          technicalRequirements: row.TechnicalRequirements || '',
+          materialRequirements: row.MaterialRequirements || '',
+          requiredQuantity: row.RequiredQuantity ? parseInt(row.RequiredQuantity, 10) : 1,
+          purchaseRequired: true,
+          productionRequired: true,
+          qualityTestingRequired: true,
+          dispatchRequired: true,
+          items: [{
+             itemName: row.ItemName || 'Bulk Imported Item',
+             size: row.Size || '',
+             quantity: row.RequiredQuantity ? parseInt(row.RequiredQuantity, 10) : 1,
+             unitPrice: row.UnitPrice ? parseFloat(row.UnitPrice) : undefined,
+          }]
+        });
+        successCount++;
+      } catch (e) {
+        errCount++;
+      }
+    });
+    
+    if (successCount > 0) {
+      setSuccessMsg(`Successfully imported ${successCount} orders from Excel.`);
+      setTimeout(() => setSuccessMsg(''), 4000);
+      if (errCount === 0) handleClose();
+    } else {
+      setError(`Failed to import orders. Check if ClientCode matches your registered clients.`);
+    }
+  };
+
+  const handleFileUpload = (e: any) => {
+    const file = e.target?.files?.[0] || e.dataTransfer?.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      const bstr = evt.target?.result;
+      const wb = XLSX.read(bstr, { type: 'binary' });
+      const wsname = wb.SheetNames[0];
+      const ws = wb.Sheets[wsname];
+      const data = XLSX.utils.sheet_to_json(ws);
+      processExcelData(data);
+    };
+    reader.readAsBinaryString(file);
+  };
+
   const toggleUserSelection = (userId: string) => {
     setSelectedUserIds((prev) =>
       prev.includes(userId) ? prev.filter((id) => id !== userId) : [...prev, userId]
@@ -183,6 +248,63 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ visible, onC
           <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>
             {error ? <Text style={styles.errorText}>{error}</Text> : null}
             {successMsg ? <Text style={[styles.errorText, { color: Colors.successBright, backgroundColor: 'rgba(16, 185, 129, 0.1)', borderColor: Colors.successBright }]}>✅ {successMsg}</Text> : null}
+
+            {Platform.OS === 'web' && (
+              <View
+                // @ts-ignore
+                onDragOver={(e: any) => { e.preventDefault(); e.stopPropagation(); }}
+                onDrop={(e: any) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleFileUpload(e);
+                }}
+                style={{
+                  borderWidth: 2,
+                  borderColor: '#0284c7',
+                  borderStyle: 'dashed',
+                  borderRadius: 8,
+                  padding: 20,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: 'rgba(2, 132, 199, 0.05)',
+                  marginVertical: 12,
+                }}
+              >
+                <Text style={{ color: '#0284c7', fontWeight: 'bold', marginBottom: 4 }}>
+                  📥 Drag & Drop Excel File Here to Bulk Create Orders
+                </Text>
+                <Text style={{ color: '#94a3b8', fontSize: 11, textAlign: 'center' }}>
+                  Required Columns: ClientCode, PONumber, Budget, RequiredQuantity{'\n'}
+                  Optional Columns: ItemName, Size, UnitPrice, TechnicalRequirements, MaterialRequirements
+                </Text>
+                {/* Fallback File Input for clicking */}
+                <TouchableOpacity
+                  style={{
+                    marginTop: 12,
+                    backgroundColor: Colors.white,
+                    borderWidth: 1,
+                    borderColor: Colors.borderDark,
+                    paddingHorizontal: 16,
+                    paddingVertical: 8,
+                    borderRadius: Radius.sm,
+                    ...Shadows.sm
+                  }}
+                  onPress={() => {
+                    const el = document.getElementById('excel-upload-input-order');
+                    if (el) el.click();
+                  }}
+                >
+                  <Text style={{ color: Colors.textMuted, fontSize: 12, fontWeight: '700' }}>Upload Excel File</Text>
+                </TouchableOpacity>
+                <input 
+                  id="excel-upload-input-order"
+                  type="file" 
+                  accept=".xlsx, .xls" 
+                  onChange={handleFileUpload} 
+                  style={{ display: 'none' }} 
+                />
+              </View>
+            )}
 
             {/* Client Searchable Dropdown */}
             <SearchableDropdown
