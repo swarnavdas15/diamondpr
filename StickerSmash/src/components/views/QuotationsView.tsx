@@ -285,47 +285,6 @@ export const QuotationsView: React.FC<QuotationsViewProps> = ({ onOpenCreateQuot
     setFollowUpModalQuotation(null);
   };
 
-  const handleSaveConversion = async (data: QuotationConversionData) => {
-    if (!conversionModalQuotation) return;
-    const q = conversionModalQuotation;
-
-    try {
-      // Directly call convertQuotationToOrder which properly:
-      // 1. Sets quotation status to FULLY_CONVERTED or PARTIALLY_CONVERTED
-      // 2. Stores convertedOrderValue, lostValue, convertedOrderId, convertedOrderNumber
-      // 3. Creates the linked Order with correct pipeline flags
-      const newOrder = await convertQuotationToOrder(q.id, {
-        convertedOrderValue: data.approvedAmount,
-        poNumber: `PO-${q.quotationNumber}`,
-        technicalRequirements: q.remarks || data.finalRemarks,
-        materialRequirements: data.finalRemarks || q.remarks || 'As per quotation specifications',
-        requiredQuantity: data.requiredQuantity,
-        purchaseRequired: data.purchaseRequired,
-        productionRequired: data.productionRequired,
-        qualityTestingRequired: data.qualityTestingRequired,
-        dispatchRequired: data.dispatchRequired,
-        customStages: data.customStages,
-      });
-
-      // If partial conversion, also log the lost reason
-      if (data.lostReason) {
-        await updateQuotation(q.id, {
-          lostRemarks: data.lostRemarks || `Partial conversion — approved ${data.approvedAmount} of ${q.quotationAmount}`,
-          competitorName: undefined,
-        });
-      }
-
-      // Navigate to the new order
-      if (newOrder) {
-        
-        setSelectedOrder(newOrder);
-      }
-    } catch (err: any) {
-      console.warn('Quotation conversion error:', err?.message);
-      setConversionError(err?.message || 'Failed to convert quotation.');
-    }
-  };
-
   const handleUnlockQuotation = async (q: Quotation) => {
     await updateQuotation(q.id, { isLocked: false, status: 'DRAFT' });
   };
