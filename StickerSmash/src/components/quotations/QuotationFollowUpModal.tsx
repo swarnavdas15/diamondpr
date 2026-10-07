@@ -45,6 +45,10 @@ export const QuotationFollowUpModal: React.FC<QuotationFollowUpModalProps> = ({
       setError('Follow-Up Date is required.');
       return;
     }
+    if (!notes.trim()) {
+      setError('Discussion notes are required.');
+      return;
+    }
 
     onSave({
       targetStatus,

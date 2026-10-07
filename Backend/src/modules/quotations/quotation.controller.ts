@@ -42,9 +42,10 @@ export const handleAddQuotationFollowUp = async (req: AuthRequest, res: Response
   try {
     const quotationId = req.params.id as string;
     const { followUpDate, notes } = req.body;
-    if (!followUpDate || !notes) {
-      return res.status(400).json({ success: false, error: 'Follow-up date and notes are required' });
+    if (!followUpDate) {
+      return res.status(400).json({ success: false, error: 'Follow-up date is required' });
     }
+    if (!notes) req.body.notes = 'No notes provided';
 
     const createdByName = req.user?.name || 'Sales User';
     const followUp = await quotationService.addQuotationFollowUp(quotationId, req.body, createdByName);
