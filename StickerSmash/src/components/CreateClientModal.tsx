@@ -32,6 +32,19 @@ export const CreateClientModal: React.FC<CreateClientModalProps> = ({ visible, o
   const [remarks, setRemarks] = useState('');
   const [error, setError] = useState('');
   const [isDragging, setIsDragging] = useState(false);
+
+  React.useEffect(() => {
+    if (Platform.OS !== 'web' || !visible) return;
+    
+    const handleDragEnter = (e: any) => {
+      e.preventDefault();
+      setIsDragging(true);
+    };
+
+    window.addEventListener('dragenter', handleDragEnter);
+    return () => window.removeEventListener('dragenter', handleDragEnter);
+  }, [visible]);
+
   const [successMsg, setSuccessMsg] = useState('');
   
 
@@ -95,10 +108,13 @@ export const CreateClientModal: React.FC<CreateClientModalProps> = ({ visible, o
 
   const handleFileUpload = (e: any) => {
     let file;
-    if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      file = e.dataTransfer.files[0];
-    } else if (e.target && e.target.files && e.target.files.length > 0) {
-      file = e.target.files[0];
+    const dt = e.dataTransfer || (e.nativeEvent && e.nativeEvent.dataTransfer);
+    const target = e.target || (e.nativeEvent && e.nativeEvent.target);
+
+    if (dt && dt.files && dt.files.length > 0) {
+      file = dt.files[0];
+    } else if (target && target.files && target.files.length > 0) {
+      file = target.files[0];
     }
 
     if (file) {

@@ -66,6 +66,19 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ visible, onC
   const [isDragging, setIsDragging] = useState(false);
 
   React.useEffect(() => {
+    if (Platform.OS !== 'web' || !visible) return;
+    
+    const handleDragEnter = (e: any) => {
+      e.preventDefault();
+      setIsDragging(true);
+    };
+
+    window.addEventListener('dragenter', handleDragEnter);
+    return () => window.removeEventListener('dragenter', handleDragEnter);
+  }, [visible]);
+
+
+  React.useEffect(() => {
     if (initialData) {
       if (initialData.clientId) setClientId(initialData.clientId);
       if (initialData.poNumber) setPoNumber(initialData.poNumber);
