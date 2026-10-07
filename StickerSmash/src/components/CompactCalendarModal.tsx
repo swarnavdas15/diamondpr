@@ -13,10 +13,23 @@ interface CompactCalendarModalProps {
 export const CompactCalendarModal: React.FC<CompactCalendarModalProps> = ({ visible, onClose }) => {
   const { width } = useWindowDimensions();
   const isMobile = width < 768;
-  const { calendarEvents, createCalendarEvent, deleteCalendarEvent } = useERP();
+  const { clients, calendarEvents, companyImportantDates, createCalendarEvent, deleteCalendarEvent, deleteCompanyImportantDate } = useERP();
 
   const todayDateObj = new Date();
   const todayStr = todayDateObj.toISOString().split('T')[0];
+
+  const combinedEvents = [
+    ...calendarEvents,
+    ...(companyImportantDates || []).map(d => ({
+      id: d.id,
+      title: (clients.find(c => c.id === d.companyId)?.companyName || "Client") + " - " + d.title,
+      type: 'IMPORTANT_DATE' as CalendarEventType,
+      eventDate: d.eventDate,
+      description: d.description || '',
+      createdByName: d.createdByName || 'System',
+      isCompanyDate: true
+    }))
+  ];
 
   // Calendar View Month State (defaults to current date)
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -95,8 +108,16 @@ export const CompactCalendarModal: React.FC<CompactCalendarModalProps> = ({ visi
     setIsAdding(false);
   };
 
+  const handleDeleteEvent = (id: string) => {
+    if (companyImportantDates && companyImportantDates.some(d => d.id === id)) {
+      deleteCompanyImportantDate(id);
+    } else {
+      handleDeleteEvent(id);
+    }
+  };
+
   // Filtered Events
-  const filteredEvents = calendarEvents.filter((e) => {
+  const filteredEvents = combinedEvents.filter((e) => {
     const categoryMatches = selectedCategory === 'ALL' || e.type === selectedCategory;
     return categoryMatches;
   });
@@ -154,7 +175,7 @@ export const CompactCalendarModal: React.FC<CompactCalendarModalProps> = ({ visi
 
                   const isToday = item.dateStr === todayStr;
                   const isSelected = item.dateStr === selectedDate;
-                  const dayEvents = calendarEvents.filter((e) => getNormalizedDateStr(e.eventDate) === item.dateStr);
+                  const dayEvents = combinedEvents.filter((e) => getNormalizedDateStr(e.eventDate) === item.dateStr);
 
                   return (
                     <TouchableOpacity
@@ -298,7 +319,7 @@ export const CompactCalendarModal: React.FC<CompactCalendarModalProps> = ({ visi
                       <View style={[styles.badge, { backgroundColor: getTypeBadgeColor(evt.type) }]}>
                         <Text style={styles.badgeText}>{evt.type.replace('_', ' ')}</Text>
                       </View>
-                      <TouchableOpacity onPress={() => deleteCalendarEvent(evt.id)}>
+                      <TouchableOpacity onPress={() => handleDeleteEvent(evt.id)}>
                         <Text style={styles.deleteText}>🗑 Delete</Text>
                       </TouchableOpacity>
                     </View>
