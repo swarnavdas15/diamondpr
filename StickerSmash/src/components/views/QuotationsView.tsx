@@ -443,7 +443,7 @@ export const QuotationsView: React.FC<QuotationsViewProps> = ({ onOpenCreateQuot
             >
               <Text style={[styles.filterChipText, statusFilter === 'ALL' && styles.filterChipTextActive]}>ALL</Text>
             </TouchableOpacity>
-            {['SENT', 'NEGOTIATION', 'APPROVED', 'FULLY_CONVERTED', 'LOST'].map((st) => (
+            {['DRAFT', 'SENT', 'NEGOTIATION', 'APPROVED', 'FULLY_CONVERTED', 'LOST'].map((st) => (
               <TouchableOpacity
                 key={st}
                 style={[styles.filterChip, statusFilter === st && styles.filterChipActive]}

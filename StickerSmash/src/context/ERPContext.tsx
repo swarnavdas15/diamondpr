@@ -798,6 +798,21 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [quotations, setQuotations] = useState<Quotation[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([]);
+
+  const computedCalendarEvents = React.useMemo(() => {
+    const quotationEvents = quotations
+      .filter(q => q.followUpDate && q.status !== 'FULLY_CONVERTED' && q.status !== 'LOST')
+      .map(q => ({
+        id: `qf-${q.id}`,
+        title: `Follow-up: ${q.companyName}`,
+        type: 'MEETING' as CalendarEventType,
+        eventDate: q.followUpDate as string,
+        description: `Quotation ${q.quotationNumber} follow-up for ${q.quotationAmount}`,
+        createdByName: q.salesExecutive || 'System',
+        createdAt: q.createdAt
+      }));
+    return [...calendarEvents, ...quotationEvents].sort((a, b) => new Date(a.eventDate).getTime() - new Date(b.eventDate).getTime());
+  }, [calendarEvents, quotations]);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
 
   // Live Backend Fetch
@@ -1533,7 +1548,7 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         vendors,
         quotations,
         tasks,
-        calendarEvents,
+        calendarEvents: computedCalendarEvents,
         selectedOrder,
         setSelectedOrder,
 
