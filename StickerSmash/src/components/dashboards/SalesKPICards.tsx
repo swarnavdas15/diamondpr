@@ -14,11 +14,11 @@ export const SalesKPICards: React.FC<SalesKPICardsProps> = ({ onCardPress, style
   const isMobile = width < 768;
 
   const totalQuotations = quotations.length;
-  const totalQuotationValue = quotations.reduce((acc, q) => acc + q.quotationAmount, 0);
-  const convertedValue = quotations.reduce((acc, q) => acc + (q.convertedOrderValue || 0), 0);
-  const lostBusinessValue = quotations.reduce((acc, q) => acc + (q.lostValue || 0), 0);
+  const totalQuotationValue = quotations.reduce((acc, q) => acc + Number(q.quotationAmount || 0), 0);
+  const convertedValue = quotations.reduce((acc, q) => acc + Number(q.convertedOrderValue || 0), 0);
+  const lostBusinessValue = quotations.reduce((acc, q) => acc + Number(q.lostValue || 0), 0);
 
-  const formatCurrency = (val: number) => `₹${val.toLocaleString('en-IN')}`;
+  const formatCurrency = (val: number | string) => `₹${Number(val || 0).toLocaleString('en-IN')}`;
 
   return (
     <View style={[styles.container, isMobile && styles.containerMobile, style]}>

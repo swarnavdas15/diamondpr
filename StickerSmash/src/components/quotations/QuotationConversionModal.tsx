@@ -101,7 +101,7 @@ export const QuotationConversionModal: React.FC<QuotationConversionModalProps> =
   const isPartialConversion = approvedNum > 0 && approvedNum < originalAmount;
   const isFullConversion = approvedNum >= originalAmount;
 
-  const formatCurrency = (val: number) => `₹${val.toLocaleString('en-IN')}`;
+  const formatCurrency = (val: number | string) => `₹${Number(val || 0).toLocaleString('en-IN')}`;
 
   const handleSubmit = () => {
     setError('');

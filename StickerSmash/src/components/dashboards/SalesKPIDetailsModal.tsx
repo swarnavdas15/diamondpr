@@ -51,7 +51,7 @@ export const SalesKPIDetailsModal: React.FC<SalesKPIDetailsModalProps> = ({
   // Detail View Submodal State
   const [selectedQuotation, setSelectedQuotation] = useState<Quotation | null>(null);
 
-  const formatCurrency = (val: number) => `₹${val.toLocaleString('en-IN')}`;
+  const formatCurrency = (val: number | string) => `₹${Number(val || 0).toLocaleString('en-IN')}`;
 
   // Unique list of Sales Executives
   const salesExecutives = useMemo(() => {
@@ -64,20 +64,20 @@ export const SalesKPIDetailsModal: React.FC<SalesKPIDetailsModalProps> = ({
 
   // General Metrics
   const totalQuotationsCount = quotations.length;
-  const totalQuotationValue = quotations.reduce((acc, q) => acc + q.quotationAmount, 0);
+  const totalQuotationValue = quotations.reduce((acc, q) => acc + Number(q.quotationAmount || 0), 0);
 
   const convertedQuotations = useMemo(
     () => quotations.filter((q) => q.status === 'FULLY_CONVERTED' || q.status === 'PARTIALLY_CONVERTED' || (q.convertedOrderValue && q.convertedOrderValue > 0)),
     [quotations]
   );
-  const totalConvertedValue = convertedQuotations.reduce((acc, q) => acc + (q.convertedOrderValue || 0), 0);
+  const totalConvertedValue = convertedQuotations.reduce((acc, q) => acc + Number(q.convertedOrderValue || 0), 0);
   const conversionRate = totalQuotationsCount > 0 ? Math.round((convertedQuotations.length / totalQuotationsCount) * 100) : 0;
 
   const lostQuotations = useMemo(
     () => quotations.filter((q) => q.status === 'LOST' || (q.lostValue && q.lostValue > 0)),
     [quotations]
   );
-  const totalLostValue = lostQuotations.reduce((acc, q) => acc + (q.lostValue || 0), 0);
+  const totalLostValue = lostQuotations.reduce((acc, q) => acc + Number(q.lostValue || 0), 0);
 
   const underNegotiationCount = quotations.filter((q) => q.status === 'NEGOTIATION' || q.status === 'UNDER_DISCUSSION').length;
 
