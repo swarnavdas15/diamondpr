@@ -142,6 +142,7 @@ model Quotation {
   updatedAt            DateTime @updatedAt
   
   followUps            QuotationFollowUp[]
+  followUps            QuotationFollowUp[]
 }
 
 model QuotationFollowUp {
