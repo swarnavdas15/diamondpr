@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, Modal, TouchableOpacity, TextInput, ScrollView, StyleSheet, Platform, useWindowDimensions } from 'react-native';
 import * as XLSX from 'xlsx';
+import { apiClient } from '../api/client';
 import { useERP } from '../context/ERPContext';
 import { useAuth } from '../context/AuthContext';
 import { Colors, Spacing, Radius, Shadows } from '../theme';
@@ -29,7 +30,7 @@ interface CreateOrderModalProps {
 }
 
 export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ visible, onClose, initialData }) => {
-  const { clients, createOrder } = useERP();
+  const { clients, createOrder, refreshData } = useERP();
   const { users } = useAuth();
   const { width } = useWindowDimensions();
   const isMobile = width < 768;
@@ -158,25 +159,25 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ visible, onC
     setCustomStages((prev) => prev.filter((s) => s.id !== id));
   };
 
-  const processExcelData = (data: any[]) => {
-    let successCount = 0;
-    let errCount = 0;
-    data.forEach((row) => {
-      // Find client using either clientCode or companyName
-      const client = clients.find(c => 
-        (row.ClientCode && c.clientCode.toLowerCase() === String(row.ClientCode).toLowerCase()) || 
-        (row.ClientCode && c.companyName.toLowerCase() === String(row.ClientCode).toLowerCase())
-      );
-
-      if (!client) {
-        errCount++;
-        return;
-      }
-      try {
-        createOrder({
-          poNumber: row.PONumber ? String(row.PONumber) : `PO-EXCEL-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+  const processExcelData = async (data: any[]) => {
+      setSuccessMsg('Processing Excel Data...');
+      let successCount = 0;
+      let errCount = 0;
+      
+      const validOrders: any[] = [];
+      data.forEach((row) => {
+        const client = clients.find(c => 
+          (row.ClientCode && c.clientCode.toLowerCase() === String(row.ClientCode).toLowerCase()) || 
+          (row.ClientCode && c.companyName.toLowerCase() === String(row.ClientCode).toLowerCase())
+        );
+        if (!client) {
+          errCount++;
+          return;
+        }
+        validOrders.push({
           clientId: client.id,
-          budget: row.Budget ? parseFloat(row.Budget) : undefined,
+          poNumber: row.PONumber ? row.PONumber.toString() : '',
+          convertedOrderValue: row.Budget ? parseFloat(row.Budget) : 0,
           technicalRequirements: row.TechnicalRequirements || '',
           materialRequirements: row.MaterialRequirements || '',
           requiredQuantity: row.RequiredQuantity ? parseInt(row.RequiredQuantity, 10) : 1,
@@ -191,13 +192,21 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ visible, onC
              unitPrice: row.UnitPrice ? parseFloat(row.UnitPrice) : undefined,
           }]
         });
-        successCount++;
-      } catch (e) {
-        errCount++;
+      });
+      
+      const chunkSize = 20;
+      for (let i = 0; i < validOrders.length; i += chunkSize) {
+        const chunk = validOrders.slice(i, i + chunkSize);
+        await Promise.all(
+          chunk.map((orderData) =>
+            apiClient.post(`/orders`, orderData).then(() => { successCount++; }).catch(e => { errCount++; console.error(e); })
+          )
+        );
       }
-    });
-    
-    if (successCount > 0) {
+      
+      if (successCount > 0) {
+        await refreshData();
+        
       setSuccessMsg(`Successfully imported ${successCount} orders from Excel.`);
       setTimeout(() => setSuccessMsg(''), 4000);
       if (errCount === 0) handleClose();

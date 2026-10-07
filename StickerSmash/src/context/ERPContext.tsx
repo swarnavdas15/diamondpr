@@ -1667,6 +1667,7 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   return (
     <ERPContext.Provider
       value={{
+        refreshData: fetchLiveDashboardData,
         orders,
         getMaskedOrders,
         clients,

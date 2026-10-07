@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, Modal, TouchableOpacity, TextInput, StyleSheet, ScrollView, useWindowDimensions, Image, Platform } from 'react-native';
 import * as XLSX from 'xlsx';
 import * as ImagePicker from 'expo-image-picker';
+import { apiClient } from '../api/client';
 import { useERP } from '../context/ERPContext';
 import { Colors, Spacing, Radius, Shadows } from '../theme';
 
@@ -17,7 +18,7 @@ interface CreateClientModalProps {
 export const CreateClientModal: React.FC<CreateClientModalProps> = ({ visible, onClose, onClientCreated }) => {
   const { width } = useWindowDimensions();
   const isMobile = width < 768;
-  const { clients, createClient, uploadClientProfileImage, uploadPrimaryContactProfileImage } = useERP();
+  const { clients, createClient, uploadClientProfileImage, uploadPrimaryContactProfileImage, refreshData } = useERP();
 
   const [clientCode, setClientCode] = useState('');
   const [companyName, setCompanyName] = useState('');
@@ -81,55 +82,61 @@ export const CreateClientModal: React.FC<CreateClientModalProps> = ({ visible, o
 
   const processExcelData = async (binaryStr: string) => {
     try {
+      setSuccessMsg('Processing Excel Data...');
       const workbook = XLSX.read(binaryStr, { type: 'binary' });
       const firstSheetName = workbook.SheetNames[0];
       const worksheet = workbook.Sheets[firstSheetName];
       const data = XLSX.utils.sheet_to_json(worksheet);
 
-      let successCount = 0;
       const processedCodes = new Set<string>();
+      const validRows = [];
 
       for (const row of data as any[]) {
         const clientCode = row['ClientCode'];
         const companyName = row['CompanyName'];
         const contactNo = row['ContactNo'];
+        if (!clientCode || !companyName || !contactNo) continue;
         
-        if (!clientCode || !companyName || !contactNo) {
-          continue; // Skip invalid rows
-        }
-
         const normalizedCode = clientCode.toString().trim().toLowerCase();
-
         const isDuplicateInState = clients.some(
-          (c) => (c.clientCode || c.clientCode || '').trim().toLowerCase() === normalizedCode
+          (c) => (c.clientCode || '').trim().toLowerCase() === normalizedCode
         );
 
         if (!isDuplicateInState && !processedCodes.has(normalizedCode)) {
           processedCodes.add(normalizedCode);
-          try {
-            await createClient({
-              clientCode: clientCode.toString(),
-              companyName: companyName.toString(),
-              contactNo: contactNo.toString(),
-              contactName: row['ContactName'] ? row['ContactName'].toString() : '',
-              email: row['Email'] ? row['Email'].toString() : '',
-              address: row['Address'] ? row['Address'].toString() : '',
-              gstNumber: row['GSTNumber'] ? row['GSTNumber'].toString() : '',
-              industry: row['Industry'] ? row['Industry'].toString() : '',
-              remarks: row['Remarks'] ? row['Remarks'].toString() : '',
-            });
-            successCount++;
-          } catch (e) {
-            console.error('Failed to create client from Excel row:', row, e);
-          }
+          validRows.push({
+            clientCode: clientCode.toString(),
+            companyName: companyName.toString(),
+            contactNo: contactNo.toString(),
+            contactName: row['ContactName'] ? row['ContactName'].toString() : '',
+            email: row['Email'] ? row['Email'].toString() : '',
+            address: row['Address'] ? row['Address'].toString() : '',
+            gstNumber: row['GSTNumber'] ? row['GSTNumber'].toString() : '',
+            industry: row['Industry'] ? row['Industry'].toString() : '',
+            remarks: row['Remarks'] ? row['Remarks'].toString() : '',
+          });
         }
       }
 
+      let successCount = 0;
+      const chunkSize = 20;
+      
+      for (let i = 0; i < validRows.length; i += chunkSize) {
+        const chunk = validRows.slice(i, i + chunkSize);
+        await Promise.all(
+          chunk.map((data) =>
+            apiClient.post(`/orders/client`, data).then(() => { successCount++; }).catch(e => console.error(e))
+          )
+        );
+      }
+
       if (successCount > 0) {
+        await refreshData();
         setSuccessMsg(`Successfully imported ${successCount} clients from Excel.`);
         setTimeout(() => handleClose(), 2000);
       } else {
         setError('No valid/new clients found in the Excel file.');
+        setSuccessMsg('');
       }
     } catch (err) {
       console.error(err);
