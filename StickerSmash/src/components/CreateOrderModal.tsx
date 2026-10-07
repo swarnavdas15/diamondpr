@@ -10,6 +10,7 @@ import { CreateClientModal } from './CreateClientModal';
 import { Client, CustomStage } from '../types';
 
 export interface InitialOrderData {
+  quotationId?: string;
   clientId?: string;
   poNumber?: string;
   budget?: number;
@@ -30,7 +31,7 @@ interface CreateOrderModalProps {
 }
 
 export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ visible, onClose, initialData }) => {
-  const { clients, createOrder, refreshData } = useERP();
+  const { clients, createOrder, updateQuotation, refreshData } = useERP();
   const { users } = useAuth();
   const { width } = useWindowDimensions();
   const isMobile = width < 768;

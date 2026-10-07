@@ -15,6 +15,7 @@ import { formatDate } from '../../utils/formatUtils';
 
 interface QuotationsViewProps {
   onOpenCreateQuotation?: () => void;
+  onOpenCreateOrderWithData?: (data: any) => void;
 }
 
 const LOST_REASON_LABELS: Record<LostReason, string> = {
@@ -38,7 +39,7 @@ const STATUS_COLORS: Record<QuotationStatus, { bg: string; text: string; border:
   LOST: { bg: 'rgba(239, 68, 68, 0.15)', text: '#ef4444', border: '#ef4444' },
 };
 
-export const QuotationsView: React.FC<QuotationsViewProps> = ({ onOpenCreateQuotation }) => {
+export const QuotationsView: React.FC<QuotationsViewProps> = ({ onOpenCreateQuotation, onOpenCreateOrderWithData }) => {
   const {
     quotations,
     updateQuotation,

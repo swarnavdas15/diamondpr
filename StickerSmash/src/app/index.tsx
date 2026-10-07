@@ -61,6 +61,7 @@ export default function MainScreen() {
   const [createUserVisible, setCreateUserVisible] = useState(false);
   const [createClientVisible, setCreateClientVisible] = useState(false);
   const [createOrderVisible, setCreateOrderVisible] = useState(false);
+  const [orderInitialData, setOrderInitialData] = useState<any>(null);
   const [createTaskVisible, setCreateTaskVisible] = useState(false);
   const [createQuotationVisible, setCreateQuotationVisible] = useState(false);
 
@@ -81,7 +82,7 @@ export default function MainScreen() {
         return (
           <SalesDashboard
             onOpenCreateClient={() => setCreateClientVisible(true)}
-            onOpenCreateOrder={() => setCreateOrderVisible(true)}
+            onOpenCreateOrder={() => { setOrderInitialData(null); setCreateOrderVisible(true); }}
             onOpenCreateQuotation={() => setCreateQuotationVisible(true)}
           />
         );
@@ -120,7 +121,7 @@ export default function MainScreen() {
         return (
           <ClientDirectoryView
             onOpenCreateClient={() => setCreateClientVisible(true)}
-            onOpenCreateOrder={() => setCreateOrderVisible(true)}
+            onOpenCreateOrder={() => { setOrderInitialData(null); setCreateOrderVisible(true); }}
           />
         );
 
@@ -131,7 +132,7 @@ export default function MainScreen() {
         return (
           <OrdersManagement
             onNavigateToQuotations={() => setActiveMenuItem('Quotations')}
-            onOpenCreateOrder={() => setCreateOrderVisible(true)}
+            onOpenCreateOrder={() => { setOrderInitialData(null); setCreateOrderVisible(true); }}
           />
         );
 
@@ -171,7 +172,7 @@ export default function MainScreen() {
         if (currentUser.role !== 'SUPER_ADMIN' && currentUser.role !== 'ADMIN' && currentUser.role !== 'SALES') {
           return renderDashboardByRole();
         }
-        return <QuotationsView onOpenCreateQuotation={() => setCreateQuotationVisible(true)} />;
+        return <QuotationsView onOpenCreateQuotation={() => setCreateQuotationVisible(true)} onOpenCreateOrderWithData={(data) => { setOrderInitialData(data); setCreateOrderVisible(true); }} />;
 
       case 'Tasks':
         return <TaskManagement onOpenCreateTask={() => setCreateTaskVisible(true)} />;
@@ -246,7 +247,7 @@ export default function MainScreen() {
         <OrderOverviewModal visible={!!selectedOrder} onClose={() => setSelectedOrder(null)} />
         <CreateUserModal visible={createUserVisible} onClose={() => setCreateUserVisible(false)} />
         <CreateClientModal visible={createClientVisible} onClose={() => setCreateClientVisible(false)} />
-        <CreateOrderModal visible={createOrderVisible} onClose={() => setCreateOrderVisible(false)} />
+        <CreateOrderModal visible={createOrderVisible} onClose={() => { setCreateOrderVisible(false); setOrderInitialData(null); }} initialData={orderInitialData} />
         <CreateTaskModal visible={createTaskVisible} onClose={() => setCreateTaskVisible(false)} />
         <CreateQuotationModal visible={createQuotationVisible} onClose={() => setCreateQuotationVisible(false)} />
       </View>
