@@ -180,9 +180,71 @@ export const contract = defineContract(
       },
     });
 
+    
+    const Quotation = model('Quotation', {
+      fields: {
+        id: field.id.uuidv7String(),
+        quotationNumber: field.text().unique(),
+        quotationDate: field.temporal.createdAtString(),
+        clientId: field.uuidString(),
+        clientCode: field.text(),
+        companyName: field.text(),
+        contactPerson: field.text(),
+        mobileNumber: field.text(),
+        email: field.text(),
+        inquiryRef: field.text().optional(),
+        quotationAmount: field.float(),
+        expectedOrderValue: field.float().optional(),
+        salesExecutive: field.text(),
+        salesExecutiveUserId: field.uuidString().optional(),
+        followUpDate: field.temporal.timestampString().optional(),
+        status: field.text().default('DRAFT'),
+        remarks: field.text().optional(),
+        
+        convertedOrderValue: field.float().optional(),
+        lostValue: field.float().optional(),
+        convertedOrderId: field.uuidString().optional(),
+        convertedOrderNumber: field.text().optional(),
+        lostDate: field.temporal.timestampString().optional(),
+        lostReason: field.text().optional(),
+        lostRemarks: field.text().optional(),
+        competitorName: field.text().optional(),
+        
+        sentVia: field.text().optional(),
+        sentAt: field.temporal.timestampString().optional(),
+        sentNotes: field.text().optional(),
+        negotiationDate: field.temporal.timestampString().optional(),
+        expectedClosureDate: field.temporal.timestampString().optional(),
+        isLocked: field.boolean().default(false),
+        
+        createdAt: field.temporal.createdAtString(),
+        updatedAt: field.temporal.updatedAtString(),
+      },
+    });
+
+    const QuotationFollowUp = model('QuotationFollowUp', {
+      fields: {
+        id: field.id.uuidv7String(),
+        quotationId: field.uuidString(),
+        followUpDate: field.temporal.timestampString(),
+        notes: field.text(),
+        status: field.text().default('PENDING'),
+        createdByName: field.text(),
+        createdAt: field.temporal.createdAtString(),
+      },
+    });
+
     return {
       enums: { Role, OrderStage, Priority, TaskStatus },
       models: {
+        Quotation: Quotation.relations({
+          client: rel.belongsTo(Client, { from: 'clientId', to: 'id' }),
+          followUps: rel.hasMany(QuotationFollowUp, { by: 'quotationId' }),
+        }),
+        QuotationFollowUp: QuotationFollowUp.relations({
+          quotation: rel.belongsTo(Quotation, { from: 'quotationId', to: 'id' }),
+        }),
+
         User: User.relations({
           createdClients: rel.hasMany(Client, { by: 'createdById' }),
           createdOrders: rel.hasMany(Order, { by: 'createdById' }),
