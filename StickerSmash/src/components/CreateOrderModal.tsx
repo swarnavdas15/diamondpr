@@ -167,8 +167,8 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ visible, onC
       const validOrders: any[] = [];
       data.forEach((row) => {
         const client = clients.find(c => 
-          (row.ClientCode && c.clientCode.toLowerCase() === String(row.ClientCode).toLowerCase()) || 
-          (row.ClientCode && c.companyName.toLowerCase() === String(row.ClientCode).toLowerCase())
+          (row.ClientCode && (c.clientCode || '').toLowerCase() === String(row.ClientCode).toLowerCase()) || 
+          (row.ClientCode && (c.companyName || '').toLowerCase() === String(row.ClientCode).toLowerCase())
         );
         if (!client) {
           errCount++;
@@ -216,7 +216,7 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ visible, onC
   };
 
   const handleFileUpload = (e: any) => {
-    const file = e.target?.files?.[0] || e.dataTransfer?.files?.[0];
+    const file = e.target?.files?.[0] || e.dataTransfer?.files?.[0] || (e.nativeEvent && e.nativeEvent.dataTransfer && e.nativeEvent.dataTransfer.files?.[0]) || (e.nativeEvent && e.nativeEvent.target && e.nativeEvent.target.files?.[0]);
     if (!file) return;
 
     const reader = new FileReader();

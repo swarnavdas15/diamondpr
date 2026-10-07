@@ -30,7 +30,8 @@ import {
 import { useAuth } from './AuthContext';
 import { apiClient } from '../api/client';
 
-interface ERPContextType {\n  refreshData: () => Promise<void>;
+interface ERPContextType {
+  refreshData: () => Promise<void>;
   orders: Order[];
   getMaskedOrders: () => Order[];
   clients: Client[];
