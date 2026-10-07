@@ -246,40 +246,39 @@ export const CreateClientModal: React.FC<CreateClientModalProps> = ({ visible, o
       <View
         // @ts-ignore
         onDragEnter={(e: any) => { e.preventDefault(); e.stopPropagation(); setIsDragging(true); }}
+        onDragOver={(e: any) => { e.preventDefault(); e.stopPropagation(); }}
         style={{ flex: 1 }}
       >
+        {Platform.OS === 'web' && isDragging && (
+          <View
+            // @ts-ignore
+            onDragOver={(e: any) => { e.preventDefault(); e.stopPropagation(); }}
+            onDragLeave={(e: any) => { e.preventDefault(); e.stopPropagation(); setIsDragging(false); }}
+            onDrop={(e: any) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setIsDragging(false);
+              handleClose(); // Close modal immediately
+              handleFileUpload(e); // Process file
+            }}
+            style={{
+              position: 'absolute',
+              top: 0, left: 0, right: 0, bottom: 0,
+              backgroundColor: 'rgba(2, 132, 199, 0.95)',
+              zIndex: 999999,
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderWidth: 6,
+              borderColor: '#fff',
+              borderStyle: 'dashed',
+            }}
+          >
+            <Text pointerEvents="none" style={{ color: '#fff', fontSize: 32, fontWeight: 'bold' }}>Drop Excel File Here</Text>
+            <Text pointerEvents="none" style={{ color: '#bae6fd', fontSize: 16, marginTop: 12 }}>Release to immediately parse & close</Text>
+          </View>
+        )}
         <TouchableOpacity style={[styles.backdrop, isMobile && { padding: 10 }]} activeOpacity={1} onPress={handleClose}>
           <TouchableOpacity activeOpacity={1} style={[styles.card, isMobile && { padding: 14, maxHeight: '95%' }]} onPress={(e) => e.stopPropagation()}>
-            
-            {Platform.OS === 'web' && isDragging && (
-              <View
-                // @ts-ignore
-                onDragOver={(e: any) => { e.preventDefault(); e.stopPropagation(); }}
-                onDragLeave={(e: any) => { e.preventDefault(); e.stopPropagation(); setIsDragging(false); }}
-                onDrop={(e: any) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  setIsDragging(false);
-                  handleClose(); // Close modal immediately
-                  handleFileUpload(e); // Process file
-                }}
-                style={{
-                  position: 'absolute',
-                  top: 0, left: 0, right: 0, bottom: 0,
-                  backgroundColor: 'rgba(2, 132, 199, 0.9)',
-                  zIndex: 9999,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  borderWidth: 4,
-                  borderColor: '#fff',
-                  borderStyle: 'dashed',
-                  borderRadius: 12
-                }}
-              >
-                <Text pointerEvents="none" style={{ color: '#fff', fontSize: 32, fontWeight: 'bold' }}>Drop Excel File Here</Text>
-                <Text pointerEvents="none" style={{ color: '#bae6fd', fontSize: 16, marginTop: 12 }}>Release to immediately parse & close</Text>
-              </View>
-            )}
 
             <View style={styles.header}>
             <Text style={styles.title}>Register New Client</Text>
