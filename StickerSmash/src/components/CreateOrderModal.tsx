@@ -66,15 +66,46 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ visible, onC
   const [isDragging, setIsDragging] = useState(false);
 
   React.useEffect(() => {
-    if (Platform.OS !== 'web' || !visible) return;
+    if (Platform.OS !== 'web' || !visible) {
+      setIsDragging(false);
+      return;
+    }
     
-    const handleDragEnter = (e: any) => {
+    const preventDefaults = (e: any) => {
       e.preventDefault();
+      e.stopPropagation();
+    };
+
+    const handleDragEnter = (e: any) => {
+      preventDefaults(e);
       setIsDragging(true);
     };
 
+    const handleDragLeave = (e: any) => {
+      preventDefaults(e);
+      // Only hide overlay if we are leaving the window entirely
+      if (!e.relatedTarget || e.relatedTarget === document.documentElement) {
+        setIsDragging(false);
+      }
+    };
+
+    const handleDrop = (e: any) => {
+      preventDefaults(e);
+      setIsDragging(false);
+    };
+
     window.addEventListener('dragenter', handleDragEnter);
-    return () => window.removeEventListener('dragenter', handleDragEnter);
+    window.addEventListener('dragover', preventDefaults);
+    window.addEventListener('dragleave', handleDragLeave);
+    window.addEventListener('drop', handleDrop);
+
+    return () => {
+      window.removeEventListener('dragenter', handleDragEnter);
+      window.removeEventListener('dragover', preventDefaults);
+      window.removeEventListener('dragleave', handleDragLeave);
+      window.removeEventListener('drop', handleDrop);
+      setIsDragging(false);
+    };
   }, [visible]);
 
 
