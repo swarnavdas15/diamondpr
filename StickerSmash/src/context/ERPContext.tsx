@@ -1020,10 +1020,12 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       await apiClient.delete(`/clients/${id}`);
       await fetchLiveDashboardData();
-    } catch (e) {
-      console.error(e);
-      // Fallback for missing backend route
-      setClients(prev => prev.filter(c => c.id !== id));
+    } catch (e: any) {
+      if (e.response?.status === 404) {
+        alert('Action Failed: The delete route is missing on the production server. Please wait for the Render deployment to complete.');
+      } else {
+        alert('Failed to delete client at DB level.');
+      }
     }
   };
 
