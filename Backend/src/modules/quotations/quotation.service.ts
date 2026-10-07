@@ -3,7 +3,7 @@ import { dbId } from '../../prisma/ids';
 
 export const listQuotations = async () => {
   const quotations = await db.orm.public.Quotation
-    .where({ isDeleted: 0 })
+    
     .include('followUps', (f) => f.orderBy((log) => log.createdAt.desc()))
     .orderBy((q) => q.createdAt.desc())
     .all();
@@ -83,3 +83,4 @@ export const addQuotationFollowUp = async (quotationId: string, data: any, creat
 
   return followUp;
 };
+\nexport const deleteQuotation = async (id: string) => {\n  await db.orm.public.Quotation.where({ id: dbId(id) }).delete();\n  return { success: true };\n};\n

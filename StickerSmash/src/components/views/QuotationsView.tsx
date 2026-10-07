@@ -169,7 +169,7 @@ export const QuotationsView: React.FC<QuotationsViewProps> = ({ onOpenCreateQuot
     setEditError('');
   };
 
-  const handleSaveEdit = () => {
+  const handleSaveEdit = async () => {
     if (!editQuotation) return;
     setEditError('');
 
@@ -183,7 +183,7 @@ export const QuotationsView: React.FC<QuotationsViewProps> = ({ onOpenCreateQuot
     }
 
     try {
-      updateQuotation(editQuotation.id, {
+      await updateQuotation(editQuotation.id, {
         companyName: editCompanyName.trim(),
         contactPerson: editContact.trim(),
         mobileNumber: editMobile.trim(),
@@ -211,25 +211,25 @@ export const QuotationsView: React.FC<QuotationsViewProps> = ({ onOpenCreateQuot
     setLostError('');
   };
 
-  const handleSaveLost = () => {
+  const handleSaveLost = async () => {
     if (!lostQuotation) return;
     setLostError('');
 
     try {
-      markQuotationLost(lostQuotation.id, {
+      await markQuotationLost(lostQuotation.id, {
         lostReason,
         lostValue: lostValue ? Number(lostValue) : lostQuotation.quotationAmount,
         lostDate,
         lostRemarks: competitorName ? `Competitor: ${competitorName}. ${lostRemarks}` : lostRemarks,
       });
-      updateQuotation(lostQuotation.id, { competitorName });
+      await updateQuotation(lostQuotation.id, { competitorName });
       setLostQuotation(null);
     } catch (err: any) {
       setLostError(err.message || 'Failed to mark quotation as lost.');
     }
   };
 
-  const handleSelectStatusChange = (q: Quotation, newSt: QuotationStatus) => {
+  const handleSelectStatusChange = async (q: Quotation, newSt: QuotationStatus) => {
     setStatusQuotation(null);
     if (newSt === 'SENT') {
       setSentModalQuotation(q);
@@ -243,13 +243,13 @@ export const QuotationsView: React.FC<QuotationsViewProps> = ({ onOpenCreateQuot
       setConversionError('');
       setConversionModalQuotation(q);
     } else {
-      updateQuotation(q.id, { status: newSt });
+      await updateQuotation(q.id, { status: newSt });
     }
   };
 
-  const handleSaveSentDetails = (data: { sentVia: any; sentAt: string; sentNotes: string }) => {
+  const handleSaveSentDetails = async (data: { sentVia: any; sentAt: string; sentNotes: string }) => {
     if (!sentModalQuotation) return;
-    updateQuotation(sentModalQuotation.id, {
+    await updateQuotation(sentModalQuotation.id, {
       status: 'SENT',
       sentVia: data.sentVia,
       sentAt: data.sentAt,
@@ -258,7 +258,7 @@ export const QuotationsView: React.FC<QuotationsViewProps> = ({ onOpenCreateQuot
     setSentModalQuotation(null);
   };
 
-  const handleSaveFollowUpDetails = (data: {
+  const handleSaveFollowUpDetails = async (data: {
     targetStatus: QuotationStatus;
     followUpDate: string;
     followUpTime?: string;
@@ -268,14 +268,14 @@ export const QuotationsView: React.FC<QuotationsViewProps> = ({ onOpenCreateQuot
     expectedClosureDate?: string;
   }) => {
     if (!followUpModalQuotation) return;
-    updateQuotation(followUpModalQuotation.id, {
+    await updateQuotation(followUpModalQuotation.id, {
       status: data.targetStatus,
       followUpDate: data.followUpDate,
       negotiationDate: data.negotiationDate,
       expectedClosureDate: data.expectedClosureDate,
     });
 
-    addQuotationFollowUp(followUpModalQuotation.id, {
+    await addQuotationFollowUp(followUpModalQuotation.id, {
       followUpDate: data.followUpDate,
       notes: data.notes,
       status: 'PENDING',
@@ -308,7 +308,7 @@ export const QuotationsView: React.FC<QuotationsViewProps> = ({ onOpenCreateQuot
 
       // If partial conversion, also log the lost reason
       if (data.lostReason) {
-        updateQuotation(q.id, {
+        await updateQuotation(q.id, {
           lostRemarks: data.lostRemarks || `Partial conversion — approved ${data.approvedAmount} of ${q.quotationAmount}`,
           competitorName: undefined,
         });
@@ -325,8 +325,8 @@ export const QuotationsView: React.FC<QuotationsViewProps> = ({ onOpenCreateQuot
     }
   };
 
-  const handleUnlockQuotation = (q: Quotation) => {
-    updateQuotation(q.id, { isLocked: false, status: 'DRAFT' });
+  const handleUnlockQuotation = async (q: Quotation) => {
+    await updateQuotation(q.id, { isLocked: false, status: 'DRAFT' });
   };
 
   const getQuotationsExportPayload = (): ExportDataPayload => {
@@ -630,10 +630,10 @@ export const QuotationsView: React.FC<QuotationsViewProps> = ({ onOpenCreateQuot
                         {isSuperAdmin && (
                           <TouchableOpacity
                             style={{ backgroundColor: 'rgba(239, 68, 68, 0.15)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: Radius.xs, borderWidth: 1, borderColor: '#ef4444', marginLeft: 4 }}
-                            onPress={(e) => {
+                            onPress={async (e) => {
                               e.stopPropagation();
                               if (window.confirm(`Delete quotation ${q.quotationNumber}?`)) {
-                                deleteQuotation(q.id);
+                                await deleteQuotation(q.id);
                               }
                             }}
                           >

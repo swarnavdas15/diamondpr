@@ -54,3 +54,14 @@ export const handleAddQuotationFollowUp = async (req: AuthRequest, res: Response
     return res.status(400).json({ success: false, error: err.message || 'Failed to add follow-up' });
   }
 };
+
+export const handleDeleteQuotation = async (req: AuthRequest, res: Response) => {
+  try {
+    const id = req.params.id as string;
+    await quotationService.deleteQuotation(id);
+    return res.status(200).json({ success: true });
+  } catch (err: any) {
+    console.error('Error in handleDeleteQuotation:', err);
+    return res.status(400).json({ success: false, error: err.message || 'Failed to delete quotation' });
+  }
+};

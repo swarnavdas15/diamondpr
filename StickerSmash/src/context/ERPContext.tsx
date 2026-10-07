@@ -64,9 +64,9 @@ interface ERPContextType {
     followUpDate?: string;
     status?: QuotationStatus;
     remarks?: string;
-  }) => Quotation;
+  }) => Promise<Quotation>;
 
-  updateQuotation: (id: string, data: Partial<Quotation>) => void;
+  updateQuotation: (id: string, data: Partial<Quotation>) => Promise<void>;
 
   addQuotationFollowUp: (
     quotationId: string,
@@ -92,13 +92,8 @@ interface ERPContextType {
 
   markQuotationLost: (
     quotationId: string,
-    data: {
-      lostReason: LostReason;
-      lostValue?: number;
-      lostRemarks?: string;
-      lostDate?: string;
-    }
-  ) => void;
+    data: { lostReason: LostReason; lostValue?: number; lostRemarks?: string; lostDate?: string; }
+  ) => Promise<void>;
 
   createVendor: (data: Omit<Vendor, 'id' | 'createdAt'>) => Vendor;
   updateVendor: (vendorId: string, data: Partial<Vendor>) => void;
@@ -123,7 +118,7 @@ interface ERPContextType {
   uploadPrimaryContactProfileImage: (clientId: string, uri: string, name: string, type: string) => Promise<void>;
   updateOrder: (id: string, data: Partial<Order>) => Promise<void>;
   deleteOrder: (id: string) => Promise<void>;
-  deleteQuotation: (id: string) => void;
+  deleteQuotation: (id: string) => Promise<void>;
   createOrder: (data: {
     poNumber: string;
     clientId: string;
@@ -814,11 +809,12 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const fetchLiveDashboardData = async () => {
     try {
-      const [clientsRes, ordersRes, contactsRes] = await Promise.all([
-        apiClient.get('/clients'),
-        apiClient.get('/orders'),
-        apiClient.get('/clients/contacts')
-      ]);
+      const [clientsRes, ordersRes, contactsRes, quotationsRes] = await Promise.all([
+          apiClient.get('/clients'),
+          apiClient.get('/orders'),
+          apiClient.get('/clients/contacts'),
+          apiClient.get('/quotations')
+        ]);
       const clientsArray = clientsRes.data.clients || clientsRes.data;
       const normalizedClients = Array.isArray(clientsArray) 
         ? clientsArray.map((c: any) => ({ ...c, clientCode: c.clientCode || c.clientcode })) 
@@ -826,6 +822,7 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setClients(normalizedClients);
       setOrders(ordersRes.data.orders || ordersRes.data);
       setCompanyContacts(contactsRes.data.contacts || []);
+      setQuotations(quotationsRes.data.quotations || []);
     } catch (error) {
       console.error('Failed to fetch ERP data from backend API:', error);
     }
@@ -1053,8 +1050,14 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  const deleteQuotation = (id: string) => {
-    setQuotations(prev => prev.filter(q => q.id !== id));
+  const deleteQuotation = async (id: string): Promise<void> => {
+    try {
+      await apiClient.delete(`/quotations/${id}`);
+      await fetchLiveDashboardData();
+    } catch (e) {
+      console.error(e);
+      throw e;
+    }
   };
 
   const createOrder = async (data: {
@@ -1398,172 +1401,45 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setCalendarEvents((prev) => prev.filter((e) => e.id !== eventId));
   };
 
-  const createQuotation = (data: {
-    companyName: string;
-    clientCode: string;
-    clientId?: string;
-    contactPerson: string;
-    mobileNumber: string;
-    email: string;
-    inquiryRef?: string;
-    quotationAmount: number;
-    expectedOrderValue?: number;
-    salesExecutive: string;
-    followUpDate?: string;
-    status?: QuotationStatus;
-    remarks?: string;
-  }): Quotation => {
-    const qCount = quotations.length + 1;
-    const qNumStr = String(qCount).padStart(3, '0');
-    const quotationNumber = `QT-2026-${qNumStr}`;
-
-    const newQuotation: Quotation = {
-      id: `qt-${Date.now()}`,
-      quotationNumber,
-      quotationDate: new Date().toISOString().split('T')[0],
-      companyName: data.companyName.trim(),
-      clientCode: data.clientCode.trim().toUpperCase(),
-      clientId: data.clientId,
-      contactPerson: data.contactPerson.trim(),
-      mobileNumber: data.mobileNumber.trim(),
-      email: data.email.trim(),
-      inquiryRef: data.inquiryRef ? data.inquiryRef.trim() : undefined,
-      quotationAmount: Number(data.quotationAmount) || 0,
-      expectedOrderValue: data.expectedOrderValue ? Number(data.expectedOrderValue) : Number(data.quotationAmount) || 0,
-      salesExecutive: data.salesExecutive || currentUser?.name || 'Sales Executive',
-      salesExecutiveUserId: currentUser?.id,
-      followUpDate: data.followUpDate || undefined,
-      status: data.status || 'DRAFT',
-      remarks: data.remarks ? data.remarks.trim() : undefined,
-      followUps: data.followUpDate
-        ? [
-            {
-              id: `fup-${Date.now()}`,
-              quotationId: `qt-${Date.now()}`,
-              followUpDate: data.followUpDate,
-              notes: 'Initial follow-up scheduled upon quotation creation.',
-              status: 'PENDING',
-              createdByName: currentUser?.name || 'Sales Executive',
-              createdAt: new Date().toISOString(),
-            },
-          ]
-        : [],
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-
-    setQuotations((prev) => [newQuotation, ...prev]);
-
-    // Auto-create ERP Calendar Event for Follow-Up Date
-    if (data.followUpDate) {
-      const calEvent: CalendarEvent = {
-        id: `cal-fup-${newQuotation.id}`,
-        title: `Follow-Up: ${data.companyName} (${quotationNumber})`,
-        type: 'FOLLOW_UP',
-        eventDate: data.followUpDate,
-        description: `Quotation Follow-Up with ${data.contactPerson} (${data.mobileNumber}). Sales Executive: ${newQuotation.salesExecutive}. Status: ${newQuotation.status}`,
-        createdByName: newQuotation.salesExecutive,
-      };
-      setCalendarEvents((prev) => [...prev.filter((e) => e.id !== calEvent.id), calEvent].sort((a, b) => a.eventDate.localeCompare(b.eventDate)));
+  const createQuotation = async (data: any): Promise<Quotation> => {
+    try {
+      const res = await apiClient.post('/quotations', data);
+      await fetchLiveDashboardData();
+      return res.data.quotation;
+    } catch (e) {
+      console.error(e);
+      throw e;
     }
-
-    return newQuotation;
   };
 
-  const updateQuotation = (id: string, data: Partial<Quotation>) => {
-    setQuotations((prev) =>
-      prev.map((q) => {
-        if (q.id === id) {
-          const updated = {
-            ...q,
-            ...data,
-            updatedAt: new Date().toISOString(),
-          };
 
-          // Auto-sync calendar event if followUpDate was updated
-          if (data.followUpDate) {
-            const calEvent: CalendarEvent = {
-              id: `cal-fup-${q.id}`,
-              title: `Follow-Up: ${updated.companyName} (${updated.quotationNumber})`,
-              type: 'FOLLOW_UP',
-              eventDate: data.followUpDate,
-              description: `Quotation Follow-Up with ${updated.contactPerson} (${updated.mobileNumber}). Sales Executive: ${updated.salesExecutive}. Status: ${updated.status}`,
-              createdByName: updated.salesExecutive,
-            };
-            setCalendarEvents((prevEvents) =>
-              [...prevEvents.filter((e) => e.id !== calEvent.id), calEvent].sort((a, b) => a.eventDate.localeCompare(b.eventDate))
-            );
-          }
-
-          return updated;
-        }
-        return q;
-      })
-    );
+  const updateQuotation = async (id: string, data: Partial<Quotation>) => {
+    try {
+      await apiClient.patch(`/quotations/${id}`, data);
+      await fetchLiveDashboardData();
+    } catch (e) {
+      console.error(e);
+      throw e;
+    }
   };
 
-  const addQuotationFollowUp = (
+  const addQuotationFollowUp = async (
     quotationId: string,
     data: { followUpDate: string; notes: string; status: FollowUpStatus }
   ) => {
-    const newFollowUp: QuotationFollowUp = {
-      id: `fup-${Date.now()}`,
-      quotationId,
-      followUpDate: data.followUpDate,
-      notes: data.notes.trim(),
-      status: data.status,
-      createdByName: currentUser?.name || 'Sales Executive',
-      createdAt: new Date().toISOString(),
-    };
-
-    setQuotations((prev) =>
-      prev.map((q) => {
-        if (q.id === quotationId) {
-          const updatedFollowUps = [newFollowUp, ...(q.followUps || [])];
-
-          // Auto-sync calendar event
-          if (data.followUpDate) {
-            const calEvent: CalendarEvent = {
-              id: `cal-fup-${q.id}`,
-              title: `Follow-Up: ${q.companyName} (${q.quotationNumber})`,
-              type: 'FOLLOW_UP',
-              eventDate: data.followUpDate,
-              description: `Follow-Up Notes: ${data.notes}. Sales Executive: ${q.salesExecutive}. Status: ${data.status}`,
-              createdByName: q.salesExecutive,
-            };
-            setCalendarEvents((prevEvents) =>
-              [...prevEvents.filter((e) => e.id !== calEvent.id), calEvent].sort((a, b) => a.eventDate.localeCompare(b.eventDate))
-            );
-          }
-
-          return {
-            ...q,
-            followUpDate: data.followUpDate,
-            followUps: updatedFollowUps,
-            updatedAt: new Date().toISOString(),
-          };
-        }
-        return q;
-      })
-    );
+    try {
+      await apiClient.post(`/quotations/${quotationId}/follow-up`, data);
+      await fetchLiveDashboardData();
+    } catch (e) {
+      console.error(e);
+      throw e;
+    }
   };
 
   const convertQuotationToOrder = async (
     quotationId: string,
-    data: {
-      convertedOrderValue: number;
-      poNumber?: string;
-      technicalRequirements?: string;
-      materialRequirements?: string;
-      requiredQuantity?: number;
-      purchaseRequired?: boolean;
-      productionRequired?: boolean;
-      qualityTestingRequired?: boolean;
-      dispatchRequired?: boolean;
-      customStages?: Omit<CustomStage, 'id' | 'createdAt' | 'status'>[];
-      items?: Array<{ itemName: string; size: string; quantity: number; unitPrice?: number }>;
-    }
-  ): Order => {
+    data: any
+  ): Promise<Order> => {
     const targetQuotation = quotations.find((q) => q.id === quotationId);
     if (!targetQuotation) {
       throw new Error('Quotation not found.');
@@ -1586,59 +1462,39 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       });
     }
 
-    const additionalConvertedVal = Number(data.convertedOrderValue) || targetQuotation.quotationAmount;
-    const totalConvertedVal = (targetQuotation.convertedOrderValue || 0) + additionalConvertedVal;
-    const lostVal = Math.max(0, targetQuotation.quotationAmount - totalConvertedVal);
-    const nextStatus: QuotationStatus = totalConvertedVal >= targetQuotation.quotationAmount ? 'FULLY_CONVERTED' : 'PARTIALLY_CONVERTED';
-
-    const newOrder = await createOrder({
-      poNumber: data.poNumber ? data.poNumber.trim() : `PO-QT-${targetQuotation.quotationNumber.replace('QT-', '')}`,
+    if (!targetClient || !targetClient.id) throw new Error('Client creation failed');
+    const order = await createOrder({
       clientId: targetClient.id,
-      clientObj: targetClient,
-      budget: additionalConvertedVal,
-      technicalRequirements: data.technicalRequirements ? data.technicalRequirements.trim() : (targetQuotation.remarks || `Converted from Quotation ${targetQuotation.quotationNumber}`),
-      materialRequirements: data.materialRequirements ? data.materialRequirements.trim() : 'Standard Forged Flange Spec',
-      requiredQuantity: data.requiredQuantity || 1,
-      purchaseRequired: data.purchaseRequired ?? true,
-      productionRequired: data.productionRequired ?? true,
-      qualityTestingRequired: data.qualityTestingRequired ?? true,
-      dispatchRequired: data.dispatchRequired ?? true,
-      customStages: data.customStages?.map((cs, idx) => ({
-        ...cs,
-        id: `cs-${Date.now()}-${idx}`,
-        status: 'PENDING',
-        createdAt: new Date().toISOString()
-      })) || [],
-      items: data.items && data.items.length > 0 ? data.items : [
-        {
-          itemName: `Flange Assembly Batch (${targetQuotation.quotationNumber})`,
-          size: 'Standard Rating',
-          quantity: data.requiredQuantity || 1,
-          unitPrice: Math.round(additionalConvertedVal / (data.requiredQuantity || 1)),
-        },
-      ],
+      poNumber: data.poNumber || `PO-${targetQuotation.quotationNumber}`,
+      technicalRequirements: data.technicalRequirements,
+      materialRequirements: data.materialRequirements,
+      requiredQuantity: data.requiredQuantity,
+      purchaseRequired: data.purchaseRequired,
+      productionRequired: data.productionRequired,
+      qualityTestingRequired: data.qualityTestingRequired,
+      dispatchRequired: data.dispatchRequired,
+      budget: data.convertedOrderValue,
+      items: data.items,
     });
 
-    setQuotations((prev) =>
-      prev.map((q) =>
-        q.id === quotationId
-          ? {
-            ...q,
-            status: nextStatus,
-            convertedOrderValue: totalConvertedVal,
-            lostValue: lostVal,
-            convertedOrderId: q.convertedOrderId ? `${q.convertedOrderId},${newOrder.id}` : newOrder.id,
-            convertedOrderNumber: q.convertedOrderNumber ? `${q.convertedOrderNumber},${newOrder.orderNumber}` : newOrder.orderNumber,
-            updatedAt: new Date().toISOString(),
-          }
-          : q
-      )
-    );
+    try {
+      await apiClient.patch(`/quotations/${quotationId}`, {
+        status: 'FULLY_CONVERTED',
+        convertedOrderValue: data.convertedOrderValue,
+        convertedOrderId: order.id,
+        convertedOrderNumber: order.orderNumber,
+        isLocked: true
+      });
+      await fetchLiveDashboardData();
+    } catch(err) {
+      console.warn('Could not sync quotation status to backend', err);
+    }
 
-    return newOrder;
+    return order;
   };
 
-  const markQuotationLost = (
+
+  const markQuotationLost = async (
     quotationId: string,
     data: {
       lostReason: LostReason;
@@ -1647,23 +1503,16 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       lostDate?: string;
     }
   ) => {
-    setQuotations((prev) =>
-      prev.map((q) => {
-        if (q.id === quotationId) {
-          const lostVal = data.lostValue !== undefined ? Number(data.lostValue) : q.quotationAmount;
-          return {
-            ...q,
-            status: 'LOST',
-            lostReason: data.lostReason,
-            lostValue: lostVal,
-            lostDate: data.lostDate || new Date().toISOString().split('T')[0],
-            lostRemarks: data.lostRemarks ? data.lostRemarks.trim() : undefined,
-            updatedAt: new Date().toISOString(),
-          };
-        }
-        return q;
-      })
-    );
+    try {
+      await apiClient.patch(`/quotations/${quotationId}`, {
+        status: 'LOST',
+        ...data
+      });
+      await fetchLiveDashboardData();
+    } catch (e) {
+      console.error(e);
+      throw e;
+    }
   };
 
   return (

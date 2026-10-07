@@ -5,6 +5,7 @@ import {
   handleCreateQuotation,
   handleUpdateQuotation,
   handleAddQuotationFollowUp,
+  handleDeleteQuotation
 } from './quotation.controller';
 
 const router = Router();
@@ -15,5 +16,6 @@ router.get('/', handleListQuotations);
 router.post('/', handleCreateQuotation);
 router.patch('/:id', handleUpdateQuotation);
 router.post('/:id/follow-up', handleAddQuotationFollowUp);
+router.delete('/:id', handleDeleteQuotation);
 
 export default router;
