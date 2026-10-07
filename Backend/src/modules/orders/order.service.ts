@@ -74,7 +74,13 @@ export class OrderService {
     const initialStage = pipeline[0];
 
     return await db.transaction(async (tx) => {
+      const client = await tx.orm.public.Client.where({ id: dbId(data.clientId) }).first();
+      if (!client) throw new Error('Client not found');
+      const orderCount = await tx.orm.public.Order.count();
+      
       const order = await tx.orm.public.Order.create({
+        orderNumber: `ORD-2026-${1000 + Number(orderCount)}`,
+        clientCode: client.clientcode,
         poNumber: data.poNumber,
         clientId: dbId(data.clientId),
         requirements: data.requirements || data.technicalRequirements || '',
