@@ -4,12 +4,12 @@ import * as userService from './user.service';
 
 export const handleCreateUser = async (req: AuthRequest, res: Response) => {
   try {
-    const { name, email, password, role, username, mobileNumber, employeeId } = req.body;
+    const { name, email, password, role, username, mobileNumber, employeeId, accessibleModules } = req.body;
     if (!name || !email || !role || !username) {
       return res.status(400).json({ error: 'Name, username, email, and role are required' });
     }
 
-    const result = await userService.createUser({ name, email, password, role, username, mobileNumber, employeeId });
+    const result = await userService.createUser({ name, email, password, role, username, mobileNumber, employeeId, accessibleModules });
     return res.status(201).json({
       message: 'User account successfully created',
       ...result,
@@ -25,6 +25,18 @@ export const handleListUsers = async (req: AuthRequest, res: Response) => {
     return res.status(200).json({ users });
   } catch (err: any) {
     return res.status(500).json({ error: err.message || 'Failed to list users' });
+  }
+};
+
+
+export const handleToggleUserMasking = async (req: AuthRequest, res: Response) => {
+  try {
+    const id = req.params.id as string;
+    const { visibility } = req.body;
+    const updated = await userService.toggleUserMasking(id, visibility);
+    return res.status(200).json({ message: 'User masking updated', user: updated });
+  } catch (err: any) {
+    return res.status(400).json({ error: err.message || 'Failed to update user masking' });
   }
 };
 

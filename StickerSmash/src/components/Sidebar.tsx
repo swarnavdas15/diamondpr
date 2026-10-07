@@ -79,22 +79,41 @@ export const Sidebar: React.FC<SidebarProps> = ({
           'Settings',
           'Logout',
         ];
-      case 'ADMIN':
-        return [
-          'Dashboard',
-          'ClientDirectory',
-          'Orders',
-          'Quotations',
-          'Purchase',
-          'Production',
-          'Dispatch',
-          'Vendors',
-          'Users',
-          'Tasks',
-          'ActivityLogs',
-          'Settings',
-          'Logout',
-        ];
+      case 'ADMIN': {
+        const base = ['Dashboard', 'Tasks', 'ActivityLogs', 'Settings', 'Logout'] as NavMenuItem[];
+        
+        if (!currentUser?.accessibleModules || (Array.isArray(currentUser.accessibleModules) && currentUser.accessibleModules.length === 0)) {
+           // Fallback if not configured properly, just give full admin access
+           return [
+             'Dashboard', 'ClientDirectory', 'Orders', 'Quotations', 'Purchase', 'Production', 'Dispatch', 'Vendors', 'Users', 'Tasks', 'ActivityLogs', 'Settings', 'Logout'
+           ];
+        }
+
+        let modules = [];
+        if (typeof currentUser.accessibleModules === 'string') {
+           try { modules = JSON.parse(currentUser.accessibleModules); } catch(e){}
+        } else if (Array.isArray(currentUser.accessibleModules)) {
+           modules = currentUser.accessibleModules;
+        }
+
+        const map: Record<string, NavMenuItem> = {
+          'clients': 'ClientDirectory',
+          'orders': 'Orders',
+          'quotations': 'Quotations',
+          'purchase': 'Purchase',
+          'production': 'Production',
+          'quality': 'QualityControl',
+          'dispatch': 'Dispatch',
+          'vendors': 'Vendors',
+          'users': 'Users'
+        };
+
+        modules.forEach((m: string) => {
+          if (map[m]) base.push(map[m]);
+        });
+        
+        return base;
+      }
       case 'SALES':
         return [
           'Dashboard',
@@ -145,45 +164,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
         isMobile ? styles.mobileDrawer : collapsed ? styles.sidebarCollapsed : styles.sidebarExpanded,
       ]}
     >
-      {/* Top Header: Company Logo & Close Button for Mobile */}
-      <View style={styles.brandHeader}>
-        <View style={styles.logoRow}>
-          <View style={styles.logoBadge}>
-            <Text style={styles.logoSymbol}>❖</Text>
-          </View>
-          {(!collapsed || isMobile) && (
-            <View style={styles.brandTitleContainer}>
-              <Text style={styles.brandTitle}>DIAMOND FLANGE</Text>
-              <Text style={styles.brandTag}>INDUSTRIAL ERP</Text>
-            </View>
-          )}
-        </View>
-        {isMobile && (
+      {isMobile && (
+        <View style={styles.brandHeader}>
           <TouchableOpacity style={styles.closeDrawerBtn} onPress={onToggleCollapse}>
-            <Text style={styles.closeDrawerText}>✕</Text>
+            <Text style={styles.closeDrawerText}>✖ Close</Text>
           </TouchableOpacity>
-        )}
-      </View>
-
-      {/* User Profile Section */}
-      <View style={[styles.profileSection, collapsed && !isMobile && styles.profileSectionCollapsed]}>
-        <View style={[styles.avatarCircle, { backgroundColor: getRoleBadgeColor(currentUser.role) }]}>
-          <Text style={styles.avatarText}>{currentUser.name.charAt(0)}</Text>
         </View>
-        {(!collapsed || isMobile) && (
-          <View style={styles.profileInfo}>
-            <Text style={styles.profileName} numberOfLines={1}>
-              {currentUser.name}
-            </Text>
-            <View style={[styles.roleBadge, { backgroundColor: getRoleBadgeColor(currentUser.role) }]}>
-              <Text style={styles.roleBadgeText}>{(currentUser?.role || '').replace('_', ' ')}</Text>
-            </View>
-          </View>
-        )}
-      </View>
-
-      <View style={styles.divider} />
-
+      )}
+      
       {/* Navigation Menu List */}
       <ScrollView style={styles.menuScroll} showsVerticalScrollIndicator={false}>
         {visibleMenuItems.map((item) => {

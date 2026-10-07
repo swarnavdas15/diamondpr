@@ -14,6 +14,7 @@ import taskRoutes from './modules/tasks/task.routes';
 import calendarRoutes from './modules/calendar/calendar.routes';
 import drawingRoutes from './modules/drawings/drawing.routes';
 import quotationRoutes from './modules/quotations/quotation.routes';
+import vendorRoutes from './modules/vendors/vendor.routes';
 
 const app = express();
 
@@ -30,6 +31,7 @@ app.use('/api/tasks', taskRoutes);
 app.use('/api/calendar', calendarRoutes);
 app.use('/api/drawings', drawingRoutes);
 app.use('/api/quotations', quotationRoutes);
+app.use('/api/vendors', vendorRoutes);
 
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', service: 'Flange ERP Backend Engine', timestamp: new Date() });

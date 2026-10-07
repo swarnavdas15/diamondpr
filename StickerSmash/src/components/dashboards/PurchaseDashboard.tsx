@@ -5,7 +5,7 @@ import { DepartmentStatus, Order } from '../../types';
 import { Colors, StatusColors, Spacing, Radius, Shadows } from '../../theme';
 import { TaskKPICards } from './TaskKPICards';
 import { OrderKPICards } from './OrderKPICards';
-import { QuantityProcessModal } from '../QuantityProcessModal';
+import { PurchaseBatchModal } from './PurchaseBatchModal';
 import { OrderQuantityTracker } from '../OrderQuantityTracker';
 import { ExportButton } from '../ui/ExportButton';
 import { ExportDataPayload } from '../../utils/exportUtils';
@@ -14,7 +14,7 @@ import { SearchableDropdown } from '../ui/SearchableDropdown';
 export const PurchaseDashboard: React.FC = () => {
   const { width } = useWindowDimensions();
   const isMobile = width < 768;
-  const { getMaskedOrders, updatePurchaseStage, setSelectedOrder, vendors } = useERP();
+  const { getMaskedOrders, addPurchaseBatch, setSelectedOrder, vendors } = useERP();
   const maskedOrders = getMaskedOrders().filter((o) => o.purchaseRequired);
 
   const [selectedVendorMap, setSelectedVendorMap] = useState<{ [key: string]: string }>({});
@@ -54,20 +54,14 @@ export const PurchaseDashboard: React.FC = () => {
     setProcessModalVisible(true);
   };
 
-  const handleProcessSubmit = async (data: { processedQty: number; remarks?: string; vendorSelected?: string }) => {
+  const handleAddBatch = async (data: { vendorName: string; quantityReceived: number; cost: number; remarks: string }) => {
     if (!selectedProcessOrder) return;
-    const vendor = data.vendorSelected || selectedVendorMap[selectedProcessOrder.id] || 'Jindal Stainless Steel Works';
-    const notes = data.remarks || notesMap[selectedProcessOrder.id] || 'Material procured and verified in stock.';
-    const currentQty = selectedProcessOrder.purchaseQuantity || 0;
-    const newQty = currentQty + data.processedQty;
-    const calcStatus: DepartmentStatus = newQty >= selectedProcessOrder.requiredQuantity ? 'COMPLETED' : 'IN_PROGRESS';
-
     try {
-      await updatePurchaseStage(selectedProcessOrder.id, calcStatus, vendor, notes, newQty);
+      await addPurchaseBatch(selectedProcessOrder.id, data);
       setProcessModalVisible(false);
       setSelectedProcessOrder(null);
     } catch (err: any) {
-      console.error('Failed to update purchase stage:', err);
+      console.error('Failed to add purchase batch:', err);
     }
   };
 
@@ -154,25 +148,51 @@ export const PurchaseDashboard: React.FC = () => {
                 {/* Dynamic Content based on Status */}
                 {ord.purchaseStatus === 'COMPLETED' ? (
                   <View style={styles.purchaseReportCard}>
-                    <Text style={styles.purchaseReportTitle}>✅ PURCHASE & SOURCING REPORT</Text>
-                    <View style={styles.purchaseReportRow}>
-                      <Text style={styles.purchaseReportLabel}>Item / Material:</Text>
-                      <Text style={styles.purchaseReportValue}>{ord.materialRequirements || 'Steel Billet'}</Text>
-                    </View>
-                    <View style={styles.purchaseReportRow}>
-                      <Text style={styles.purchaseReportLabel}>Vendor / Supplier:</Text>
-                      <Text style={styles.purchaseReportValueHighlight}>{ord.vendorSelected || 'Jindal Stainless Steel Works'}</Text>
-                    </View>
-                    <View style={styles.purchaseReportRow}>
-                      <Text style={styles.purchaseReportLabel}>Procurement Notes:</Text>
-                      <Text style={styles.purchaseReportValue}>{ord.procurementNotes || 'Material fully procured and verified.'}</Text>
-                    </View>
-                    <View style={styles.purchaseReportRow}>
-                      <Text style={styles.purchaseReportLabel}>Total Quantity Sourced:</Text>
-                      <Text style={styles.purchaseReportValue}>{ord.purchaseQuantity || ord.requiredQuantity} / {ord.requiredQuantity} pcs</Text>
-                    </View>
+                    <Text style={styles.purchaseReportTitle}>✓ PURCHASE & SOURCING REPORT</Text>
+                    {ord.purchaseBatches && ord.purchaseBatches.length > 0 ? (
+                      <View>
+                        <View style={{ flexDirection: 'row', borderBottomWidth: 1, borderColor: Colors.borderMuted || '#CBD5E1', paddingBottom: 6, marginBottom: 6 }}>
+                          <Text style={[styles.purchaseReportLabel, { flex: 2 }]}>Vendor</Text>
+                          <Text style={[styles.purchaseReportLabel, { flex: 1 }]}>Qty</Text>
+                          <Text style={[styles.purchaseReportLabel, { flex: 1, textAlign: 'right' }]}>Cost</Text>
+                        </View>
+                        {ord.purchaseBatches.map(b => (
+                          <View key={b.id} style={{ flexDirection: 'row', marginBottom: 4 }}>
+                            <Text style={[styles.purchaseReportValue, { flex: 2, color: Colors.accentTeal || '#29585C' }]}>{b.vendorName}</Text>
+                            <Text style={[styles.purchaseReportValue, { flex: 1 }]}>{b.quantityReceived}</Text>
+                            <Text style={[styles.purchaseReportValue, { flex: 1, textAlign: 'right' }]}>{b.cost ? `₹${b.cost}` : '-'}</Text>
+                          </View>
+                        ))}
+                        <View style={{ flexDirection: 'row', borderTopWidth: 1, borderColor: Colors.borderMuted || '#CBD5E1', paddingTop: 6, marginTop: 6 }}>
+                          <Text style={[styles.purchaseReportLabel, { flex: 2 }]}>TOTAL:</Text>
+                          <Text style={[styles.purchaseReportValueHighlight, { flex: 1 }]}>{ord.purchaseQuantity} / {ord.requiredQuantity} pcs</Text>
+                          <Text style={[styles.purchaseReportValueHighlight, { flex: 1, textAlign: 'right', color: '#10b981' }]}>
+                            ₹{ord.purchaseBatches.reduce((sum, b) => sum + (b.cost || 0), 0)}
+                          </Text>
+                        </View>
+                      </View>
+                    ) : (
+                      <>
+                        <View style={styles.purchaseReportRow}>
+                          <Text style={styles.purchaseReportLabel}>Item / Material:</Text>
+                          <Text style={styles.purchaseReportValue}>{ord.materialRequirements || 'Steel Billet'}</Text>
+                        </View>
+                        <View style={styles.purchaseReportRow}>
+                          <Text style={styles.purchaseReportLabel}>Vendor / Supplier:</Text>
+                          <Text style={styles.purchaseReportValueHighlight}>{ord.vendorSelected || 'None'}</Text>
+                        </View>
+                        <View style={styles.purchaseReportRow}>
+                          <Text style={styles.purchaseReportLabel}>Procurement Notes:</Text>
+                          <Text style={styles.purchaseReportValue}>{ord.procurementNotes || 'Material fully procured.'}</Text>
+                        </View>
+                        <View style={styles.purchaseReportRow}>
+                          <Text style={styles.purchaseReportLabel}>Total Quantity Sourced:</Text>
+                          <Text style={styles.purchaseReportValue}>{ord.purchaseQuantity || ord.requiredQuantity} / {ord.requiredQuantity} pcs</Text>
+                        </View>
+                      </>
+                    )}
                   </View>
-                ) : (
+                  ) : (
                   <OrderQuantityTracker order={ord} style={{ marginTop: Spacing.xs }} />
                 )}
 
@@ -230,13 +250,12 @@ export const PurchaseDashboard: React.FC = () => {
       </View>
 
       {/* Stage-Wise Quantity Process Modal */}
-      <QuantityProcessModal
-        visible={processModalVisible}
-        order={selectedProcessOrder}
-        stage="PURCHASE"
-        onClose={() => setProcessModalVisible(false)}
-        onSubmit={handleProcessSubmit}
-      />
+      <PurchaseBatchModal
+          visible={processModalVisible}
+          order={selectedProcessOrder}
+          onClose={() => setProcessModalVisible(false)}
+          onSubmit={handleAddBatch}
+        />
     </ScrollView>
   );
 };
@@ -483,12 +502,12 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   purchaseReportCard: {
-    backgroundColor: '#0f172a',
+    backgroundColor: '#F8FAFC',
     borderRadius: Radius.md,
     padding: Spacing.md,
     marginTop: Spacing.sm,
     borderWidth: 1,
-    borderColor: '#10b981',
+    borderColor: '#22C55E',
   },
   purchaseReportTitle: {
     color: '#10b981',
@@ -514,7 +533,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   purchaseReportValueHighlight: {
-    color: Colors.accentTeal,
+      color: Colors.accentTeal || '#29585C', // Colors.accentTeal was too dark for the #0f172a background
     fontSize: 12,
     fontWeight: '800',
     flex: 1,

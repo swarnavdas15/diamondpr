@@ -1,6 +1,6 @@
 import { Response } from 'express';
 import { AuthRequest } from '../../middlewares/auth.middleware';
-import { OrderService, createOrder, getOrders, getOrderById, updateSalesWorkflowStage, updatePurchaseStage, updateProductionStage, updateQualityStage, updateDispatchStage, verifyAndCompleteOrder } from './order.service';
+import { OrderService, createOrder, getOrders, getOrderById, updateSalesWorkflowStage, updatePurchaseStage, addPurchaseBatch, updateProductionStage, updateQualityStage, updateDispatchStage, verifyAndCompleteOrder } from './order.service';
 import { parseBulkOrderExcel } from '../../utils/excelParser';
 import { db } from '../../prisma/db';
 import { maskOrderList, maskOrderData } from '../../middlewares/masking.middleware';
@@ -38,6 +38,7 @@ export const handleCreateOrder = async (req: AuthRequest, res: Response) => {
       order: maskOrderData ? maskOrderData(order, req.user?.role) : order,
     });
   } catch (err: any) {
+    console.log("Create order error:", err);
     return res.status(400).json({ success: false, error: err.message || 'Failed to create order', message: err.message });
   }
 };
@@ -112,12 +113,23 @@ export const handleUpdateSalesWorkflow = async (req: AuthRequest, res: Response)
   }
 };
 
-export const handleUpdatePurchaseStage = async (req: AuthRequest, res: Response) => {
+export const handleAddPurchaseBatch = async (req: AuthRequest, res: Response) => {
   try {
     const id = req.params.id as string;
-    const { status, vendorSelected, procurementNotes } = req.body;
     const userId = req.user?.userId || '';
-    const order = await updatePurchaseStage(id, status, userId, procurementNotes);
+    const batch = await addPurchaseBatch(id, req.body, userId);
+    return res.status(201).json({ success: true, message: 'Purchase batch added successfully', batch });
+  } catch (err: any) {
+    return res.status(400).json({ success: false, error: err.message || 'Failed to add purchase batch' });
+  }
+};
+
+export const handleUpdatePurchaseStage = async (req: AuthRequest, res: Response) => {
+    try {
+      const id = req.params.id as string;
+      const { status, vendorSelected, procurementNotes, processedQty } = req.body;
+      const userId = req.user?.userId || '';
+      const order = await updatePurchaseStage(id, status, userId, procurementNotes, processedQty, vendorSelected);
     return res.status(200).json({ success: true, message: 'Purchase stage updated', order });
   } catch (err: any) {
     return res.status(400).json({ success: false, error: err.message || 'Failed to update purchase stage' });
@@ -125,11 +137,11 @@ export const handleUpdatePurchaseStage = async (req: AuthRequest, res: Response)
 };
 
 export const handleUpdateProductionStage = async (req: AuthRequest, res: Response) => {
-  try {
-    const id = req.params.id as string;
-    const { status, shopFloorNotes } = req.body;
-    const userId = req.user?.userId || '';
-    const order = await updateProductionStage(id, status, userId, shopFloorNotes);
+    try {
+      const id = req.params.id as string;
+      const { status, shopFloorNotes, processedQty, isRework } = req.body;
+      const userId = req.user?.userId || '';
+      const order = await updateProductionStage(id, status, userId, shopFloorNotes, processedQty, isRework);
     return res.status(200).json({ success: true, message: 'Production stage updated', order });
   } catch (err: any) {
     return res.status(400).json({ success: false, error: err.message || 'Failed to update production stage' });
@@ -137,11 +149,11 @@ export const handleUpdateProductionStage = async (req: AuthRequest, res: Respons
 };
 
 export const handleUpdateQualityStage = async (req: AuthRequest, res: Response) => {
-  try {
-    const id = req.params.id as string;
-    const { status, qcRemarks } = req.body;
-    const userId = req.user?.userId || '';
-    const order = await updateQualityStage(id, status, userId, qcRemarks);
+    try {
+      const id = req.params.id as string;
+      const { status, qcRemarks, qcResult, processedQty } = req.body;
+      const userId = req.user?.userId || '';
+      const order = await updateQualityStage(id, status, userId, qcRemarks, processedQty, qcResult);
     return res.status(200).json({ success: true, message: 'Quality testing stage updated', order });
   } catch (err: any) {
     return res.status(400).json({ success: false, error: err.message || 'Failed to update quality stage' });
@@ -149,11 +161,11 @@ export const handleUpdateQualityStage = async (req: AuthRequest, res: Response) 
 };
 
 export const handleUpdateDispatchStage = async (req: AuthRequest, res: Response) => {
-  try {
-    const id = req.params.id as string;
-    const { status, dispatchNotes } = req.body;
-    const userId = req.user?.userId || '';
-    const order = await updateDispatchStage(id, status, userId, dispatchNotes);
+    try {
+      const id = req.params.id as string;
+      const { status, dispatchNotes, processedQty, logisticsEntry, transportRef } = req.body;
+      const userId = req.user?.userId || '';
+      const order = await updateDispatchStage(id, status, userId, dispatchNotes, processedQty, logisticsEntry, transportRef);
     return res.status(200).json({ success: true, message: 'Dispatch stage updated', order });
   } catch (err: any) {
     return res.status(400).json({ success: false, error: err.message || 'Failed to update dispatch stage' });

@@ -8,6 +8,7 @@ import { Colors, Spacing, Radius, Shadows } from '../../theme';
 import { SalesKPIDetailsModal } from '../dashboards/SalesKPIDetailsModal';
 import { QuotationSentModal } from '../quotations/QuotationSentModal';
 import { QuotationFollowUpModal } from '../quotations/QuotationFollowUpModal';
+import { QuotationConversionModal, QuotationConversionData } from '../quotations/QuotationConversionModal';
 
 import { ExportButton } from '../ui/ExportButton';
 import { ExportDataPayload } from '../../utils/exportUtils';
@@ -42,9 +43,9 @@ const STATUS_COLORS: Record<QuotationStatus, { bg: string; text: string; border:
 export const QuotationsView: React.FC<QuotationsViewProps> = ({ onOpenCreateQuotation, onOpenCreateOrderWithData }) => {
   const {
     quotations,
+    clients,
     updateQuotation,
     addQuotationFollowUp,
-    convertQuotationToOrder,
     markQuotationLost,
     setSelectedOrder,
     deleteQuotation,
@@ -86,6 +87,7 @@ export const QuotationsView: React.FC<QuotationsViewProps> = ({ onOpenCreateQuot
   const [followUpModalQuotation, setFollowUpModalQuotation] = useState<Quotation | null>(null);
   const [followUpTargetStatus, setFollowUpTargetStatus] = useState<'UNDER_DISCUSSION' | 'NEGOTIATION'>('UNDER_DISCUSSION');
   
+  const [conversionModalQuotation, setConversionModalQuotation] = useState<Quotation | null>(null);
   const [conversionError, setConversionError] = useState<string>('');
   const [competitorName, setCompetitorName] = useState('');
 
@@ -242,10 +244,53 @@ export const QuotationsView: React.FC<QuotationsViewProps> = ({ onOpenCreateQuot
       setFollowUpModalQuotation(q);
     } else if (newSt === 'APPROVED') {
       setConversionError('');
-      
+      setConversionModalQuotation(q);
     } else {
       await updateQuotation(q.id, { status: newSt });
     }
+  };
+
+  // Step 1: Conversion form submitted -> Step 2: open Create Order form pre-filled.
+  // The order itself (and quotation linking) is created when the user submits the order form.
+  const handleSaveConversion = (data: QuotationConversionData) => {
+    const q = conversionModalQuotation;
+    if (!q) return;
+    if (!onOpenCreateOrderWithData) {
+      setConversionError('Order form is not available from this screen.');
+      return;
+    }
+    const targetClient = clients.find(
+      (c) => (c.clientCode || '').toLowerCase() === (q.clientCode || '').toLowerCase()
+    );
+    onOpenCreateOrderWithData({
+      quotationId: q.id,
+      quotationNumber: q.quotationNumber,
+      quotationAmount: Number(q.quotationAmount || 0),
+      clientId: targetClient?.id,
+      // Used to auto-register the client if it doesn't exist yet
+      clientDraft: targetClient
+        ? undefined
+        : {
+            clientCode: q.clientCode,
+            companyName: q.companyName,
+            contactName: q.contactPerson,
+            contactNo: q.mobileNumber,
+            email: q.email,
+          },
+      poNumber: '',
+      budget: Number(data.approvedAmount || 0),
+      requiredQuantity: data.requiredQuantity || 1,
+      technicalRequirements: q.remarks || q.inquiryRef || data.finalRemarks || '',
+      materialRequirements: data.finalRemarks || '',
+      purchaseRequired: data.purchaseRequired,
+      productionRequired: data.productionRequired,
+      qualityTestingRequired: data.qualityTestingRequired,
+      dispatchRequired: data.dispatchRequired,
+      customStages: data.customStages,
+      lostReason: data.lostReason,
+      lostRemarks: data.lostRemarks,
+    });
+    setConversionModalQuotation(null);
   };
 
   const handleSaveSentDetails = async (data: { sentVia: any; sentAt: string; sentNotes: string }) => {
@@ -866,7 +911,13 @@ export const QuotationsView: React.FC<QuotationsViewProps> = ({ onOpenCreateQuot
         onSave={handleSaveFollowUpDetails}
       />
 
-      
+      <QuotationConversionModal
+        visible={!!conversionModalQuotation}
+        quotation={conversionModalQuotation}
+        onClose={() => setConversionModalQuotation(null)}
+        onSubmitConversion={handleSaveConversion}
+        externalError={conversionError}
+      />
 
       {/* Sales KPI Details Modal */}
       <SalesKPIDetailsModal

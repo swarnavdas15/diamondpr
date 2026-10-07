@@ -31,6 +31,7 @@ interface AuthContextType {
   adminResetUserPassword: (userId: string, newPass: string) => Promise<void>;
   deleteUser: (userId: string) => Promise<void>;
   toggleUserStatus: (userId: string) => Promise<void>;
+  toggleUserMasking: (userId: string, visibility: string) => Promise<void>;
   updateUserRole: (userId: string, newRole: Role) => Promise<void>;
 }
 
@@ -477,6 +478,37 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  
+  const toggleUserMasking = async (userId: string, visibility: string) => {
+    if (!currentUser || currentUser.role !== 'SUPER_ADMIN') {
+      throw new Error('Permission Denied: Only Super Admin can modify user masking.');
+    }
+    
+    const userToToggle = users.find((u) => u.id === userId);
+    if (!userToToggle) return;
+
+    try {
+      await apiClient.patch(`/users/${userId}/masking`, { visibility });
+      
+      setUsers((prev) =>
+        prev.map((u) => {
+          if (u.id === userId) {
+            addAuditLog(
+              'USER_UPDATED',
+              `Super Admin updated client data masking to '${visibility}' for user '${u.email}'.`,
+              'System'
+            );
+            return { ...u, clientDataVisibility: visibility as any };
+          }
+          return u;
+        })
+      );
+    } catch (e: any) {
+      console.error(e);
+      throw new Error(e.response?.data?.error || 'Failed to update user masking');
+    }
+  };
+
   const toggleUserStatus = async (userId: string) => {
     if (!currentUser || currentUser.role !== 'SUPER_ADMIN') {
       throw new Error('Permission Denied: Only Super Admin can modify user status.');
@@ -548,6 +580,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         adminResetUserPassword,
         deleteUser,
         toggleUserStatus,
+        toggleUserMasking,
         updateUserRole,
       }}
     >

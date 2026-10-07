@@ -16,12 +16,34 @@ interface AdminDashboardProps {
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isSuperAdmin = false }) => {
   const { getMaskedOrders, setSelectedOrder } = useERP();
   const orders = getMaskedOrders();
-  const { authAuditLogs, currentUser } = useAuth();
+  const { authAuditLogs, currentUser, users, toggleUserStatus } = useAuth();
   const { width } = useWindowDimensions();
   const isMobile = width < 768;
 
   // If currentUser is SUPER_ADMIN, enforce isSuperAdmin = true
   const effectiveSuperAdmin = isSuperAdmin || currentUser?.role === 'SUPER_ADMIN';
+
+  let modules: string[] = [];
+  if (effectiveSuperAdmin) {
+    modules = ['clients', 'orders', 'quotations', 'purchase', 'production', 'quality', 'dispatch', 'vendors', 'users', 'tasks'];
+  } else {
+    if (typeof currentUser?.accessibleModules === 'string') {
+       try { modules = JSON.parse(currentUser.accessibleModules); } catch(e){}
+    } else if (Array.isArray(currentUser?.accessibleModules)) {
+       modules = currentUser.accessibleModules;
+    } else {
+       modules = ['clients', 'orders', 'quotations', 'purchase', 'production', 'quality', 'dispatch', 'vendors', 'users', 'tasks'];
+    }
+  }
+
+  const showTasks = true; // Always show tasks
+  const showOrders = modules.includes('orders');
+  const showUsers = modules.includes('users');
+  const showPurchase = modules.includes('purchase');
+  const showProduction = modules.includes('production');
+  const showQuality = modules.includes('quality');
+  const showDispatch = modules.includes('dispatch');
+
 
   const getAdminExportPayload = (): ExportDataPayload => {
     return {
@@ -35,7 +57,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isSuperAdmin = f
         o.status,
         o.purchaseStatus,
         o.productionStatus,
-        o.qcResult,
+        o.qualityStatus,
         o.dispatchStatus,
         o.requiredQuantity,
       ]),
@@ -103,7 +125,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isSuperAdmin = f
             {orders.map((ord) => {
               const purStyle = getPillStyle(ord.purchaseStatus);
               const prodStyle = getPillStyle(ord.productionStatus);
-              const qcStyle = getPillStyle(ord.qcResult);
+              const qcStyle = getPillStyle(ord.qualityStatus);
               const dispStyle = getPillStyle(ord.dispatchStatus);
 
               return (
@@ -127,7 +149,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isSuperAdmin = f
 
                   <View style={{ width: 110 }}>
                     <View style={{ backgroundColor: qcStyle.bg, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, borderWidth: 1, borderColor: qcStyle.border, alignItems: 'center' }}>
-                      <Text style={{ color: qcStyle.text, fontSize: 10, fontWeight: '800' }}>{ord.qcResult}</Text>
+                      <Text style={{ color: qcStyle.text, fontSize: 10, fontWeight: '800' }}>{ord.qualityStatus}</Text>
                     </View>
                   </View>
 

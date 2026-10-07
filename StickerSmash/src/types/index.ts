@@ -75,6 +75,7 @@ export interface User {
   role: Role;
   isActive: boolean;
   clientDataVisibility?: ClientDataVisibility;
+  accessibleModules?: string[];
   createdAt?: string;
 }
 
@@ -209,10 +210,12 @@ export interface PurchaseBatch {
   materialSpec?: string;
   quantityOrdered: number;
   quantityReceived: number;
+  cost?: number;
+  remarks?: string;
   batchNumber?: string;
   deliveryDate?: string;
   invoiceRef?: string;
-  remarks?: string;
+
   status: 'ORDERED' | 'PARTIALLY_RECEIVED' | 'FULLY_RECEIVED';
   createdByName: string;
   createdAt: string;

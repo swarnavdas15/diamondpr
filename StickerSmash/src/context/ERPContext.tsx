@@ -95,9 +95,9 @@ interface ERPContextType {
     data: { lostReason: LostReason; lostValue?: number; lostRemarks?: string; lostDate?: string; }
   ) => Promise<void>;
 
-  createVendor: (data: Omit<Vendor, 'id' | 'createdAt'>) => Vendor;
-  updateVendor: (vendorId: string, data: Partial<Vendor>) => void;
-  deleteVendor: (vendorId: string) => void;
+  createVendor: (data: Omit<Vendor, 'id' | 'createdAt'>) => Promise<Vendor>;
+  updateVendor: (vendorId: string, data: Partial<Vendor>) => Promise<void>;
+  deleteVendor: (vendorId: string) => Promise<void>;
 
   createClient: (data: {
     clientCode: string;
@@ -130,6 +130,7 @@ interface ERPContextType {
     productionRequired: boolean;
     qualityTestingRequired: boolean;
     dispatchRequired: boolean;
+    clientObj?: any;
     customStages?: CustomStage[];
     items?: Array<{ itemName: string; size: string; quantity: number; unitPrice?: number }>;
   }) => Promise<Order>;
@@ -150,7 +151,7 @@ interface ERPContextType {
   deleteOrderDrawing: (orderId: string, drawingId: string) => void;
 
   updatePurchaseStage: (orderId: string, status: DepartmentStatus, vendorSelected?: string, procurementNotes?: string, processedQty?: number) => void;
-  addPurchaseBatch: (orderId: string, batch: Omit<PurchaseBatch, 'id' | 'orderId' | 'createdByName' | 'createdAt'>) => PurchaseBatch;
+  addPurchaseBatch: (orderId: string, batch: Omit<PurchaseBatch, 'id' | 'orderId' | 'createdByName' | 'createdAt'>) => Promise<void>;
   updateProductionStage: (orderId: string, status: DepartmentStatus, shopFloorNotes?: string, processedQty?: number, isRework?: boolean) => void;
   updateQualityStage: (orderId: string, status: DepartmentStatus, qcResult?: QCResult, qcRemarks?: string, processedQty?: number, passedQty?: number, failedQty?: number) => void;
   updateDispatchStage: (orderId: string, status: DepartmentStatus, logisticsEntry?: string, transportRef?: string, dispatchNotes?: string, processedQty?: number) => void;
@@ -800,19 +801,34 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([]);
 
   const computedCalendarEvents = React.useMemo(() => {
+    // 1. Existing quotation follow-ups
     const quotationEvents = quotations
       .filter(q => q.followUpDate && q.status !== 'FULLY_CONVERTED' && q.status !== 'LOST')
       .map(q => ({
         id: `qf-${q.id}`,
         title: `Follow-up: ${q.companyName}`,
-        type: 'MEETING' as CalendarEventType,
+        type: 'FOLLOW_UP' as CalendarEventType,
         eventDate: q.followUpDate as string,
         description: `Quotation ${q.quotationNumber} follow-up for ${q.quotationAmount}`,
         createdByName: q.salesExecutive || 'System',
         createdAt: q.createdAt
       }));
-    return [...calendarEvents, ...quotationEvents].sort((a, b) => new Date(a.eventDate).getTime() - new Date(b.eventDate).getTime());
-  }, [calendarEvents, quotations]);
+
+    // 2. Task Deadlines
+    const taskEvents = tasks
+      .filter(t => t.dueDate && t.status !== 'COMPLETED')
+      .map(t => ({
+        id: `td-${t.id}`,
+        title: `Deadline: ${t.title}`,
+        type: 'DEADLINE' as CalendarEventType,
+        eventDate: (t.dueDate as string).split('T')[0],
+        description: `Priority: ${t.priority} | ${t.description || 'No description'}`,
+        createdByName: t.assignedToName || t.assignedToDepartment || 'System',
+        createdAt: t.createdAt
+      }));
+
+    return [...calendarEvents, ...quotationEvents, ...taskEvents].sort((a, b) => new Date(a.eventDate).getTime() - new Date(b.eventDate).getTime());
+  }, [calendarEvents, quotations, tasks]);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
 
   // Live Backend Fetch
@@ -824,12 +840,14 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const fetchLiveDashboardData = async () => {
     try {
-      const [clientsRes, ordersRes, contactsRes, quotationsRes] = await Promise.all([
-          apiClient.get('/clients'),
-          apiClient.get('/orders'),
-          apiClient.get('/clients/contacts'),
-          apiClient.get('/quotations')
-        ]);
+      const [clientsRes, ordersRes, contactsRes, quotationsRes, vendorsRes, tasksRes] = await Promise.all([
+        apiClient.get('/clients'),
+        apiClient.get('/orders'),
+        apiClient.get('/clients/contacts'),
+        apiClient.get('/quotations'),
+        apiClient.get('/vendors').catch(() => ({ data: [] })),
+        apiClient.get('/tasks').catch(() => ({ data: [] }))
+      ]);
       const clientsArray = clientsRes.data.clients || clientsRes.data;
       const normalizedClients = Array.isArray(clientsArray) 
         ? clientsArray.map((c: any) => ({ ...c, clientCode: c.clientCode || c.clientcode })) 
@@ -838,6 +856,12 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setOrders(ordersRes.data.orders || ordersRes.data);
       setCompanyContacts(contactsRes.data.contacts || []);
       setQuotations(quotationsRes.data.quotations || []);
+      if (vendorsRes && vendorsRes.data && (vendorsRes.data.vendors || Array.isArray(vendorsRes.data))) {
+        setVendors(vendorsRes.data.vendors || vendorsRes.data);
+      }
+      if (tasksRes && tasksRes.data && (tasksRes.data.tasks || Array.isArray(tasksRes.data))) {
+        setTasks(tasksRes.data.tasks || tasksRes.data);
+      }
     } catch (error) {
       console.error('Failed to fetch ERP data from backend API:', error);
     }
@@ -895,43 +919,35 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setCompanyContacts((prev) => prev.filter((c) => c.id !== id));
   };
 
-  const createVendor = (data: Omit<Vendor, 'id' | 'createdAt'>): Vendor => {
-    const trimmedCode = data.vendorCode.trim();
-    if (!trimmedCode) {
-      throw new Error('Vendor Code is required.');
+  const createVendor = async (data: Omit<Vendor, 'id' | 'createdAt'>): Promise<Vendor> => {
+    try {
+      const res = await apiClient.post('/vendors', data);
+      await fetchLiveDashboardData();
+      return res.data.vendor || res.data;
+    } catch (e: any) {
+      
+      throw new Error(e.response?.data?.error || e.response?.data?.message || e.message || 'Failed to create vendor');
     }
-
-    const isDuplicate = vendors.some(
-      (v) => v.vendorCode.trim().toLowerCase() === trimmedCode.toLowerCase()
-    );
-
-    if (isDuplicate) {
-      throw new Error(`Vendor Code "${trimmedCode}" already exists. Duplicate Vendor Codes are not allowed.`);
-    }
-
-    const newVendor: Vendor = {
-      ...data,
-      id: `vnd-${Date.now()}`,
-      vendorCode: trimmedCode,
-      createdAt: new Date().toISOString(),
-    };
-
-    setVendors((prev) => [newVendor, ...prev]);
-    return newVendor;
   };
 
-  const updateVendor = (vendorId: string, data: Partial<Vendor>) => {
-    setVendors((prev) =>
-      prev.map((v) => (v.id === vendorId ? { ...v, ...data } : v))
-    );
+  const updateVendor = async (vendorId: string, data: Partial<Vendor>) => {
+    try {
+      await apiClient.patch(`/vendors/${vendorId}`, data);
+      await fetchLiveDashboardData();
+    } catch (e: any) {
+      
+      throw new Error(e.response?.data?.error || e.response?.data?.message || e.message || 'Failed to update vendor');
+    }
   };
 
-  const deleteVendor = (vendorId: string) => {
-    const role = currentUser?.role;
-    if (role !== 'SUPER_ADMIN' && role !== 'ADMIN') {
-      throw new Error('Permission Denied: Only Super Admin and Admin are authorized to delete vendors.');
+  const deleteVendor = async (vendorId: string) => {
+    try {
+      await apiClient.delete(`/vendors/${vendorId}`);
+      await fetchLiveDashboardData();
+    } catch (e: any) {
+      
+      throw new Error(e.response?.data?.error || e.response?.data?.message || e.message || 'Failed to delete vendor');
     }
-    setVendors((prev) => prev.filter((v) => v.id !== vendorId));
   };
 
   /**
@@ -945,7 +961,7 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
    */
   const getMaskedOrders = (): Order[] => {
     const userRole = currentUser?.role || 'SUPER_ADMIN';
-    const isRestricted = ['PURCHASE', 'PRODUCTION', 'QUALITY_TESTING', 'DISPATCH'].includes(userRole);
+    const isRestricted = currentUser?.clientDataVisibility === 'CODE_ONLY';
     const isQC = userRole === 'QUALITY_TESTING';
 
     let filtered = orders;
@@ -1217,104 +1233,18 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       try { await apiClient.patch(`/orders/${orderId}/purchase`, { status, processedQty, vendorSelected, procurementNotes }); await fetchLiveDashboardData(); } catch (e) { console.error(e); }
   };
 
-  const addPurchaseBatch = (
+  const addPurchaseBatch = async (
     orderId: string,
     batchData: Omit<PurchaseBatch, 'id' | 'orderId' | 'createdByName' | 'createdAt'>
-  ): PurchaseBatch => {
-    if (!currentUser || !['PURCHASE', 'ADMIN', 'SUPER_ADMIN'].includes(currentUser.role)) {
-      throw new Error('Permission Denied: Only Purchase personnel can add purchase batches.');
+  ) => {
+    try {
+      await apiClient.post(`/orders/${orderId}/purchase-batch`, batchData);
+      await fetchLiveDashboardData();
+    } catch (e: any) {
+      console.error(e);
+      throw new Error(e.response?.data?.message || 'Failed to add purchase batch');
     }
-    let createdBatch: PurchaseBatch | undefined;
-
-    setOrders((prev) =>
-      prev.map((o) => {
-        if (o.id === orderId) {
-          const newBatch: PurchaseBatch = {
-            ...batchData,
-            id: `pb-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-            orderId,
-            createdByName: currentUser?.name || 'System',
-            createdAt: new Date().toISOString(),
-          };
-          createdBatch = newBatch;
-
-          // Also update total purchase quantity
-          const newPurchaseQty = (o.purchaseQuantity || 0) + batchData.quantityReceived;
-          const calcStatus: DepartmentStatus =
-            newPurchaseQty >= o.requiredQuantity ? 'COMPLETED' : newPurchaseQty > 0 ? 'IN_PROGRESS' : o.purchaseStatus;
-
-          const log = addStageLog(
-            o,
-            'PURCHASE',
-            `Purchase Batch Added → ${batchData.quantityReceived} PCS from ${batchData.vendorName}`,
-            calcStatus,
-            batchData.remarks || `Vendor: ${batchData.vendorName}`
-          );
-
-          const qLog: QuantityLog = {
-            id: `ql-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-            orderId,
-            stage: 'PURCHASE',
-            processedQty: batchData.quantityReceived,
-            accumulatedQty: newPurchaseQty,
-            remainingQty: Math.max(0, o.requiredQuantity - newPurchaseQty),
-            totalQty: o.requiredQuantity,
-            actionLabel: `Received ${batchData.quantityReceived} PCS Batch`,
-            remarks: batchData.remarks || `Vendor: ${batchData.vendorName}`,
-            changedByName: currentUser?.name || 'System Admin',
-            changedByRole: currentUser?.role || 'PURCHASE',
-            createdAt: new Date().toISOString(),
-          };
-
-          const isCompleted = calcStatus === 'COMPLETED';
-          let currentStageVal: any = o.currentStage || 'PURCHASE';
-          let assignedDeptVal: any = o.assignedDepartment || 'PURCHASE';
-          let nextStageVal: any = o.nextStage || 'PRODUCTION';
-          let prodStatusVal = o.productionStatus;
-
-          const extraLogs: StageLog[] = [];
-
-          if (isCompleted) {
-            if (o.productionRequired) {
-              currentStageVal = 'PRODUCTION';
-              assignedDeptVal = 'PRODUCTION';
-              nextStageVal = o.qualityTestingRequired ? 'QUALITY_TESTING' : 'DISPATCH';
-              extraLogs.push(addStageLog(o, 'PURCHASE', 'Purchase Completed -> Moved to Production Department', 'PRODUCTION_PENDING'));
-            } else if (o.qualityTestingRequired) {
-              currentStageVal = 'QUALITY_TESTING';
-              assignedDeptVal = 'QUALITY_TESTING';
-              nextStageVal = 'DISPATCH';
-              extraLogs.push(addStageLog(o, 'PURCHASE', 'Purchase Completed -> Moved to Quality Testing', 'QC_PENDING'));
-            } else {
-              currentStageVal = 'DISPATCH';
-              assignedDeptVal = 'DISPATCH';
-              nextStageVal = 'COMPLETED';
-              extraLogs.push(addStageLog(o, 'PURCHASE', 'Purchase Completed -> Moved to Dispatch', 'READY_FOR_DISPATCH'));
-            }
-          }
-
-          return {
-            ...o,
-            purchaseQuantity: newPurchaseQty,
-            purchaseStatus: calcStatus,
-            productionStatus: prodStatusVal,
-            currentStage: currentStageVal,
-            assignedDepartment: assignedDeptVal,
-            nextStage: nextStageVal,
-            purchaseBatches: [...(o.purchaseBatches || []), newBatch],
-            vendorSelected: batchData.vendorName,
-            quantityLogs: [qLog, ...(o.quantityLogs || [])],
-            stageLogs: [...extraLogs, log, ...o.stageLogs],
-            updatedAt: new Date().toISOString(),
-          };
-        }
-        return o;
-      })
-    );
-
-    return createdBatch!;
   };
-
 
   const updateProductionStage = async (
     orderId: string,
@@ -1354,7 +1284,7 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       try { await apiClient.patch(`/orders/${orderId}/verify-completion`, { remarks }); await fetchLiveDashboardData(); } catch (e) { console.error(e); }
   };
 
-  const createTask = (data: {
+  const createTask = async (data: {
     title: string;
     description?: string;
     priority: Priority;
@@ -1364,40 +1294,37 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     orderId?: string;
     dueDate?: string;
   }) => {
-    const orderObj = orders.find((o) => o.id === data.orderId);
-    const newTask: Task = {
-      id: `tsk-${Date.now()}`,
-      orderId: data.orderId,
-      orderNumber: orderObj?.orderNumber,
-      title: data.title,
-      description: data.description,
-      priority: data.priority,
-      status: 'PENDING',
-      assignedToDepartment: data.assignedToDepartment,
-      assignedToUserId: data.assignedToUserId,
-      assignedToName: data.assignedToName,
-      createdByName: currentUser?.name || 'System',
-      createdByRole: currentUser?.role || 'SUPER_ADMIN',
-      createdByUserId: currentUser?.id,
-      dueDate: data.dueDate,
-      createdAt: new Date().toISOString(),
-    };
-    setTasks((prev) => [newTask, ...prev]);
+    try {
+      await apiClient.post('/tasks', data);
+      await fetchLiveDashboardData();
+    } catch (e: any) {
+      console.error(e);
+      throw new Error(e.response?.data?.message || 'Failed to create task');
+    }
   };
 
-  const updateTaskStatus = (taskId: string, status: TaskStatus) => {
-    setTasks((prev) =>
-      prev.map((t) => (t.id === taskId ? { ...t, status } : t))
-    );
+  const updateTaskStatus = async (taskId: string, status: TaskStatus) => {
+    try {
+      await apiClient.patch(`/tasks/${taskId}/status`, { status });
+      await fetchLiveDashboardData();
+    } catch (e: any) {
+      console.error(e);
+      throw new Error(e.response?.data?.message || 'Failed to update task');
+    }
   };
 
-  const deleteTask = (taskId: string) => {
-    // STRICT RULE: Only SUPER_ADMIN and ADMIN can delete tasks
+  const deleteTask = async (taskId: string) => {
     const role = currentUser?.role;
     if (role !== 'SUPER_ADMIN' && role !== 'ADMIN') {
       throw new Error('Permission Denied: Only Super Admin and Admin are authorized to delete tasks.');
     }
-    setTasks((prev) => prev.filter((t) => t.id !== taskId));
+    try {
+      await apiClient.delete(`/tasks/${taskId}`);
+      await fetchLiveDashboardData();
+    } catch (e: any) {
+      console.error(e);
+      throw new Error(e.response?.data?.message || 'Failed to delete task');
+    }
   };
 
   const createCalendarEvent = (data: { title: string; type: CalendarEventType; eventDate: string; description?: string }) => {

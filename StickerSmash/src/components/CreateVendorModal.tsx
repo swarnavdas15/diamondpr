@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, Modal, TouchableOpacity, TextInput, StyleSheet, ScrollView, useWindowDimensions } from 'react-native';
+import { View, Text, Platform, Modal, TouchableOpacity, TextInput, StyleSheet, ScrollView, useWindowDimensions } from 'react-native';
 import { useERP } from '../context/ERPContext';
 import { Vendor, VendorStatus } from '../types';
 import { Colors, Spacing, Radius, Shadows } from '../theme';
+import * as XLSX from 'xlsx';
 
 interface CreateVendorModalProps {
   visible: boolean;
@@ -119,6 +120,97 @@ export const CreateVendorModal: React.FC<CreateVendorModalProps> = ({
     }
   }, [vendorToEdit, visible]);
 
+  
+  const [successMsg, setSuccessMsg] = useState('');
+
+  const processExcelData = async (binaryStr: string) => {
+    try {
+      setSuccessMsg('Processing Excel Data...');
+      const workbook = XLSX.read(binaryStr, { type: 'binary' });
+      const firstSheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[firstSheetName];
+      const data = XLSX.utils.sheet_to_json(worksheet);
+
+      let successCount = 0;
+      const processedCodes = new Set<string>();
+
+
+      for (const rawRow of data as any[]) {
+        const row: any = {};
+        for (const key in rawRow) {
+          row[key.replace(/\s+/g, '').toLowerCase()] = rawRow[key];
+        }
+
+        const vCode = row['vendorcode'] || row['code'] || row['vendorid'];
+        const vName = row['vendorname'] || row['name'] || row['companyname'];
+        if (!vCode || !vName) {
+          console.warn('Skipping row due to missing code or name:', rawRow);
+          continue;
+        }
+          
+        const normalizedCode = vCode.toString().trim().toLowerCase();
+        if (processedCodes.has(normalizedCode)) continue;
+        processedCodes.add(normalizedCode);
+
+        try {
+          await createVendor({
+            vendorCode: vCode.toString().trim(),
+            vendorName: vName.toString().trim(),
+            companyName: row['companyname'] ? row['companyname'].toString().trim() : '',
+            contactPerson: row['contactperson'] ? row['contactperson'].toString().trim() : 'N/A',
+            mobileNumber: row['mobilenumber'] || row['contactno'] || row['phone'] ? (row['mobilenumber'] || row['contactno'] || row['phone']).toString().trim() : '0000000000',
+            email: row['email'] ? row['email'].toString().trim() : 'N/A',
+            materialSupplied: row['materialsupplied'] || row['material'] || row['supplied'] ? (row['materialsupplied'] || row['material'] || row['supplied']).toString().trim() : 'Various',
+            vendorCategory: row['vendorcategory'] || row['category'] ? (row['vendorcategory'] || row['category']).toString().trim() : 'General',
+            status: 'ACTIVE',
+            website: row['website'] ? row['website'].toString().trim() : '',
+            addressLine1: row['city'] || row['address'] ? (row['city'] || row['address']).toString().trim() : '',
+            country: 'India',
+          });
+          successCount++;
+        } catch (e: any) {
+          console.warn('Skipping vendor duplicate or error:', e.message || e);
+        }
+      }
+
+      if (successCount > 0) {
+        setSuccessMsg(`Successfully imported ${successCount} vendors from Excel.`);
+        setTimeout(() => {
+          setSuccessMsg('');
+          handleClose();
+        }, 2000);
+      } else {
+        setError('No valid/new vendors found in the Excel file.');
+        setSuccessMsg('');
+      }
+    } catch (err) {
+      console.error(err);
+      setError('Failed to parse Excel file. Ensure it is a valid .xlsx or .xls file.');
+      setSuccessMsg('');
+    }
+  };
+
+  const handleFileUpload = (e: any) => {
+    let file;
+    const dt = e.dataTransfer || (e.nativeEvent && e.nativeEvent.dataTransfer);
+    const target = e.target || (e.nativeEvent && e.nativeEvent.target);
+
+    if (dt && dt.files && dt.files.length > 0) {
+      file = dt.files[0];
+    } else if (target && target.files && target.files.length > 0) {
+      file = target.files[0];
+    }
+
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (evt) => {
+        const bstr = evt.target?.result as string;
+        processExcelData(bstr);
+      };
+      reader.readAsBinaryString(file);
+    }
+  };
+
   const handleSubmit = async () => {
     setError('');
 
@@ -226,10 +318,72 @@ export const CreateVendorModal: React.FC<CreateVendorModalProps> = ({
             <TouchableOpacity onPress={handleClose}>
               <Text style={styles.close}>✕</Text>
             </TouchableOpacity>
-          </View>
+          
+            </View>
 
-          <ScrollView style={styles.formScroll} showsVerticalScrollIndicator={false}>
             {error ? <Text style={styles.errorText}>⚠️ {error}</Text> : null}
+            {successMsg ? <Text style={[styles.errorText, { color: Colors.successBright, backgroundColor: 'rgba(16, 185, 129, 0.1)', borderColor: Colors.successBright }]}>✅ {successMsg}</Text> : null}
+
+            <ScrollView style={styles.formScroll} showsVerticalScrollIndicator={false}>
+              <View style={{ paddingBottom: 10 }}>
+                {Platform.OS === 'web' && !vendorToEdit && (
+                  <View
+                    // @ts-ignore
+                    onDragOver={(e: any) => { e.preventDefault(); e.stopPropagation(); }}
+                    onDrop={(e: any) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      handleFileUpload(e);
+                    }}
+                    style={{
+                      borderWidth: 2,
+                      borderColor: '#0284c7',
+                      borderStyle: 'dashed',
+                      borderRadius: 8,
+                      padding: 40,
+                      minHeight: 160,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      backgroundColor: 'rgba(2, 132, 199, 0.03)',
+                      marginBottom: 16,
+                    }}
+                  >
+                    <Text style={{ color: '#0284c7', fontWeight: 'bold', fontSize: 14, marginBottom: 8, textAlign: 'center' }}>
+                      📁 Bulk Import via Excel
+                    </Text>
+                    <Text style={{ color: '#64748b', fontSize: 12, textAlign: 'center', lineHeight: 18, paddingHorizontal: 10 }}>
+                      Drag & drop your Excel file here or click below to upload. {'\n'}
+                      <Text style={{ fontWeight: '600' }}>Required Columns:</Text> VendorCode, VendorName
+                    </Text>
+                    
+                    <TouchableOpacity
+                      style={{
+                        marginTop: 16,
+                        backgroundColor: Colors.white,
+                        borderWidth: 1,
+                        borderColor: '#bae6fd',
+                        paddingHorizontal: 20,
+                        paddingVertical: 10,
+                        borderRadius: 6,
+                      }}
+                      onPress={() => {
+                        const el = document.getElementById('excel-upload-input-vendor');
+                        if (el) el.click();
+                      }}
+                    >
+                      <Text style={{ color: '#0284c7', fontSize: 13, fontWeight: '700' }}>Browse Files</Text>
+                    </TouchableOpacity>
+                    <input 
+                      id="excel-upload-input-vendor"
+                      type="file" 
+                      accept=".xlsx, .xls" 
+                      onChange={handleFileUpload} 
+                      style={{ display: 'none' }} 
+                    />
+                  </View>
+                )}
+              </View>
+
 
             {/* SECTION 1: BASIC INFORMATION */}
             <Text style={styles.sectionHeader}>1. Basic Information</Text>

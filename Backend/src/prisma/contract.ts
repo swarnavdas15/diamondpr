@@ -58,6 +58,8 @@ export const contract = defineContract(
         mobileNumber: field.text().optional(),
         employeeId: field.text().optional(),
         role: field.namedType(Role).default(Role.members.PRODUCTION),
+          accessibleModules: field.json().optional(),
+          clientDataVisibility: field.text().default('FULL'),
         fcmToken: field.text().optional(),
         refreshToken: field.text().optional(),
         isActive: field.boolean().default(true),
@@ -67,6 +69,38 @@ export const contract = defineContract(
       },
     });
 
+    
+    const Vendor = model('Vendor', {
+      fields: {
+        id: field.id.uuidv7String(),
+        vendorCode: field.text(),
+        vendorName: field.text(),
+        companyName: field.text().optional(),
+        gstNumber: field.text().optional(),
+        panNumber: field.text().optional(),
+        contactPerson: field.text(),
+        mobileNumber: field.text(),
+        alternateMobile: field.text().optional(),
+        email: field.text(),
+        website: field.text().optional(),
+        addressLine1: field.text().optional(),
+        addressLine2: field.text().optional(),
+        city: field.text().optional(),
+        state: field.text().optional(),
+        pinCode: field.text().optional(),
+        country: field.text().optional(),
+        materialSupplied: field.text(),
+        vendorCategory: field.text().optional(),
+        paymentTerms: field.text().optional(),
+        leadTime: field.text().optional(),
+        status: field.text().default('ACTIVE'),
+        remarks: field.text().optional(),
+        notes: field.text().optional(),
+        createdAt: field.temporal.createdAtString(),
+        updatedAt: field.temporal.updatedAtString(),
+        isDeleted: field.int().default(0),
+      }
+    });
     const Client = model('Client', {
       fields: {
         id: field.id.uuidv7String(),
@@ -113,6 +147,36 @@ export const contract = defineContract(
         clientId: field.uuidString(),
         requirements: field.text().optional(),
         budget: field.bigint().optional(),
+        orderNumber: field.text().optional(),
+        clientCode: field.text().optional(),
+        clientName: field.text().optional(),
+        technicalRequirements: field.text().optional(),
+        materialRequirements: field.text().optional(),
+        requiredQuantity: field.int().default(1),
+        unit: field.text().default('pcs'),
+        purchaseRequired: field.boolean().default(true),
+        productionRequired: field.boolean().default(true),
+        qualityTestingRequired: field.boolean().default(true),
+        dispatchRequired: field.boolean().default(true),
+        purchaseStatus: field.text().default('PENDING'),
+        productionStatus: field.text().default('PENDING'),
+        qualityStatus: field.text().default('PENDING'),
+        dispatchStatus: field.text().default('PENDING'),
+        purchaseQuantity: field.int().default(0),
+        productionQuantity: field.int().default(0),
+        qcQuantity: field.int().default(0),
+        qcPassedQuantity: field.int().default(0),
+        qcFailedQuantity: field.int().default(0),
+        reworkQuantity: field.int().default(0),
+        dispatchQuantity: field.int().default(0),
+        vendorSelected: field.text().optional(),
+        procurementNotes: field.text().optional(),
+        shopFloorNotes: field.text().optional(),
+        qcResult: field.text().optional(),
+        qcRemarks: field.text().optional(),
+        dispatchNotes: field.text().optional(),
+        logisticsEntry: field.text().optional(),
+        transportRef: field.text().optional(),
         createdById: field.uuidString().optional(),
         isDeleted: field.int().default(0),
         createdAt: field.temporal.createdAtString(),
@@ -143,6 +207,19 @@ export const contract = defineContract(
       },
     });
 
+        const PurchaseBatch = model('PurchaseBatch', {
+      fields: {
+        id: field.id.uuidv7String(),
+        orderId: field.uuidString(),
+        vendorName: field.text(),
+        quantityReceived: field.int().default(0),
+        cost: field.float().optional(),
+        remarks: field.text().optional(),
+        createdById: field.uuidString().optional(),
+        createdAt: field.temporal.createdAtString(),
+      },
+    });
+
     const Task = model('Task', {
       fields: {
         id: field.id.uuidv7String(),
@@ -153,6 +230,13 @@ export const contract = defineContract(
         status: field.namedType(TaskStatus).default(TaskStatus.members.PENDING),
         dueDate: field.temporal.timestampString().optional(),
         assignedToId: field.uuidString().optional(),
+          assignedToDepartment: field.text().optional(),
+          assignedToName: field.text().optional(),
+          assignedToUserId: field.uuidString().optional(),
+          createdByName: field.text().optional(),
+          createdByRole: field.text().optional(),
+          createdByUserId: field.uuidString().optional(),
+          orderNumber: field.text().optional(),
         createdById: field.uuidString().optional(),
         isDeleted: field.int().default(0),
         createdAt: field.temporal.createdAtString(),
@@ -237,6 +321,7 @@ export const contract = defineContract(
     return {
       enums: { Role, OrderStage, Priority, TaskStatus },
       models: {
+        Vendor: Vendor,
         Quotation: Quotation.relations({
           client: rel.belongsTo(Client, { from: 'clientId', to: 'id' }),
           followUps: rel.hasMany(QuotationFollowUp, { by: 'quotationId' }),
@@ -262,11 +347,12 @@ export const contract = defineContract(
         CompanyContact: CompanyContact.relations({
           client: rel.belongsTo(Client, { from: 'companyId', to: 'id' }),
         }),
-        Order: Order.relations({
-          client: rel.belongsTo(Client, { from: 'clientId', to: 'id' }),
-          createdBy: rel.belongsTo(User, { from: 'createdById', to: 'id' }),
-          items: rel.hasMany(OrderItem, { by: 'orderId' }),
-          tasks: rel.hasMany(Task, { by: 'orderId' }),
+                  Order: Order.relations({
+            client: rel.belongsTo(Client, { from: 'clientId', to: 'id' }),
+            createdBy: rel.belongsTo(User, { from: 'createdById', to: 'id' }),
+            items: rel.hasMany(OrderItem, { by: 'orderId' }),
+            tasks: rel.hasMany(Task, { by: 'orderId' }),
+            purchaseBatches: rel.hasMany(PurchaseBatch, { by: 'orderId' }),
           drawings: rel.hasMany(Drawing, { by: 'orderId' }),
           notes: rel.hasMany(Note, { by: 'orderId' }),
           stageLogs: rel.hasMany(StageLog, { by: 'orderId' }),
@@ -278,7 +364,11 @@ export const contract = defineContract(
           order: rel.belongsTo(Order, { from: 'orderId', to: 'id' }),
           changedBy: rel.belongsTo(User, { from: 'changedById', to: 'id' }),
         }),
-        Task: Task.relations({
+                  PurchaseBatch: PurchaseBatch.relations({
+            order: rel.belongsTo(Order, { from: 'orderId', to: 'id' }),
+            createdBy: rel.belongsTo(User, { from: 'createdById', to: 'id' }),
+          }),
+          Task: Task.relations({
           order: rel.belongsTo(Order, { from: 'orderId', to: 'id' }),
           assignedTo: rel.belongsTo(User, { from: 'assignedToId', to: 'id' }),
           createdBy: rel.belongsTo(User, { from: 'createdById', to: 'id' }),

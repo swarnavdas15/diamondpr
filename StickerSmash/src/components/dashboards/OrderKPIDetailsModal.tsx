@@ -160,7 +160,7 @@ export const OrderKPIDetailsModal: React.FC<OrderKPIDetailsModalProps> = ({
                 filtered.map((ord) => {
                   const purStyle = getPillStyle(ord.purchaseStatus);
                   const prodStyle = getPillStyle(ord.productionStatus);
-                  const qcStyle = getPillStyle(ord.qcResult);
+                  const qcStyle = getPillStyle(ord.qualityStatus);
                   const dispStyle = getPillStyle(ord.dispatchStatus);
 
                   return (
@@ -192,7 +192,7 @@ export const OrderKPIDetailsModal: React.FC<OrderKPIDetailsModalProps> = ({
 
                       <View style={{ width: 110 }}>
                         <View style={[styles.statusPill, { backgroundColor: qcStyle.bg, borderColor: qcStyle.border }]}>
-                          <Text style={[styles.statusPillText, { color: qcStyle.text }]}>{ord.qcResult}</Text>
+                          <Text style={[styles.statusPillText, { color: qcStyle.text }]}>{ord.qualityStatus}</Text>
                         </View>
                       </View>
 
@@ -251,7 +251,7 @@ export const OrderKPIDetailsModal: React.FC<OrderKPIDetailsModalProps> = ({
                 </View>
                 <View style={styles.stageBox}>
                   <Text style={styles.stageLabel}>QUALITY TEST</Text>
-                  <Text style={[styles.stageVal, { color: getPillStyle(ord.qcResult).text }]}>{ord.qcResult}</Text>
+                  <Text style={[styles.stageVal, { color: getPillStyle(ord.qualityStatus).text }]}>{ord.qualityStatus}</Text>
                 </View>
                 <View style={styles.stageBox}>
                   <Text style={styles.stageLabel}>DISPATCH</Text>

@@ -33,7 +33,9 @@ export type ReportType =
   | 'LOST_BUSINESS'
   | 'AUDIT_LOG';
 
-import { PieChart } from 'react-native-chart-kit';
+import { PieChart, BarChart } from 'react-native-chart-kit';
+import { WebBarChart } from './WebBarChart';
+import { WebRevenueChart, MonthlyRevenuePoint } from './WebRevenueChart';
 
 interface PieChartItem {
   label: string;
@@ -49,6 +51,75 @@ interface VisualPieChartProps {
   centerLabel?: string | number;
   centerSubLabel?: string;
 }
+
+
+interface BarChartItem {
+  label: string;
+  completed: number;
+  pending: number;
+}
+
+interface VisualBarChartProps {
+  title?: string;
+  subtitle?: string;
+  items: BarChartItem[];
+}
+
+const VisualBarChart: React.FC<VisualBarChartProps> = ({ title, subtitle, items }) => {
+  const maxVal = Math.max(...items.map(d => d.completed + d.pending), 1);
+  
+  return (
+    <View style={styles.pieChartCard}>
+      {title ? <Text style={styles.pieChartTitle}>{title}</Text> : null}
+      {subtitle ? <Text style={styles.pieChartSubtitle}>{subtitle}</Text> : null}
+      
+      {/* Legend */}
+      <View style={{ flexDirection: 'row', gap: 16, marginTop: 10, marginBottom: 20, paddingHorizontal: 4 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: '#22c55e' }} />
+          <Text style={{ fontSize: 13, color: '#475569', fontWeight: '500' }}>Completed Tasks</Text>
+        </View>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: '#f59e0b' }} />
+          <Text style={{ fontSize: 13, color: '#475569', fontWeight: '500' }}>Pending Tasks</Text>
+        </View>
+      </View>
+
+      <View style={{ paddingHorizontal: 4 }}>
+        {Platform.OS === 'web' && items.length > 0 ? (
+          <WebBarChart data={items.map(i => ({ name: i.label.split(' ')[0], completed: i.completed, pending: i.pending }))} />
+        ) : items.length === 0 ? (
+          <View style={{ padding: 30, alignItems: 'center', backgroundColor: '#f8fafc', borderRadius: 8 }}>
+            <Text style={{ color: '#64748b' }}>No task data available for staff comparison.</Text>
+          </View>
+        ) : (
+          items.map((item, idx) => {
+            const completedPct = (item.completed / maxVal) * 100;
+            const pendingPct = (item.pending / maxVal) * 100;
+            const completionRate = (item.completed + item.pending) > 0 
+              ? Math.round((item.completed / (item.completed + item.pending)) * 100) 
+              : 0;
+
+            return (
+              <View key={idx} style={{ marginBottom: 18 }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8, alignItems: 'flex-end' }}>
+                  <Text style={{ fontWeight: '600', color: '#1e293b', fontSize: 14 }}>{item.label}</Text>
+                  <Text style={{ fontSize: 12, color: '#64748b', fontWeight: '500' }}>
+                    {item.completed} / {item.completed + item.pending} Tasks ({completionRate}% Yield)
+                  </Text>
+                </View>
+                <View style={{ height: 12, backgroundColor: '#f1f5f9', borderRadius: 6, flexDirection: 'row', overflow: 'hidden' }}>
+                  <View style={{ width: `${completedPct}%`, backgroundColor: '#22c55e' }} />
+                  <View style={{ width: `${pendingPct}%`, backgroundColor: '#f59e0b' }} />
+                </View>
+              </View>
+            );
+          })
+        )}
+      </View>
+    </View>
+  );
+};
 
 const VisualPieChart: React.FC<VisualPieChartProps> = ({
   title,
@@ -284,7 +355,9 @@ export const SuperAdminAnalyticsView: React.FC = () => {
       o.currentStage === 'COMPLETED' || o.dispatchStatus === 'COMPLETED' || o.status === 'COMPLETED'
     ).length;
 
-    const activeOrders = filteredOrders.filter((o) =>
+    const activeOrders = totalOrders - completedOrders;
+
+    const productionOrders = filteredOrders.filter((o) =>
       (o.currentStage === 'PRODUCTION' || o.productionStatus === 'IN_PROGRESS') &&
       o.currentStage !== 'COMPLETED' && o.dispatchStatus !== 'COMPLETED'
     ).length;
@@ -304,9 +377,11 @@ export const SuperAdminAnalyticsView: React.FC = () => {
       o.currentStage !== 'COMPLETED' && o.dispatchStatus !== 'COMPLETED'
     ).length;
 
-    const delayedOrders = filteredOrders.filter((o) =>
-      o.status !== 'COMPLETED' && o.currentStage !== 'COMPLETED' && o.productionStatus === 'IN_PROGRESS'
-    ).length;
+    const delayedOrders = filteredOrders.filter((o) => {
+      if (o.status === 'COMPLETED' || o.currentStage === 'COMPLETED' || o.dispatchStatus === 'COMPLETED') return false;
+      const daysActive = (new Date().getTime() - new Date(o.createdAt).getTime()) / (1000 * 3600 * 24);
+      return daysActive > 14;
+    }).length;
 
     const totalQuotations = filteredQuotations.length;
     const convertedQuotations = filteredQuotations.filter(
@@ -314,19 +389,20 @@ export const SuperAdminAnalyticsView: React.FC = () => {
     ).length;
     const conversionRate = totalQuotations > 0 ? ((convertedQuotations / totalQuotations) * 100).toFixed(1) : '0.0';
 
-    const totalRevenue = filteredQuotations.reduce((acc, q) => acc + (q.convertedOrderValue || 0), 0);
-    const lostBusinessValue = filteredQuotations.reduce((acc, q) => acc + (q.lostValue || 0), 0);
+    const totalRevenue = filteredQuotations.reduce((acc, q) => acc + Number(q.convertedOrderValue || 0), 0);
+    const lostBusinessValue = filteredQuotations.reduce((acc, q) => acc + Number(q.lostValue || 0), 0);
 
     const totalTasks = filteredTasks.length;
     const pendingTasks = filteredTasks.filter((t) => t.status !== 'COMPLETED').length;
 
     // Scores
-    const deptScore = totalOrders > 0 ? Math.min(100, Math.round((completedOrders / totalOrders) * 100 + 15)) : 88;
-    const userProductivityScore = totalTasks > 0 ? Math.round(((totalTasks - pendingTasks) / totalTasks) * 100) : 92;
+    const deptScore = totalOrders > 0 ? Math.min(100, Math.round((completedOrders / totalOrders) * 100)) : 0;
+    const userProductivityScore = totalTasks > 0 ? Math.round(((totalTasks - pendingTasks) / totalTasks) * 100) : 0;
 
     return {
       totalOrders,
       activeOrders,
+      productionOrders,
       completedOrders,
       pendingPurchaseOrders,
       testingOrders,
@@ -342,6 +418,58 @@ export const SuperAdminAnalyticsView: React.FC = () => {
       userProductivityScore,
     };
   }, [filteredOrders, filteredQuotations, filteredTasks]);
+
+
+  // 2b. Monthly Revenue & Negotiation (Bargaining) Analytics
+  const revenueAnalytics = useMemo(() => {
+    const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const now = new Date();
+    const buckets: (MonthlyRevenuePoint & { key: string; deals: number })[] = [];
+    for (let i = 11; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      buckets.push({
+        key: `${d.getFullYear()}-${d.getMonth()}`,
+        month: `${MONTHS[d.getMonth()]} ${String(d.getFullYear()).slice(2)}`,
+        quoted: 0, converted: 0, negotiation: 0, lost: 0, deals: 0,
+      });
+    }
+    const byKey = new Map(buckets.map((b) => [b.key, b]));
+
+    let totalQuoted = 0, totalConverted = 0, totalNegotiation = 0, totalLost = 0, convertedDeals = 0;
+
+    filteredQuotations.forEach((q) => {
+      const rawDate = q.quotationDate || q.createdAt;
+      const d = rawDate ? new Date(rawDate) : null;
+      const bucket = d && !isNaN(d.getTime()) ? byKey.get(`${d.getFullYear()}-${d.getMonth()}`) : undefined;
+
+      const quotedAmt = Number(q.quotationAmount) || 0;
+      const convertedAmt = Number(q.convertedOrderValue) || 0;
+      const isConverted = q.status === 'FULLY_CONVERTED' || q.status === 'PARTIALLY_CONVERTED' || convertedAmt > 0;
+      const isLost = q.status === 'LOST';
+
+      if (isConverted) {
+        const finalAmt = convertedAmt > 0 ? convertedAmt : quotedAmt;
+        const discount = Math.max(0, quotedAmt - finalAmt);
+        totalQuoted += quotedAmt;
+        totalConverted += finalAmt;
+        totalNegotiation += discount;
+        convertedDeals += 1;
+        if (bucket) {
+          bucket.quoted += quotedAmt;
+          bucket.converted += finalAmt;
+          bucket.negotiation += discount;
+          bucket.deals += 1;
+        }
+      } else if (isLost) {
+        const lostAmt = Number(q.lostValue) || quotedAmt;
+        totalLost += lostAmt;
+        if (bucket) bucket.lost += lostAmt;
+      }
+    });
+
+    const avgDiscountPct = totalQuoted > 0 ? ((totalNegotiation / totalQuoted) * 100).toFixed(1) : '0.0';
+    return { monthly: buckets, totalQuoted, totalConverted, totalNegotiation, totalLost, convertedDeals, avgDiscountPct };
+  }, [filteredQuotations]);
 
   // Reset Filters Handler
   const handleResetFilters = () => {
@@ -692,7 +820,7 @@ export const SuperAdminAnalyticsView: React.FC = () => {
         <View style={styles.kpiCard}>
           <Text style={[styles.kpiVal, { color: Colors.accentTeal }]}>{metrics.activeOrders}</Text>
           <Text style={styles.kpiLabel}>Active Work Orders</Text>
-          <Text style={styles.kpiSub}>In shop floor pipeline</Text>
+          <Text style={styles.kpiSub}>System-wide active pipeline</Text>
         </View>
 
         <View style={styles.kpiCard}>
@@ -704,7 +832,7 @@ export const SuperAdminAnalyticsView: React.FC = () => {
         <View style={styles.kpiCard}>
           <Text style={[styles.kpiVal, { color: Colors.industrialOrange }]}>{metrics.delayedOrders}</Text>
           <Text style={styles.kpiLabel}>Delayed Orders</Text>
-          <Text style={styles.kpiSub}>Bottleneck alerts</Text>
+          <Text style={styles.kpiSub}>Active {'>'} 14 Days</Text>
         </View>
 
         <View style={styles.kpiCard}>
@@ -796,7 +924,7 @@ export const SuperAdminAnalyticsView: React.FC = () => {
             centerSubLabel="Total Orders"
             items={[
               { label: 'Completed Orders', value: metrics.completedOrders, color: '#22c55e' },
-              { label: 'Active Shop Floor Production', value: metrics.activeOrders, color: '#0284c7' },
+              { label: 'Active Shop Floor Production', value: metrics.productionOrders, color: '#0284c7' },
               { label: 'Pending Sourcing & Procurement', value: metrics.pendingPurchaseOrders, color: '#f59e0b' },
               { label: 'Quality Testing & Inspection', value: metrics.testingOrders, color: '#8b5cf6' },
               { label: 'Ready for Dispatch / Shipping', value: metrics.dispatchOrders, color: '#ec4899' },
@@ -836,7 +964,7 @@ export const SuperAdminAnalyticsView: React.FC = () => {
             const completedProc = filteredOrders.filter((o) => o.purchaseRequired && o.purchaseStatus === 'COMPLETED').length;
             const inProgProc = filteredOrders.filter((o) => o.purchaseRequired && o.purchaseStatus === 'IN_PROGRESS').length;
             const pendingProc = filteredOrders.filter((o) => o.purchaseRequired && o.purchaseStatus === 'PENDING').length;
-            const yieldPct = totalProc > 0 ? Math.round((completedProc / totalProc) * 100) : 100;
+            const yieldPct = totalProc > 0 ? Math.round((completedProc / totalProc) * 100) : 0;
 
             return (
               <VisualPieChart
@@ -866,7 +994,7 @@ export const SuperAdminAnalyticsView: React.FC = () => {
             const completedProd = filteredOrders.filter((o) => o.productionRequired && o.productionStatus === 'COMPLETED').length;
             const inProgProd = filteredOrders.filter((o) => o.productionRequired && o.productionStatus === 'IN_PROGRESS').length;
             const pendingProd = filteredOrders.filter((o) => o.productionRequired && o.productionStatus === 'PENDING').length;
-            const yieldPct = totalProd > 0 ? Math.round((completedProd / totalProd) * 100) : 100;
+            const yieldPct = totalProd > 0 ? Math.round((completedProd / totalProd) * 100) : 0;
 
             return (
               <VisualPieChart
@@ -896,7 +1024,7 @@ export const SuperAdminAnalyticsView: React.FC = () => {
             const passedQc = filteredOrders.filter((o) => o.qualityTestingRequired && o.qcResult === 'PASSED').length;
             const failedQc = filteredOrders.filter((o) => o.qualityTestingRequired && o.qcResult === 'FAILED').length;
             const pendingQc = filteredOrders.filter((o) => o.qualityTestingRequired && (o.qcResult === 'PENDING' || !o.qcResult)).length;
-            const passPct = totalQc > 0 ? Math.round((passedQc / totalQc) * 100) : 100;
+            const passPct = totalQc > 0 ? Math.round((passedQc / totalQc) * 100) : 0;
 
             return (
               <VisualPieChart
@@ -926,7 +1054,7 @@ export const SuperAdminAnalyticsView: React.FC = () => {
             const completedDisp = filteredOrders.filter((o) => o.dispatchRequired && o.dispatchStatus === 'COMPLETED').length;
             const inProgDisp = filteredOrders.filter((o) => o.dispatchRequired && o.dispatchStatus === 'IN_PROGRESS').length;
             const pendingDisp = filteredOrders.filter((o) => o.dispatchRequired && o.dispatchStatus === 'PENDING').length;
-            const dispPct = totalDisp > 0 ? Math.round((completedDisp / totalDisp) * 100) : 100;
+            const dispPct = totalDisp > 0 ? Math.round((completedDisp / totalDisp) * 100) : 0;
 
             return (
               <VisualPieChart
@@ -948,20 +1076,27 @@ export const SuperAdminAnalyticsView: React.FC = () => {
       {/* 7. USER PRODUCTIVITY GRAPH ANALYTICS TAB */}
       {activeTab === 'USERS' && (
         <View style={styles.sectionCard}>
-          <Text style={styles.sectionTitle}>👤 Staff & User Productivity Analytics</Text>
+          <Text style={styles.sectionTitle}>dY`  Staff & User Productivity Analytics</Text>
           <Text style={styles.sectionSub}>Task completion yields and cross-departmental staff performance scores.</Text>
 
-          <VisualPieChart
-            title="👤 System Staff Task Performance Pie Chart"
-            subtitle="Cross-departmental staff productivity breakdown: Completed Tasks, System Users, and Open Tasks."
-            centerLabel={`${metrics.userProductivityScore}%`}
-            centerSubLabel="Score"
-            items={[
-              { label: 'Completed Tasks', value: metrics.totalTasks - metrics.pendingTasks, color: '#22c55e' },
-              { label: 'Active System Users', value: users.length, color: '#0284c7' },
-              { label: 'Open Pending Tasks', value: metrics.pendingTasks, color: '#f59e0b' },
-            ]}
-          />
+          {(() => {
+            const staffStats = users.map((u) => {
+              const uTasks = filteredTasks.filter((t) => t.assignedToUserId === u.id || t.assignedToName === u.name);
+              const comp = uTasks.filter((t) => t.status === 'COMPLETED').length;
+              return { label: u.name, completed: comp, pending: uTasks.length - comp, total: uTasks.length };
+            }).sort((a, b) => b.completed - a.completed);
+            
+            // Only show staff who have at least 1 assigned task (or top 5 if many)
+            const activeStaff = staffStats.filter(s => s.total > 0);
+
+            return (
+              <VisualBarChart
+                title="📊 Staff Task Performance & Yield Comparison"
+                subtitle="Comparative horizontal breakdown of completed vs pending tasks across active staff members."
+                items={activeStaff.length > 0 ? activeStaff : staffStats} 
+              />
+            );
+          })()}
         </View>
       )}
 
@@ -969,18 +1104,37 @@ export const SuperAdminAnalyticsView: React.FC = () => {
       {activeTab === 'REVENUE' && (
         <View style={styles.sectionCard}>
           <Text style={styles.sectionTitle}>💰 Revenue & Financial Performance Analytics</Text>
-          <Text style={styles.sectionSub}>Comparison of Converted Revenue vs Lost Business Value.</Text>
+          <Text style={styles.sectionSub}>Monthly revenue trend with quotation vs converted value and negotiation (bargaining) discount.</Text>
 
-          <VisualPieChart
-            title="💰 Converted Revenue vs Lost Value Financial Pie Chart"
-            subtitle="Direct revenue comparison between successfully converted orders and lost business value."
-            centerLabel={`₹${metrics.totalRevenue.toLocaleString()}`}
-            centerSubLabel="Revenue"
-            items={[
-              { label: 'Converted Revenue', value: metrics.totalRevenue, displayValue: `₹${metrics.totalRevenue.toLocaleString()}`, color: '#22c55e' },
-              { label: 'Lost Business Value', value: metrics.lostBusinessValue, displayValue: `₹${metrics.lostBusinessValue.toLocaleString()}`, color: '#ef4444' },
-            ]}
-          />
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 16 }}>
+            {[
+              { label: 'Quoted (Converted Deals)', value: `₹${revenueAnalytics.totalQuoted.toLocaleString('en-IN')}`, color: '#475569' },
+              { label: 'Converted Revenue', value: `₹${revenueAnalytics.totalConverted.toLocaleString('en-IN')}`, color: '#16a34a' },
+              { label: 'Negotiation Discount', value: `₹${revenueAnalytics.totalNegotiation.toLocaleString('en-IN')}`, color: '#d97706' },
+              { label: 'Avg. Discount Given', value: `${revenueAnalytics.avgDiscountPct}%`, color: '#d97706' },
+              { label: 'Lost Business', value: `₹${revenueAnalytics.totalLost.toLocaleString('en-IN')}`, color: '#dc2626' },
+              { label: 'Converted Deals', value: String(revenueAnalytics.convertedDeals), color: '#0284c7' },
+            ].map((c) => (
+              <View key={c.label} style={{ flexGrow: 1, flexBasis: 160, padding: 14, borderRadius: 10, borderWidth: 1, borderColor: '#e2e8f0', backgroundColor: '#f8fafc' }}>
+                <Text style={{ fontSize: 18, fontWeight: '700', color: c.color }}>{c.value}</Text>
+                <Text style={{ fontSize: 12, color: '#64748b', marginTop: 4, fontWeight: '500' }}>{c.label}</Text>
+              </View>
+            ))}
+          </View>
+
+          <View style={[styles.pieChartCard, { marginTop: 16 }]}>
+            <Text style={styles.pieChartTitle}>📊 Monthly Revenue vs Quotation (Last 12 Months)</Text>
+            <Text style={styles.pieChartSubtitle}>
+              Grey = original quoted amount, Green = final converted revenue, Amber = negotiation discount (Quoted − Converted), Red line = lost business.
+            </Text>
+            {revenueAnalytics.monthly.some((m) => m.quoted || m.converted || m.lost) ? (
+              <WebRevenueChart data={revenueAnalytics.monthly} />
+            ) : (
+              <View style={{ padding: 30, alignItems: 'center', backgroundColor: '#f8fafc', borderRadius: 8, marginTop: 16 }}>
+                <Text style={{ color: '#64748b' }}>No converted or lost quotations in the last 12 months yet.</Text>
+              </View>
+            )}
+          </View>
         </View>
       )}
     </ScrollView>

@@ -4,6 +4,7 @@ import { requireRole } from '../../middlewares/role.middleware';
 import {
   handleCreateUser,
   handleListUsers,
+  handleToggleUserMasking,
   handleToggleUserStatus,
   handleUpdateUserRole,
   handleDeleteUser,
@@ -16,6 +17,7 @@ const router = Router();
 // Only SUPER_ADMIN can create users, toggle status, modify roles, delete, and reset password
 router.post('/', authenticateToken, requireRole(['SUPER_ADMIN']), handleCreateUser);
 router.patch('/:id', authenticateToken, requireRole(['SUPER_ADMIN']), handleUpdateUserDetails);
+router.patch('/:id/masking', authenticateToken, requireRole(['SUPER_ADMIN']), handleToggleUserMasking);
 router.patch('/:id/status', authenticateToken, requireRole(['SUPER_ADMIN']), handleToggleUserStatus);
 router.patch('/:id/role', authenticateToken, requireRole(['SUPER_ADMIN']), handleUpdateUserRole);
 router.delete('/:id', authenticateToken, requireRole(['SUPER_ADMIN']), handleDeleteUser);

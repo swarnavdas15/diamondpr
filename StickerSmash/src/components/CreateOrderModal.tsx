@@ -12,6 +12,7 @@ import { Client, CustomStage } from '../types';
 export interface InitialOrderData {
   quotationId?: string;
   clientId?: string;
+  clientDraft?: any;
   poNumber?: string;
   budget?: number;
   technicalRequirements?: string;
@@ -31,7 +32,7 @@ interface CreateOrderModalProps {
 }
 
 export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ visible, onClose, initialData }) => {
-  const { clients, createOrder, updateQuotation, refreshData } = useERP();
+  const { clients, createOrder, updateQuotation, refreshData, createClient } = useERP();
   const { users } = useAuth();
   const { width } = useWindowDimensions();
   const isMobile = width < 768;
@@ -238,38 +239,65 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ visible, onC
     );
   };
 
-  const handleSubmit = () => {
-    if (!poNumber.trim() || !clientId) {
+  const handleSubmit = async () => {
+    let resolvedClientId = clientId;
+    let newClientObj = undefined;
+
+    if (!resolvedClientId && initialData?.clientDraft) {
+      try {
+        const nc = await createClient(initialData.clientDraft);
+        resolvedClientId = nc.id;
+        newClientObj = nc;
+      } catch (e: any) {
+        setError(e.message || 'Failed to auto-create client from quotation.');
+        return;
+      }
+    }
+
+    if (!poNumber.trim() || !resolvedClientId) {
       setError('PO Number and Client selection are required.');
       return;
     }
 
-    createOrder({
-      poNumber,
-      clientId,
-      budget: budget ? parseFloat(budget) : undefined,
-      technicalRequirements,
-      materialRequirements,
-      requiredQuantity: parseInt(requiredQuantity, 10) || 1,
+    try {
+      const newOrder = await createOrder({
+        poNumber,
+        clientId: resolvedClientId,
+        clientObj: newClientObj,
+        budget: budget ? parseFloat(budget) : undefined,
+        technicalRequirements,
+        materialRequirements,
+        requiredQuantity: parseInt(requiredQuantity, 10) || 1,
 
-      // Pipeline customizer selections
-      purchaseRequired,
-      productionRequired,
-      qualityTestingRequired,
-      dispatchRequired,
-      customStages,
+        // Pipeline customizer selections
+        purchaseRequired,
+        productionRequired,
+        qualityTestingRequired,
+        dispatchRequired,
+        customStages,
 
-      items: [
-        {
-          itemName,
-          size,
-          quantity: parseInt(requiredQuantity, 10) || 1,
-          unitPrice: unitPrice ? parseFloat(unitPrice) : undefined,
-        },
-      ],
-    });
+        items: [
+          {
+            itemName,
+            size,
+            quantity: parseInt(requiredQuantity, 10) || 1,
+            unitPrice: unitPrice ? parseFloat(unitPrice) : undefined,
+          },
+        ],
+      });
 
-    handleClose();
+      if (initialData?.quotationId) {
+        await updateQuotation(initialData.quotationId, {
+          status: 'FULLY_CONVERTED',
+          convertedOrderId: newOrder.id,
+          convertedOrderValue: budget ? parseFloat(budget) : undefined,
+        });
+      }
+
+      handleClose();
+    } catch (err: any) {
+      setError(err.response?.data?.error || err.response?.data?.message || err.message || 'Failed to create order');
+    }
   };
 
   const handleClose = () => {

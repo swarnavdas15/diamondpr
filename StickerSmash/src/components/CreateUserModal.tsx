@@ -24,15 +24,18 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({ visible, onClo
   const [employeeId, setEmployeeId] = useState('');
   const [role, setRole] = useState<Role>('PRODUCTION');
   const [isActive, setIsActive] = useState(true);
+  const [accessibleModules, setAccessibleModules] = useState<string[]>([]);
 
   const [createdUser, setCreatedUser] = useState<any | null>(null);
   const [errorMsg, setErrorMsg] = useState('');
 
   const roles: { role: Role; label: string; department: string }[] = [
     { role: 'SUPER_ADMIN', label: 'Super Admin', department: 'Executive Management' },
+    { role: 'ADMIN', label: 'Admin (Custom)', department: 'Custom Management' },
     { role: 'SALES', label: 'Sales Department', department: 'Commercial & Accounts' },
     { role: 'PURCHASE', label: 'Purchase Department', department: 'Procurement & Supply Chain' },
     { role: 'PRODUCTION', label: 'Production Department', department: 'Shop Floor & Machining' },
+    { role: 'QUALITY_TESTING', label: 'Quality Testing', department: 'Quality Assurance' },
     { role: 'DISPATCH', label: 'Dispatch Department', department: 'Logistics & Shipment' },
   ];
 
@@ -77,12 +80,32 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({ visible, onClo
         mobileNumber: mobileNumber.trim(),
         employeeId: employeeId.trim() || undefined,
         role,
-        isActive,
-      });
+          isActive,
+          accessibleModules: role === 'ADMIN' ? accessibleModules : undefined,
+        });
       setCreatedUser(newUser);
     } catch (err: any) {
       setErrorMsg(err.message || 'Failed to create user account');
     }
+  };
+
+  
+  const MODULE_OPTIONS = [
+    { id: 'clients', label: 'Client Directory' },
+    { id: 'orders', label: 'Sales & Orders' },
+    { id: 'quotations', label: 'Quotations' },
+    { id: 'purchase', label: 'Purchase' },
+    { id: 'production', label: 'Production' },
+    { id: 'quality', label: 'Quality Testing' },
+    { id: 'dispatch', label: 'Dispatch' },
+    { id: 'vendors', label: 'Vendors' },
+    { id: 'users', label: 'User Management' },
+  ];
+
+  const toggleModule = (mod: string) => {
+    setAccessibleModules((prev) => 
+      prev.includes(mod) ? prev.filter(m => m !== mod) : [...prev, mod]
+    );
   };
 
   const handleReset = () => {
@@ -96,6 +119,7 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({ visible, onClo
     setEmployeeId('');
     setRole('PRODUCTION');
     setIsActive(true);
+    setAccessibleModules([]);
     setCreatedUser(null);
     setErrorMsg('');
     onClose();

@@ -21,6 +21,16 @@ import { Client } from '../../types';
 export const ClientDirectoryView: React.FC<PlaceholderProps> = ({ onOpenCreateClient, onOpenCreateOrder }) => {
   const { clients, orders, setSelectedOrder, deleteClient } = useERP();
   const { currentUser } = useAuth();
+  const isMasked = currentUser?.clientDataVisibility === 'CODE_ONLY';
+  const displayedClients = clients.map(c => isMasked ? {
+    ...c,
+    companyName: 'MASKED',
+    contactName: 'MASKED',
+    contactNo: 'MASKED',
+    email: 'MASKED',
+    address: 'MASKED'
+  } : c);
+  
   const [selectedClientForModal, setSelectedClientForModal] = useState<Client | null>(null);
   const [clientToDelete, setClientToDelete] = useState<Client | null>(null);
   const { width } = useWindowDimensions();
@@ -31,7 +41,7 @@ export const ClientDirectoryView: React.FC<PlaceholderProps> = ({ onOpenCreateCl
       title: 'Client Directory & Company Records Report',
       filename: 'Client_Directory_Report',
       headers: ['Client Code', 'Company Name', 'Contact Name', 'Contact No', 'Email', 'GST Number', 'Industry'],
-      rows: clients.map((c) => [
+      rows: displayedClients.map((c) => [
         c.clientCode,
         c.companyName,
         c.contactName || 'N/A',
@@ -314,7 +324,8 @@ export const VendorsView: React.FC = () => {
 
       {/* Vendor Details View Modal */}
       {vendorToView && (
-        <View style={styles.viewModalOverlay}>
+        <Modal transparent={true} visible={true} animationType="fade" onRequestClose={() => setVendorToView(null)}>
+          <View style={styles.viewModalOverlay}>
           <TouchableOpacity style={styles.modalBackdropTouch} activeOpacity={1} onPress={() => setVendorToView(null)} />
           <View style={styles.viewModalCard}>
             {/* Clean, Unclipped Header */}
@@ -338,7 +349,7 @@ export const VendorsView: React.FC = () => {
             </View>
 
             {/* Scrollable Organised Detail Cards */}
-            <ScrollView style={{ maxHeight: 460 }} showsVerticalScrollIndicator={true} nestedScrollEnabled={true}>
+            <ScrollView style={{ maxHeight: '75%' }} showsVerticalScrollIndicator={true} nestedScrollEnabled={true}>
               {/* Card 1: Identity & Tax Credentials */}
               <View style={styles.detailSectionCard}>
                 <View style={styles.sectionHeaderRow}>
@@ -381,88 +392,42 @@ export const VendorsView: React.FC = () => {
                 </View>
               </View>
 
-              {/* Card 2: Contact & Communication */}
-              <View style={styles.detailSectionCard}>
-                <Text style={styles.sectionCardTitle}>📞 Key Contact Person & Communication</Text>
-
-                <View style={styles.infoGridTwoCol}>
-                  <View style={styles.infoItemRow}>
-                    <Text style={styles.infoFieldLabel}>Contact Person:</Text>
-                    <Text style={styles.infoFieldValBold}>{vendorToView.contactPerson || 'N/A'}</Text>
-                  </View>
-
-                  <View style={styles.infoItemRow}>
-                    <Text style={styles.infoFieldLabel}>Mobile Number:</Text>
-                    <Text style={styles.infoFieldValTeal}>{vendorToView.mobileNumber || 'N/A'}</Text>
-                  </View>
-
-                  <View style={styles.infoItemRow}>
-                    <Text style={styles.infoFieldLabel}>Alt. Phone:</Text>
-                    <Text style={styles.infoFieldVal}>{vendorToView.alternateMobile || 'N/A'}</Text>
-                  </View>
-
-                  <View style={styles.infoItemRow}>
-                    <Text style={styles.infoFieldLabel}>Email Address:</Text>
-                    <Text style={styles.infoFieldVal}>{vendorToView.email || 'N/A'}</Text>
-                  </View>
-                </View>
-
-                {vendorToView.website ? (
-                  <View style={[styles.infoItemRow, { marginTop: 6 }]}>
-                    <Text style={styles.infoFieldLabel}>Official Website:</Text>
-                    <Text style={[styles.infoFieldVal, { color: '#0284c7' }]}>{vendorToView.website}</Text>
-                  </View>
-                ) : null}
-              </View>
-
-              {/* Card 3: Material Sourcing & Commercials */}
-              <View style={styles.detailSectionCard}>
-                <Text style={styles.sectionCardTitle}>📦 Material Sourcing & Commercial Terms</Text>
-
-                <View style={styles.materialBanner}>
-                  <Text style={styles.materialBannerLabel}>Primary Material Supplied:</Text>
-                  <Text style={styles.materialBannerVal}>{vendorToView.materialSupplied || 'N/A'}</Text>
-                </View>
-
-                <View style={styles.infoGridThreeCol}>
-                  <View style={styles.infoBoxItem}>
-                    <Text style={styles.infoBoxLabel}>Category</Text>
-                    <Text style={styles.infoBoxValText}>{vendorToView.vendorCategory || 'General'}</Text>
-                  </View>
-
-                  <View style={styles.infoBoxItem}>
-                    <Text style={styles.infoBoxLabel}>Payment Terms</Text>
-                    <Text style={styles.infoBoxValText}>{vendorToView.paymentTerms || 'Net 30'}</Text>
-                  </View>
-
-                  <View style={styles.infoBoxItem}>
-                    <Text style={styles.infoBoxLabel}>Lead Time</Text>
-                    <Text style={styles.infoBoxValText}>{vendorToView.leadTime || '7 Days'}</Text>
-                  </View>
-                </View>
-              </View>
-
-              {/* Card 4: Factory Address & Remarks */}
-              <View style={styles.detailSectionCard}>
-                <Text style={styles.sectionCardTitle}>📍 Registered Factory Address & Remarks</Text>
-
-                <View style={{ gap: 6, marginTop: 4 }}>
-                  <Text style={styles.infoFieldLabel}>Address:</Text>
-                  <Text style={styles.addressTextVal}>
-                    {[vendorToView.addressLine1, vendorToView.addressLine2, vendorToView.city, vendorToView.state, vendorToView.pinCode, vendorToView.country]
-                      .filter(Boolean)
-                      .join(', ') || 'No address registered.'}
-                  </Text>
-
-                  {vendorToView.remarks ? (
-                    <View style={{ marginTop: 6 }}>
-                      <Text style={styles.infoFieldLabel}>Operational Remarks:</Text>
-                      <Text style={styles.remarksTextVal}>{vendorToView.remarks}</Text>
+              {/* Card 2 and 3 in Grid */}
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 16 }}>
+                  <View style={{ flex: 1, minWidth: 300 }}>
+                    <View style={[styles.detailSectionCard, { height: '100%', marginBottom: 0 }]}>
+                      <Text style={styles.sectionCardTitle}>📞 Key Contact Person & Communication</Text>
+                      <View style={styles.infoGridTwoCol}>
+                        <View style={styles.infoItemRow}><Text style={styles.infoFieldLabel}>Contact Person:</Text><Text style={styles.infoFieldValBold}>{vendorToView.contactPerson || 'N/A'}</Text></View>
+                        <View style={styles.infoItemRow}><Text style={styles.infoFieldLabel}>Mobile Number:</Text><Text style={styles.infoFieldValTeal}>{vendorToView.mobileNumber || 'N/A'}</Text></View>
+                        <View style={styles.infoItemRow}><Text style={styles.infoFieldLabel}>Alt. Phone:</Text><Text style={styles.infoFieldVal}>{vendorToView.alternateMobile || 'N/A'}</Text></View>
+                        <View style={styles.infoItemRow}><Text style={styles.infoFieldLabel}>Email Address:</Text><Text style={styles.infoFieldVal}>{vendorToView.email || 'N/A'}</Text></View>
+                      </View>
+                      {vendorToView.website ? (
+                        <View style={[styles.infoItemRow, { marginTop: 6 }]}><Text style={styles.infoFieldLabel}>Official Website:</Text><Text style={[styles.infoFieldVal, { color: '#0284c7' }]}>{vendorToView.website}</Text></View>
+                      ) : null}
                     </View>
-                  ) : null}
+                  </View>
+
+                  <View style={{ flex: 1, minWidth: 300 }}>
+                    <View style={[styles.detailSectionCard, { height: '100%', marginBottom: 0 }]}>
+                      <Text style={styles.sectionCardTitle}>📦 Material Sourcing & Commercial Terms</Text>
+                      <View style={styles.materialBanner}>
+                        <Text style={styles.materialBannerLabel}>Primary Material Supplied:</Text>
+                        <Text style={styles.materialBannerVal}>{vendorToView.materialSupplied || 'N/A'}</Text>
+                      </View>
+                      <View style={[styles.infoItemRow, { marginTop: 12 }]}><Text style={styles.infoFieldLabel}>Vendor Category:</Text><Text style={styles.infoFieldVal}>{vendorToView.vendorCategory || 'General'}</Text></View>
+                      <View style={styles.infoItemRow}><Text style={styles.infoFieldLabel}>Primary Location:</Text><Text style={styles.infoFieldVal}>{vendorToView.addressLine1 || 'N/A'}</Text></View>
+                      {vendorToView.remarks ? (
+                        <View style={{ marginTop: 12, padding: 8, backgroundColor: '#fffbeb', borderRadius: 4 }}>
+                          <Text style={styles.infoFieldLabel}>Operational Remarks:</Text>
+                          <Text style={styles.remarksTextVal}>{vendorToView.remarks}</Text>
+                        </View>
+                      ) : null}
+                    </View>
+                  </View>
                 </View>
-              </View>
-            </ScrollView>
+              </ScrollView>
 
             {/* Footer Action Buttons */}
             <View style={styles.viewModalFooterRow}>
@@ -482,11 +447,12 @@ export const VendorsView: React.FC = () => {
                 <Text style={styles.closeModalBtnTextNew}>Close</Text>
               </TouchableOpacity>
             </View>
+                      </View>
           </View>
-        </View>
-      )}
+        </Modal>
+        )}
 
-      {/* Top Banner */}
+        {/* Top Banner */}
       <View style={styles.topBanner}>
         <View style={{ flex: 1, paddingRight: Spacing.md }}>
           <Text style={styles.title}>Vendors & Material Supply Directory</Text>
@@ -675,6 +641,17 @@ export { QuotationsView } from './QuotationsView';
 
 // 7. Settings View
 export const SettingsView: React.FC = () => {
+  const { currentUser, users, toggleUserMasking } = useAuth();
+
+  if (currentUser?.role !== 'SUPER_ADMIN') {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <Text style={{ fontSize: 18, color: Colors.industrialOrange, fontWeight: 'bold' }}>o" Access Denied</Text>
+        <Text style={{ color: Colors.textMuted, marginTop: 10 }}>Only Super Admin can access the settings panel.</Text>
+      </View>
+    );
+  }
+
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
       <View style={styles.topBanner}>
@@ -685,12 +662,59 @@ export const SettingsView: React.FC = () => {
       </View>
 
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>System Configuration</Text>
-        <View style={styles.settingItem}>
-          <Text style={styles.settingTitle}>Strict Client Data Masking Policy</Text>
-          <Text style={styles.settingSub}>Enforces masking of client names & contacts for Purchase, Production, Quality, and Dispatch roles.</Text>
-          <View style={styles.badgeActive}><Text style={styles.badgeText}>ENABLED (STRICT)</Text></View>
-        </View>
+        <Text style={styles.cardTitle}>User Client Data Masking</Text>
+        <Text style={styles.settingSub} style={{ marginBottom: 15, color: Colors.textMuted, fontSize: 11 }}>
+          Toggle masking for individual users. If masked, they will only see the "Client Code". Names and contacts will be hidden.
+        </Text>
+        
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          <View style={{ minWidth: 600 }}>
+            <View style={{ flexDirection: 'row', backgroundColor: Colors.inputBg, padding: 10, borderRadius: 6, marginBottom: 8, borderWidth: 1, borderColor: Colors.borderDark }}>
+              <Text style={[styles.th, { width: 140 }]}>User Name</Text>
+              <Text style={[styles.th, { width: 120 }]}>Role</Text>
+              <Text style={[styles.th, { width: 120 }]}>Status</Text>
+              <Text style={[styles.th, { width: 150, textAlign: 'center' }]}>Mask Client Data</Text>
+            </View>
+
+            {users.map((u) => {
+              const isMasked = u.clientDataVisibility === 'CODE_ONLY';
+              return (
+                <View key={u.id} style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.cardBg, padding: 10, borderRadius: 6, marginBottom: 4, borderWidth: 1, borderColor: Colors.borderDark }}>
+                  <Text style={{ width: 140, color: Colors.textLight, fontWeight: '700', fontSize: 13 }}>{u.name}</Text>
+                  <Text style={{ width: 120, color: Colors.accentTeal, fontSize: 11 }}>{u.role.replace('_', ' ')}</Text>
+                  
+                  <View style={{ width: 120 }}>
+                    <Text style={{ color: u.isActive ? Colors.successBright : Colors.industrialOrange, fontSize: 11, fontWeight: 'bold' }}>
+                      {u.isActive ? 'Active' : 'Inactive'}
+                    </Text>
+                  </View>
+
+                  <View style={{ width: 150, alignItems: 'center' }}>
+                    {u.role === 'SUPER_ADMIN' ? (
+                      <Text style={{ color: Colors.textSubtle, fontSize: 11, fontStyle: 'italic' }}>Protected</Text>
+                    ) : (
+                      <TouchableOpacity
+                        style={{
+                          backgroundColor: isMasked ? 'rgba(249, 115, 22, 0.1)' : 'rgba(16, 185, 129, 0.1)',
+                          borderWidth: 1,
+                          borderColor: isMasked ? '#f97316' : Colors.successBright,
+                          paddingHorizontal: 12,
+                          paddingVertical: 6,
+                          borderRadius: Radius.xs,
+                        }}
+                        onPress={() => toggleUserMasking(u.id, isMasked ? 'FULL' : 'CODE_ONLY')}
+                      >
+                        <Text style={{ color: isMasked ? '#f97316' : Colors.successBright, fontSize: 11, fontWeight: '800' }}>
+                          {isMasked ? 'MASKED' : 'UNMASKED'}
+                        </Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        </ScrollView>
       </View>
     </ScrollView>
   );

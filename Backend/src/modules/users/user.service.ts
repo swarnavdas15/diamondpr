@@ -28,6 +28,7 @@ export const createUser = async (data: {
     mobileNumber: data.mobileNumber ?? null,
     employeeId: data.employeeId ?? null,
     role: data.role as any,
+    accessibleModules: data.accessibleModules ? JSON.stringify(data.accessibleModules) : null,
   });
 
   return { user, generatedPassword: rawPassword };
@@ -38,6 +39,13 @@ export const listAllUsers = async () => {
     .where({ isDeleted: 0 })
     .orderBy((u) => u.createdAt.desc())
     .all();
+};
+
+
+export const toggleUserMasking = async (userId: string, visibility: string) => {
+  return await db.orm.public.User
+    .where({ id: dbId(userId) })
+    .update({ clientDataVisibility: visibility });
 };
 
 export const toggleUserStatus = async (userId: string, _isActive: boolean) => {
