@@ -268,10 +268,10 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ visible, onC
                 borderStyle: 'dashed',
                 borderRadius: 12
               }}
-            >
-              <Text style={{ color: '#fff',
+              >
+              <Text pointerEvents="none" style={{ color: '#fff',
                 fontSize: 32, fontWeight: 'bold' }}>Drop Excel File Here</Text>
-              <Text style={{ color: '#bae6fd',
+              <Text pointerEvents="none" style={{ color: '#bae6fd',
                 fontSize: 16, marginTop: 12 }}>Release to immediately parse & close</Text>
             </View>
           )}

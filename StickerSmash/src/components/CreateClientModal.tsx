@@ -276,8 +276,8 @@ export const CreateClientModal: React.FC<CreateClientModalProps> = ({ visible, o
                   borderRadius: 12
                 }}
               >
-                <Text style={{ color: '#fff', fontSize: 32, fontWeight: 'bold' }}>Drop Excel File Here</Text>
-                <Text style={{ color: '#bae6fd', fontSize: 16, marginTop: 12 }}>Release to immediately parse & close</Text>
+                <Text pointerEvents="none" style={{ color: '#fff', fontSize: 32, fontWeight: 'bold' }}>Drop Excel File Here</Text>
+                <Text pointerEvents="none" style={{ color: '#bae6fd', fontSize: 16, marginTop: 12 }}>Release to immediately parse & close</Text>
               </View>
             )}
 
