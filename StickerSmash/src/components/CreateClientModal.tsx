@@ -477,6 +477,7 @@ export const CreateClientModal: React.FC<CreateClientModalProps> = ({ visible, o
           </ScrollView>
         </TouchableOpacity>
       </TouchableOpacity>
+      </View>
     </Modal>
   );
 };

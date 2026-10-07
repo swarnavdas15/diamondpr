@@ -626,6 +626,7 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ visible, onC
           </TouchableOpacity>
         </TouchableOpacity>
       </Modal>
+      </View>
     </Modal>
   );
 };
