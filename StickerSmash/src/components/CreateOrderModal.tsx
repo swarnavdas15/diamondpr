@@ -63,6 +63,7 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ visible, onC
   const [unitPrice, setUnitPrice] = useState('');
 
   const [error, setError] = useState('');
+  const [isDragging, setIsDragging] = useState(false);
 
   React.useEffect(() => {
     if (initialData) {
@@ -236,8 +237,44 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ visible, onC
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={handleClose}>
-      <TouchableOpacity style={[styles.backdrop, isMobile && { padding: 10 }]} activeOpacity={1} onPress={handleClose}>
+      <View
+        // @ts-ignore
+        onDragEnter={(e: any) => { e.preventDefault(); e.stopPropagation(); setIsDragging(true); }}
+        style={{ flex: 1 }}
+      >
+        <TouchableOpacity style={[styles.backdrop, isMobile && { padding: 10 }]} activeOpacity={1} onPress={handleClose}>
         <TouchableOpacity activeOpacity={1} style={[styles.card, isMobile && { padding: 14, maxHeight: '95%' }]} onPress={(e) => e.stopPropagation()}>
+          {Platform.OS === 'web' && isDragging && (
+            <View
+              // @ts-ignore
+              onDragOver={(e: any) => { e.preventDefault(); e.stopPropagation(); }}
+              onDragLeave={(e: any) => { e.preventDefault(); e.stopPropagation(); setIsDragging(false); }}
+              onDrop={(e: any) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setIsDragging(false);
+                handleClose();
+                handleFileUpload(e);
+              }}
+              style={{
+                position: 'absolute',
+                top: 0, left: 0, right: 0, bottom: 0,
+                backgroundColor: 'rgba(2, 132, 199, 0.95)',
+                zIndex: 9999,
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderWidth: 4,
+                borderColor: '#fff',
+                borderStyle: 'dashed',
+                borderRadius: 12
+              }}
+            >
+              <Text style={{ color: '#fff',
+                fontSize: 32, fontWeight: 'bold' }}>Drop Excel File Here</Text>
+              <Text style={{ color: '#bae6fd',
+                fontSize: 16, marginTop: 12 }}>Release to immediately parse & close</Text>
+            </View>
+          )}
           <View style={styles.header}>
             <Text style={styles.title}>Sales: Create Order & Custom Pipeline</Text>
             <TouchableOpacity onPress={handleClose}>
