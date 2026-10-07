@@ -8,7 +8,7 @@ import { Colors, Spacing, Radius, Shadows } from '../../theme';
 import { SalesKPIDetailsModal } from '../dashboards/SalesKPIDetailsModal';
 import { QuotationSentModal } from '../quotations/QuotationSentModal';
 import { QuotationFollowUpModal } from '../quotations/QuotationFollowUpModal';
-import { QuotationConversionModal, QuotationConversionData } from '../quotations/QuotationConversionModal';
+
 import { ExportButton } from '../ui/ExportButton';
 import { ExportDataPayload } from '../../utils/exportUtils';
 import { formatDate } from '../../utils/formatUtils';
@@ -85,7 +85,7 @@ export const QuotationsView: React.FC<QuotationsViewProps> = ({ onOpenCreateQuot
   const [sentModalQuotation, setSentModalQuotation] = useState<Quotation | null>(null);
   const [followUpModalQuotation, setFollowUpModalQuotation] = useState<Quotation | null>(null);
   const [followUpTargetStatus, setFollowUpTargetStatus] = useState<'UNDER_DISCUSSION' | 'NEGOTIATION'>('UNDER_DISCUSSION');
-  const [conversionModalQuotation, setConversionModalQuotation] = useState<Quotation | null>(null);
+  
   const [conversionError, setConversionError] = useState<string>('');
   const [competitorName, setCompetitorName] = useState('');
 
@@ -242,7 +242,7 @@ export const QuotationsView: React.FC<QuotationsViewProps> = ({ onOpenCreateQuot
       setFollowUpModalQuotation(q);
     } else if (newSt === 'APPROVED') {
       setConversionError('');
-      setConversionModalQuotation(q);
+      
     } else {
       await updateQuotation(q.id, { status: newSt });
     }
@@ -317,7 +317,7 @@ export const QuotationsView: React.FC<QuotationsViewProps> = ({ onOpenCreateQuot
 
       // Navigate to the new order
       if (newOrder) {
-        setConversionModalQuotation(null);
+        
         setSelectedOrder(newOrder);
       }
     } catch (err: any) {
@@ -907,13 +907,7 @@ export const QuotationsView: React.FC<QuotationsViewProps> = ({ onOpenCreateQuot
         onSave={handleSaveFollowUpDetails}
       />
 
-      <QuotationConversionModal
-        visible={!!conversionModalQuotation}
-        quotation={conversionModalQuotation}
-        onClose={() => setConversionModalQuotation(null)}
-        onSubmitConversion={handleSaveConversion}
-        externalError={conversionError}
-      />
+      
 
       {/* Sales KPI Details Modal */}
       <SalesKPIDetailsModal
