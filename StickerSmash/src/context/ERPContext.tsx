@@ -120,6 +120,7 @@ interface ERPContextType {
   updateClient: (id: string, data: Partial<Client>) => Promise<void>;
   deleteClient: (id: string) => Promise<void>;
   uploadClientProfileImage: (clientId: string, uri: string, name: string, type: string) => Promise<void>;
+  uploadPrimaryContactProfileImage: (clientId: string, uri: string, name: string, type: string) => Promise<void>;
   updateOrder: (id: string, data: Partial<Order>) => Promise<void>;
   deleteOrder: (id: string) => Promise<void>;
   deleteQuotation: (id: string) => void;
