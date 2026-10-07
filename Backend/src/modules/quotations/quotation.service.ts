@@ -83,4 +83,8 @@ export const addQuotationFollowUp = async (quotationId: string, data: any, creat
 
   return followUp;
 };
-\nexport const deleteQuotation = async (id: string) => {\n  await db.orm.public.Quotation.where({ id: dbId(id) }).delete();\n  return { success: true };\n};\n
+
+export const deleteQuotation = async (id: string) => {
+  await db.orm.public.Quotation.where({ id: dbId(id) }).delete();
+  return { success: true };
+};
