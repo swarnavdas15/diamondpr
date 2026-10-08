@@ -1,0 +1,47 @@
+import 'dotenv/config';
+import { db } from './src/prisma/db';
+
+async function test() {
+  try {
+    const res = await db.query('SELECT count(*) FROM vendors');
+    console.log('Vendors exists:', res);
+  } catch (err) {
+    console.error('No vendors table', err.message);
+    try {
+      console.log('Pushing schema changes...');
+      await db.query(`
+        CREATE TABLE IF NOT EXISTS vendors (
+          "id" text PRIMARY KEY,
+          "vendorCode" text NOT NULL,
+          "vendorName" text NOT NULL,
+          "companyName" text,
+          "gstNumber" text,
+          "panNumber" text,
+          "contactPerson" text NOT NULL,
+          "mobileNumber" text NOT NULL,
+          "alternateMobile" text,
+          "email" text NOT NULL,
+          "website" text,
+          "addressLine1" text,
+          "addressLine2" text,
+          "city" text,
+          "state" text,
+          "pinCode" text,
+          "country" text,
+          "materialSupplied" text NOT NULL,
+          "vendorCategory" text,
+          "paymentTerms" text,
+          "leadTime" text,
+          "status" text DEFAULT 'ACTIVE',
+          "remarks" text,
+          "notes" text,
+          "createdAt" timestamptz DEFAULT now() NOT NULL,
+          "updatedAt" timestamptz NOT NULL,
+          "isDeleted" integer DEFAULT 0 NOT NULL
+        )
+      `);
+      console.log('Table vendors created successfully!');
+    } catch(e) { console.error('Push failed', e.message); }
+  }
+}
+test().then(() => process.exit(0));

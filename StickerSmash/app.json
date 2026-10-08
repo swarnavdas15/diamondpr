@@ -1,14 +1,18 @@
 {
   "expo": {
     "name": "StickerSmash",
-    "slug": "StickerSmash",
+    "slug": "diamond-flange-erp",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "stickersmash",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon"
+      "icon": "./assets/expo.icon",
+      "bundleIdentifier": "com.swarnavsteam.diamondflangeerp",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -17,7 +21,8 @@
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.swarnavsteam.diamondflangeerp"
     },
     "web": {
       "output": "static",
@@ -41,8 +46,9 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "9aad11b7-877b-4053-ba86-8f5282c7aced"
+        "projectId": "7fadeff7-8424-45d0-9485-783d54a22a5a"
       }
-    }
+    },
+    "owner": "swarnavs-team"
   }
 }
