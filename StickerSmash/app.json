@@ -49,6 +49,12 @@
         "projectId": "7fadeff7-8424-45d0-9485-783d54a22a5a"
       }
     },
-    "owner": "swarnavs-team"
+    "owner": "swarnavs-team",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/9aad11b7-877b-4053-ba86-8f5282c7aced"
+    }
   }
 }

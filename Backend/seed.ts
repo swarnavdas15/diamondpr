@@ -5,25 +5,33 @@ async function main() {
   console.log('Seeding database...');
   
   // Seed Super Admin
-  const hashedPassword = await bcrypt.hash('SuperAdmin@123', 10);
+  const adminEmail = 'admin@diamondflanges.com';
+  const hashedPassword = await bcrypt.hash('Manish@admin123', 10);
   
   // Check if admin already exists
-  const existingAdmin = await db.orm.public.User.where({ email: 'amarchattaraj@gmail.com' }).first();
+  const existingAdmin = await db.orm.public.User.where({ email: adminEmail, isDeleted: 0 }).first();
   let adminId;
 
   if (!existingAdmin) {
     const admin = await db.orm.public.User.create({
       name: 'Super Admin',
-      email: 'amarchattaraj@gmail.com',
+      username: adminEmail,
+      email: adminEmail,
       password: hashedPassword,
       role: 'SUPER_ADMIN',
       isDeleted: 0,
     });
     adminId = admin.id;
-    console.log('✅ Created Super Admin User');
+    console.log('✅ Created Super Admin User (admin@diamondflanges.com)');
   } else {
     adminId = existingAdmin.id;
-    console.log('⚠️ Super Admin already exists');
+    await db.orm.public.User.where({ id: adminId }).update({
+      password: hashedPassword,
+      username: adminEmail,
+      role: 'SUPER_ADMIN',
+      isActive: true,
+    });
+    console.log('✅ Updated Super Admin password & credentials (admin@diamondflanges.com)');
   }
 
   // Seed Initial Client

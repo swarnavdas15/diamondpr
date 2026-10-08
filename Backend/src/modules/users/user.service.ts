@@ -10,6 +10,7 @@ export const createUser = async (data: {
   mobileNumber?: string;
   employeeId?: string;
   role: any;
+  accessibleModules?: any;
 }) => {
   const existingEmail = await db.orm.public.User.where({ email: data.email, isDeleted: 0 }).first();
   if (existingEmail) throw new Error('Email already exists');

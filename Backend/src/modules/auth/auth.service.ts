@@ -17,9 +17,15 @@ interface OtpRecord {
 const otpStore = new Map<string, OtpRecord>();
 
 export const loginUser = async (identifier: string, pass: string) => {
-  const user = await db.orm.public.User
+  let user = await db.orm.public.User
     .where({ email: identifier, isDeleted: 0 })
     .first();
+
+  if (!user) {
+    user = await db.orm.public.User
+      .where({ username: identifier, isDeleted: 0 })
+      .first();
+  }
 
   if (!user) {
     throw new Error('Invalid User ID or Password. Please try again.');
@@ -63,10 +69,13 @@ export const loginUser = async (identifier: string, pass: string) => {
 };
 
 export const requestPasswordResetOtp = async (identifier: string) => {
-  const user = await db.orm.public.User.where({ email: identifier, isDeleted: 0 }).first();
+  let user = await db.orm.public.User.where({ email: identifier, isDeleted: 0 }).first();
+  if (!user) {
+    user = await db.orm.public.User.where({ username: identifier, isDeleted: 0 }).first();
+  }
 
   if (!user) {
-    throw new Error(`No account found for Email: '${identifier}'`);
+    throw new Error(`No account found for Email/Username: '${identifier}'`);
   }
 
   const email = user.email.toLowerCase();
@@ -100,7 +109,10 @@ export const requestPasswordResetOtp = async (identifier: string) => {
 };
 
 export const verifyOtpCode = async (identifier: string, inputOtp: string) => {
-  const user = await db.orm.public.User.where({ email: identifier, isDeleted: 0 }).first();
+  let user = await db.orm.public.User.where({ email: identifier, isDeleted: 0 }).first();
+  if (!user) {
+    user = await db.orm.public.User.where({ username: identifier, isDeleted: 0 }).first();
+  }
 
   if (!user) {
     throw new Error('User account not found.');
@@ -146,7 +158,10 @@ export const resetUserPassword = async (identifier: string, resetToken: string, 
     throw new Error('Reset token is invalid or expired. Please request a new OTP.');
   }
 
-  const user = await db.orm.public.User.where({ email: identifier, isDeleted: 0 }).first();
+  let user = await db.orm.public.User.where({ email: identifier, isDeleted: 0 }).first();
+  if (!user) {
+    user = await db.orm.public.User.where({ username: identifier, isDeleted: 0 }).first();
+  }
 
   if (!user) {
     throw new Error('User account not found.');

@@ -11,6 +11,8 @@ export interface CalendarEventItem {
   createdAt: string;
 }
 
+const calendarEventModel = () => (db.orm.public as any).CalendarEvent;
+
 export const createCalendarEvent = async (data: {
   title: string;
   type?: string;
@@ -18,7 +20,7 @@ export const createCalendarEvent = async (data: {
   description?: string;
   createdByName?: string;
 }): Promise<CalendarEventItem> => {
-  const row = await db.orm.public.CalendarEvent.create({
+  const row = await calendarEventModel().create({
     title: data.title,
     type: data.type || 'MEETING',
     eventDate: data.eventDate,
@@ -37,11 +39,11 @@ export const createCalendarEvent = async (data: {
 };
 
 export const listCalendarEvents = async (): Promise<CalendarEventItem[]> => {
-  const rows = await db.orm.public.CalendarEvent
-    .orderBy((e) => e.eventDate.asc())
+  const rows = await calendarEventModel()
+    .orderBy((e: any) => e.eventDate.asc())
     .all();
 
-  return rows.map((row) => ({
+  return rows.map((row: any) => ({
     id: row.id,
     title: row.title,
     type: row.type,
@@ -54,7 +56,7 @@ export const listCalendarEvents = async (): Promise<CalendarEventItem[]> => {
 
 export const deleteCalendarEvent = async (id: string): Promise<boolean> => {
   try {
-    await db.orm.public.CalendarEvent.where({ id: dbId(id) }).delete();
+    await calendarEventModel().where({ id: dbId(id) }).delete();
     return true;
   } catch {
     return false;
