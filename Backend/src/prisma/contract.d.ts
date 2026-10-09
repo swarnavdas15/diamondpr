@@ -34,9 +34,9 @@ import type {
 } from '@prisma/orm-postgres/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'9766403f80a8bc5eb018ec589f86c89bad166ffb46b20217812b8b2f4b3e7ced'>;
+  StorageHashBase<'371e375f528d63bf7e4c4b13a125ad3335dc39a4745081c9a39d5b86adfba068'>;
 export type ExecutionHash =
-  ExecutionHashBase<'3d16e588986f4e68f6beb9c43c843e83529868ca8afe54361bc3b71edece10b7'>;
+  ExecutionHashBase<'58b91c7716d80468b5292f64d323bd8d21a8729609c09414f747a3275ec4b0f3'>;
 export type ProfileHash =
   ProfileHashBase<'3916f444a8a17ad749191acf9e08dad97d1a327b88c2f1d45d12f240296aa8b2'>;
 
@@ -242,6 +242,15 @@ type DefaultLiteralValue<CodecId extends string, Encoded> = CodecId extends keyo
 
 export type FieldOutputTypes = {
   readonly public: {
+    readonly CalendarEvent: {
+      readonly id: Char<36>;
+      readonly title: CodecTypes['pg/text@1']['output'];
+      readonly type: CodecTypes['pg/text@1']['output'];
+      readonly eventDate: CodecTypes['pg/timestamp-string@1']['output'];
+      readonly description: CodecTypes['pg/text@1']['output'] | null;
+      readonly createdByName: CodecTypes['pg/text@1']['output'];
+      readonly createdAt: CodecTypes['pg/timestamptz-string@1']['output'];
+    };
     readonly Client: {
       readonly id: Char<36>;
       readonly clientcode: CodecTypes['pg/text@1']['output'];
@@ -498,6 +507,15 @@ export type FieldOutputTypes = {
 };
 export type FieldInputTypes = {
   readonly public: {
+    readonly CalendarEvent: {
+      readonly id: CodecTypes['sql/char@1']['input'];
+      readonly title: CodecTypes['pg/text@1']['input'];
+      readonly type: CodecTypes['pg/text@1']['input'];
+      readonly eventDate: CodecTypes['pg/timestamp-string@1']['input'];
+      readonly description: CodecTypes['pg/text@1']['input'] | null;
+      readonly createdByName: CodecTypes['pg/text@1']['input'];
+      readonly createdAt: CodecTypes['pg/timestamptz-string@1']['input'];
+    };
     readonly Client: {
       readonly id: CodecTypes['sql/char@1']['input'];
       readonly clientcode: CodecTypes['pg/text@1']['input'];
@@ -754,6 +772,15 @@ export type FieldInputTypes = {
 };
 export type StorageColumnTypes = {
   readonly public: {
+    readonly CalendarEvent: {
+      readonly createdAt: CodecTypes['pg/timestamptz-string@1']['output'];
+      readonly createdByName: CodecTypes['pg/text@1']['output'];
+      readonly description: CodecTypes['pg/text@1']['output'] | null;
+      readonly eventDate: CodecTypes['pg/timestamp-string@1']['output'];
+      readonly id: Char<36>;
+      readonly title: CodecTypes['pg/text@1']['output'];
+      readonly type: CodecTypes['pg/text@1']['output'];
+    };
     readonly Client: {
       readonly address: CodecTypes['pg/text@1']['output'] | null;
       readonly clientcode: CodecTypes['pg/text@1']['output'];
@@ -1010,6 +1037,15 @@ export type StorageColumnTypes = {
 };
 export type StorageColumnInputTypes = {
   readonly public: {
+    readonly CalendarEvent: {
+      readonly createdAt: CodecTypes['pg/timestamptz-string@1']['input'];
+      readonly createdByName: CodecTypes['pg/text@1']['input'];
+      readonly description: CodecTypes['pg/text@1']['input'] | null;
+      readonly eventDate: CodecTypes['pg/timestamp-string@1']['input'];
+      readonly id: CodecTypes['sql/char@1']['input'];
+      readonly title: CodecTypes['pg/text@1']['input'];
+      readonly type: CodecTypes['pg/text@1']['input'];
+    };
     readonly Client: {
       readonly address: CodecTypes['pg/text@1']['input'] | null;
       readonly clientcode: CodecTypes['pg/text@1']['input'];
@@ -1294,6 +1330,16 @@ export namespace Models {
     createdAt: CodecTypes['pg/timestamptz-string@1']['output'];
     updatedAt: CodecTypes['pg/timestamptz-string@1']['output'];
     isDeleted: CodecTypes['pg/int4@1']['output'];
+    readonly [RelationKeys]?: never;
+  };
+  export type public_CalendarEvent = {
+    id: Char<36>;
+    title: CodecTypes['pg/text@1']['output'];
+    type: CodecTypes['pg/text@1']['output'];
+    eventDate: CodecTypes['pg/timestamp-string@1']['output'];
+    description: CodecTypes['pg/text@1']['output'] | null;
+    createdByName: CodecTypes['pg/text@1']['output'];
+    createdAt: CodecTypes['pg/timestamptz-string@1']['output'];
     readonly [RelationKeys]?: never;
   };
   export type public_Quotation = {
@@ -1585,6 +1631,7 @@ export namespace Models {
 export declare const models: {
   public: {
     Vendor: Models.public_Vendor;
+    CalendarEvent: Models.public_CalendarEvent;
     Quotation: Models.public_Quotation;
     QuotationFollowUp: Models.public_QuotationFollowUp;
     User: Models.public_User;
@@ -1618,6 +1665,59 @@ type ContractBase = Omit<
         readonly kind: 'postgres-schema';
         readonly entries: {
           readonly table: {
+            readonly CalendarEvent: {
+              columns: {
+                readonly id: {
+                  readonly nativeType: 'character';
+                  readonly codecId: 'sql/char@1';
+                  readonly nullable: false;
+                  readonly typeParams: { readonly length: 36 };
+                };
+                readonly title: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: false;
+                };
+                readonly type: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: false;
+                  readonly default: {
+                    readonly kind: 'literal';
+                    readonly value: DefaultLiteralValue<'pg/text@1', 'MEETING'>;
+                  };
+                };
+                readonly eventDate: {
+                  readonly nativeType: 'timestamp';
+                  readonly codecId: 'pg/timestamp-string@1';
+                  readonly nullable: false;
+                };
+                readonly description: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: true;
+                };
+                readonly createdByName: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: false;
+                  readonly default: {
+                    readonly kind: 'literal';
+                    readonly value: DefaultLiteralValue<'pg/text@1', 'System'>;
+                  };
+                };
+                readonly createdAt: {
+                  readonly nativeType: 'timestamptz';
+                  readonly codecId: 'pg/timestamptz-string@1';
+                  readonly nullable: false;
+                  readonly default: { readonly kind: 'function'; readonly expression: 'now()' };
+                };
+              };
+              primaryKey: { readonly columns: readonly ['id'] };
+              uniques: readonly [];
+              indexes: readonly [];
+              foreignKeys: readonly [];
+            };
             readonly Client: {
               columns: {
                 readonly id: {
@@ -2963,6 +3063,10 @@ type ContractBase = Omit<
   readonly targetFamily: 'sql';
   readonly roots: {
     readonly Vendor: { readonly namespace: 'public' & NamespaceId; readonly model: 'Vendor' };
+    readonly CalendarEvent: {
+      readonly namespace: 'public' & NamespaceId;
+      readonly model: 'CalendarEvent';
+    };
     readonly Quotation: { readonly namespace: 'public' & NamespaceId; readonly model: 'Quotation' };
     readonly QuotationFollowUp: {
       readonly namespace: 'public' & NamespaceId;
@@ -2989,6 +3093,62 @@ type ContractBase = Omit<
     readonly namespaces: {
       readonly public: {
         readonly models: {
+          readonly CalendarEvent: {
+            readonly fields: {
+              readonly id: {
+                readonly nullable: false;
+                readonly type: {
+                  readonly kind: 'scalar';
+                  readonly codecId: 'sql/char@1';
+                  readonly typeParams: { readonly length: 36 };
+                };
+              };
+              readonly title: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly type: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly eventDate: {
+                readonly nullable: false;
+                readonly type: {
+                  readonly kind: 'scalar';
+                  readonly codecId: 'pg/timestamp-string@1';
+                };
+              };
+              readonly description: {
+                readonly nullable: true;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly createdByName: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly createdAt: {
+                readonly nullable: false;
+                readonly type: {
+                  readonly kind: 'scalar';
+                  readonly codecId: 'pg/timestamptz-string@1';
+                };
+              };
+            };
+            readonly relations: Record<string, never>;
+            readonly storage: {
+              readonly table: 'CalendarEvent';
+              readonly namespaceId: 'public';
+              readonly fields: {
+                readonly id: { readonly column: 'id' };
+                readonly title: { readonly column: 'title' };
+                readonly type: { readonly column: 'type' };
+                readonly eventDate: { readonly column: 'eventDate' };
+                readonly description: { readonly column: 'description' };
+                readonly createdByName: { readonly column: 'createdByName' };
+                readonly createdAt: { readonly column: 'createdAt' };
+              };
+            };
+          };
           readonly Client: {
             readonly fields: {
               readonly id: {
@@ -4790,6 +4950,14 @@ type ContractBase = Omit<
     readonly executionHash: ExecutionHash;
     readonly mutations: {
       readonly defaults: readonly [
+        {
+          readonly ref: {
+            readonly namespace: 'public';
+            readonly table: 'CalendarEvent';
+            readonly column: 'id';
+          };
+          readonly onCreate: { readonly kind: 'generator'; readonly id: 'uuidv7' };
+        },
         {
           readonly ref: {
             readonly namespace: 'public';

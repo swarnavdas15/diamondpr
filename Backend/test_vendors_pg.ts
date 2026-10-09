@@ -6,7 +6,7 @@ async function test() {
   try {
     const res = await pool.query('SELECT count(*) FROM vendors');
     console.log('Vendors exists:', res.rows);
-  } catch (err) {
+  } catch (err: any) {
     console.error('No vendors table', err.message);
     try {
       console.log('Pushing schema changes...');

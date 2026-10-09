@@ -38,10 +38,10 @@ export const createCalendarEvent = async (data: {
 
 export const listCalendarEvents = async (): Promise<CalendarEventItem[]> => {
   const rows = await db.orm.public.CalendarEvent
-    .orderBy((e) => e.eventDate.asc())
+    .orderBy((e: { eventDate: { asc: () => any } }) => e.eventDate.asc())
     .all();
 
-  return rows.map((row) => ({
+  return rows.map((row: any) => ({
     id: row.id,
     title: row.title,
     type: row.type,

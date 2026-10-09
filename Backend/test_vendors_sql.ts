@@ -1,15 +1,16 @@
 import 'dotenv/config';
-import { db } from './src/prisma/db';
+import { Pool } from 'pg';
 
 async function test() {
+  const pool = new Pool({ connectionString: process.env.DATABASE_URL });
   try {
-    const res = await db.sql`SELECT count(*) FROM vendors`;
-    console.log('Vendors exists:', res);
-  } catch (err) {
+    const res = await pool.query('SELECT count(*) FROM vendors');
+    console.log('Vendors exists:', res.rows);
+  } catch (err: any) {
     console.error('No vendors table', err.message);
     try {
       console.log('Pushing schema changes...');
-      await db.sql`
+      await pool.query(`
         CREATE TABLE IF NOT EXISTS vendors (
           "id" text PRIMARY KEY,
           "vendorCode" text NOT NULL,
@@ -39,9 +40,11 @@ async function test() {
           "updatedAt" timestamptz,
           "isDeleted" integer DEFAULT 0 NOT NULL
         )
-      `;
+      `);
       console.log('Table vendors created successfully!');
-    } catch(e) { console.error('Push failed', e); }
+    } catch(e: any) { console.error('Push failed', e); }
+  } finally {
+    await pool.end();
   }
 }
 test().then(() => process.exit(0));

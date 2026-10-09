@@ -318,10 +318,23 @@ export const contract = defineContract(
       },
     });
 
+    const CalendarEvent = model('CalendarEvent', {
+      fields: {
+        id: field.id.uuidv7String(),
+        title: field.text(),
+        type: field.text().default('MEETING'),
+        eventDate: field.temporal.timestampString(),
+        description: field.text().optional(),
+        createdByName: field.text().default('System'),
+        createdAt: field.temporal.createdAtString(),
+      },
+    });
+
     return {
       enums: { Role, OrderStage, Priority, TaskStatus },
       models: {
         Vendor: Vendor,
+        CalendarEvent: CalendarEvent,
         Quotation: Quotation.relations({
           client: rel.belongsTo(Client, { from: 'clientId', to: 'id' }),
           followUps: rel.hasMany(QuotationFollowUp, { by: 'quotationId' }),

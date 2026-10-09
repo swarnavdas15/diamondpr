@@ -20,13 +20,13 @@ export const createQuotation = async (data: any) => {
     quotationNumber: data.quotationNumber || quotationNumber,
     companyName: data.companyName,
     clientCode: data.clientCode,
-    clientId: data.clientId ? dbId(data.clientId) : null,
+    clientId: dbId(data.clientId || ''),
     contactPerson: data.contactPerson,
     mobileNumber: data.mobileNumber,
     email: data.email,
     inquiryRef: data.inquiryRef ?? null,
-    quotationAmount: BigInt(data.quotationAmount || 0),
-    expectedOrderValue: data.expectedOrderValue ? BigInt(data.expectedOrderValue) : null,
+    quotationAmount: Number(data.quotationAmount || 0),
+    expectedOrderValue: data.expectedOrderValue ? Number(data.expectedOrderValue) : null,
     salesExecutive: data.salesExecutive || 'Sales Executive',
     salesExecutiveUserId: data.salesExecutiveUserId ? dbId(data.salesExecutiveUserId) : null,
     followUpDate: data.followUpDate ?? null,
@@ -47,16 +47,16 @@ export const updateQuotation = async (id: string, data: any) => {
   delete updatePayload.id;
 
   if (updatePayload.quotationAmount !== undefined) {
-    updatePayload.quotationAmount = BigInt(updatePayload.quotationAmount);
+    updatePayload.quotationAmount = Number(updatePayload.quotationAmount);
   }
   if (updatePayload.convertedOrderValue !== undefined) {
-    updatePayload.convertedOrderValue = BigInt(updatePayload.convertedOrderValue);
+    updatePayload.convertedOrderValue = Number(updatePayload.convertedOrderValue);
   }
   if (updatePayload.lostValue !== undefined) {
-    updatePayload.lostValue = BigInt(updatePayload.lostValue);
+    updatePayload.lostValue = Number(updatePayload.lostValue);
   }
   if (updatePayload.expectedOrderValue !== undefined) {
-    updatePayload.expectedOrderValue = BigInt(updatePayload.expectedOrderValue);
+    updatePayload.expectedOrderValue = Number(updatePayload.expectedOrderValue);
   }
 
   const updated = await db.orm.public.Quotation
