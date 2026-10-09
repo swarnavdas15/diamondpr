@@ -11,15 +11,18 @@ import { OrderQuantityTracker } from './OrderQuantityTracker';
 interface OrderOverviewModalProps {
   visible: boolean;
   onClose: () => void;
+  onEditOrder?: (order: any) => void;
 }
 
-export const OrderOverviewModal: React.FC<OrderOverviewModalProps> = ({ visible, onClose }) => {
+export const OrderOverviewModal: React.FC<OrderOverviewModalProps> = ({ visible, onClose, onEditOrder }) => {
   const { selectedOrder } = useERP();
   const { currentUser } = useAuth();
   const { width } = useWindowDimensions();
   const isMobile = width < 768;
 
   if (!selectedOrder) return null;
+
+  const isAuthorizedToEdit = currentUser ? ['SUPER_ADMIN', 'ADMIN', 'SALES'].includes(currentUser.role) : false;
 
   const isRestrictedRole = currentUser
     ? ['PURCHASE', 'PRODUCTION', 'QUALITY_TESTING', 'DISPATCH'].includes(currentUser.role)
@@ -155,9 +158,23 @@ export const OrderOverviewModal: React.FC<OrderOverviewModalProps> = ({ visible,
                 <Text style={styles.poNumberText}>PO Number: {selectedOrder.poNumber} 📋</Text>
               </TouchableOpacity>
             </View>
-            <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
-              <Text style={styles.closeBtnText}>✕</Text>
-            </TouchableOpacity>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              {isAuthorizedToEdit && onEditOrder && (
+                <TouchableOpacity
+                  onPress={() => {
+                    const currentOrder = selectedOrder;
+                    onClose();
+                    onEditOrder(currentOrder);
+                  }}
+                  style={{ backgroundColor: 'rgba(2, 132, 199, 0.1)', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 6, borderWidth: 1, borderColor: '#0284c7' }}
+                >
+                  <Text style={{ color: '#0284c7', fontSize: 12, fontWeight: '700' }}>✏️ Edit Order</Text>
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
+                <Text style={styles.closeBtnText}>✕</Text>
+              </TouchableOpacity>
+            </View>
           </View>
 
           <ScrollView style={styles.contentScroll} showsVerticalScrollIndicator={false}>

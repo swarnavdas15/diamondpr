@@ -20,6 +20,7 @@ import { OrderOverviewModal } from './OrderOverviewModal';
 interface OrdersManagementProps {
   onNavigateToQuotations?: () => void;
   onOpenCreateOrder?: () => void;
+  onOpenEditOrder?: (order: Order) => void;
 }
 
 type StatusFilter = 'ALL' | 'ACTIVE' | 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'READY_FOR_DISPATCH' | 'DELAYED';
@@ -29,9 +30,11 @@ type DateFilter = 'ALL' | 'TODAY' | 'LAST_7_DAYS' | 'LAST_30_DAYS';
 export const OrdersManagement: React.FC<OrdersManagementProps> = ({
   onNavigateToQuotations,
   onOpenCreateOrder,
+  onOpenEditOrder,
 }) => {
   const { orders, setSelectedOrder, selectedOrder, deleteOrder } = useERP();
   const { currentUser } = useAuth();
+  const canEdit = currentUser ? ['SUPER_ADMIN', 'ADMIN', 'SALES'].includes(currentUser.role) : false;
   const { width } = useWindowDimensions();
   const isMobile = width < 768;
 
@@ -474,12 +477,22 @@ export const OrdersManagement: React.FC<OrdersManagementProps> = ({
                   </View>
                 </View>
 
-                <TouchableOpacity
-                  style={styles.viewDetailsBtnMobile}
-                  onPress={() => handleViewOrderDetails(order)}
-                >
-                  <Text style={styles.viewDetailsBtnText}>👁️ View Details & Pipeline ➔</Text>
-                </TouchableOpacity>
+                <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
+                  <TouchableOpacity
+                    style={[styles.viewDetailsBtnMobile, { flex: 1 }]}
+                    onPress={() => handleViewOrderDetails(order)}
+                  >
+                    <Text style={styles.viewDetailsBtnText}>👁️ View Details & Pipeline</Text>
+                  </TouchableOpacity>
+                  {canEdit && onOpenEditOrder && (
+                    <TouchableOpacity
+                      style={{ backgroundColor: 'rgba(2, 132, 199, 0.1)', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 6, borderWidth: 1, borderColor: '#0284c7', justifyContent: 'center', alignItems: 'center' }}
+                      onPress={() => onOpenEditOrder(order)}
+                    >
+                      <Text style={{ color: '#0284c7', fontSize: 12, fontWeight: '700' }}>✏️ Edit</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
               </TouchableOpacity>
             );
           })}
@@ -501,7 +514,7 @@ export const OrdersManagement: React.FC<OrdersManagementProps> = ({
                 <Text style={[styles.th, { width: 150 }]}>CURRENT STAGE</Text>
                 <Text style={[styles.th, { width: 150 }]}>ORDER STATUS</Text>
                 <Text style={[styles.th, { width: 160 }]}>INVOLVED DEPTS</Text>
-                <Text style={[styles.th, { width: 120, textAlign: 'center' }]}>ACTIONS</Text>
+                <Text style={[styles.th, { width: 160, textAlign: 'center' }]}>ACTIONS</Text>
               </View>
 
               {/* Table Body */}
@@ -563,13 +576,24 @@ export const OrdersManagement: React.FC<OrdersManagementProps> = ({
                       {order.dispatchRequired && <Text style={styles.deptMiniPill}>DISP</Text>}
                     </View>
 
-                    <View style={{ width: 120, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 6 }}>
+                    <View style={{ width: 160, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 6 }}>
                       <TouchableOpacity
                         style={styles.viewActionBtn}
                         onPress={() => handleViewOrderDetails(order)}
                       >
                         <Text style={styles.viewActionBtnText}>👁️ Details</Text>
                       </TouchableOpacity>
+                      {canEdit && onOpenEditOrder && (
+                        <TouchableOpacity
+                          style={{ backgroundColor: 'rgba(2, 132, 199, 0.1)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, borderWidth: 1, borderColor: '#0284c7' }}
+                          onPress={(e) => {
+                            e.stopPropagation();
+                            onOpenEditOrder(order);
+                          }}
+                        >
+                          <Text style={{ color: '#0284c7', fontSize: 11, fontWeight: '700' }}>✏️ Edit</Text>
+                        </TouchableOpacity>
+                      )}
                       {currentUser?.role === 'SUPER_ADMIN' && (
                         <TouchableOpacity
                           style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, borderWidth: 1, borderColor: '#ef4444' }}

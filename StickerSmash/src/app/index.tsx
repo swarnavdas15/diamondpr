@@ -60,8 +60,10 @@ export default function MainScreen() {
   const [calendarVisible, setCalendarVisible] = useState(false);
   const [createUserVisible, setCreateUserVisible] = useState(false);
   const [createClientVisible, setCreateClientVisible] = useState(false);
+  const [clientToEdit, setClientToEdit] = useState<any>(null);
   const [createOrderVisible, setCreateOrderVisible] = useState(false);
   const [orderInitialData, setOrderInitialData] = useState<any>(null);
+  const [orderToEdit, setOrderToEdit] = useState<any>(null);
   const [createTaskVisible, setCreateTaskVisible] = useState(false);
   const [createQuotationVisible, setCreateQuotationVisible] = useState(false);
 
@@ -120,8 +122,9 @@ export default function MainScreen() {
       case 'ClientDirectory':
         return (
           <ClientDirectoryView
-            onOpenCreateClient={() => setCreateClientVisible(true)}
-            onOpenCreateOrder={() => { setOrderInitialData(null); setCreateOrderVisible(true); }}
+            onOpenCreateClient={() => { setClientToEdit(null); setCreateClientVisible(true); }}
+            onOpenEditClient={(client) => { setClientToEdit(client); setCreateClientVisible(true); }}
+            onOpenCreateOrder={() => { setOrderToEdit(null); setOrderInitialData(null); setCreateOrderVisible(true); }}
           />
         );
 
@@ -132,7 +135,8 @@ export default function MainScreen() {
         return (
           <OrdersManagement
             onNavigateToQuotations={() => setActiveMenuItem('Quotations')}
-            onOpenCreateOrder={() => { setOrderInitialData(null); setCreateOrderVisible(true); }}
+            onOpenCreateOrder={() => { setOrderToEdit(null); setOrderInitialData(null); setCreateOrderVisible(true); }}
+            onOpenEditOrder={(order) => { setOrderInitialData(null); setOrderToEdit(order); setCreateOrderVisible(true); }}
           />
         );
 
@@ -244,10 +248,10 @@ export default function MainScreen() {
 
         {/* Modals */}
         <CompactCalendarModal visible={calendarVisible} onClose={() => setCalendarVisible(false)} />
-        <OrderOverviewModal visible={!!selectedOrder} onClose={() => setSelectedOrder(null)} />
+        <OrderOverviewModal visible={!!selectedOrder} onClose={() => setSelectedOrder(null)} onEditOrder={(order) => { setOrderInitialData(null); setOrderToEdit(order); setCreateOrderVisible(true); }} />
         <CreateUserModal visible={createUserVisible} onClose={() => setCreateUserVisible(false)} />
-        <CreateClientModal visible={createClientVisible} onClose={() => setCreateClientVisible(false)} />
-        <CreateOrderModal visible={createOrderVisible} onClose={() => { setCreateOrderVisible(false); setOrderInitialData(null); }} initialData={orderInitialData} />
+        <CreateClientModal visible={createClientVisible} onClose={() => { setCreateClientVisible(false); setClientToEdit(null); }} clientToEdit={clientToEdit} />
+        <CreateOrderModal visible={createOrderVisible} onClose={() => { setCreateOrderVisible(false); setOrderInitialData(null); setOrderToEdit(null); }} initialData={orderInitialData} orderToEdit={orderToEdit} />
         <CreateTaskModal visible={createTaskVisible} onClose={() => setCreateTaskVisible(false)} />
         <CreateQuotationModal visible={createQuotationVisible} onClose={() => setCreateQuotationVisible(false)} />
       </View>

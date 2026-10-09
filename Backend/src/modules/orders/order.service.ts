@@ -255,6 +255,12 @@ export const verifyAndCompleteOrder = async (id: string, userId: string, remarks
 export const updateOrder = async (id: string, data: any) => {
   const updateData: any = {};
   if (data.poNumber !== undefined) updateData.poNumber = data.poNumber;
+  if (data.clientId !== undefined) updateData.clientId = dbId(data.clientId);
+  if (data.clientCode !== undefined) updateData.clientCode = data.clientCode;
+  if (data.clientName !== undefined) updateData.clientName = data.clientName;
+  if (data.contactNo !== undefined) updateData.contactNo = data.contactNo;
+  if (data.email !== undefined) updateData.email = data.email;
+  if (data.address !== undefined) updateData.address = data.address;
   if (data.budget !== undefined) updateData.budget = data.budget;
   if (data.technicalRequirements !== undefined) updateData.technicalRequirements = data.technicalRequirements;
   if (data.materialRequirements !== undefined) updateData.materialRequirements = data.materialRequirements;
@@ -267,5 +273,21 @@ export const updateOrder = async (id: string, data: any) => {
   if (Object.keys(updateData).length > 0) {
     await db.orm.public.Order.where({ id: dbId(id) }).update(updateData);
   }
+
+  if (data.items && Array.isArray(data.items) && data.items.length > 0) {
+    await db.orm.public.OrderItem.where({ orderId: dbId(id) }).delete();
+    for (const item of data.items) {
+      if (item.itemName) {
+        await db.orm.public.OrderItem.create({
+          orderId: dbId(id),
+          itemName: item.itemName,
+          size: item.size || '',
+          quantity: Number(item.quantity) || 1,
+          unitPrice: toOptionalBigInt(item.unitPrice),
+        });
+      }
+    }
+  }
+
   return await getOrderById(id);
 };

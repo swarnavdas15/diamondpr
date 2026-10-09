@@ -13,12 +13,13 @@ interface CreateClientModalProps {
   visible: boolean;
   onClose: () => void;
   onClientCreated?: (client: Client) => void;
+  clientToEdit?: Client | null;
 }
 
-export const CreateClientModal: React.FC<CreateClientModalProps> = ({ visible, onClose, onClientCreated }) => {
+export const CreateClientModal: React.FC<CreateClientModalProps> = ({ visible, onClose, onClientCreated, clientToEdit }) => {
   const { width } = useWindowDimensions();
   const isMobile = width < 768;
-  const { clients, createClient, uploadClientProfileImage, uploadPrimaryContactProfileImage, refreshData } = useERP();
+  const { clients, createClient, updateClient, uploadClientProfileImage, uploadPrimaryContactProfileImage, refreshData } = useERP();
 
   const [clientCode, setClientCode] = useState('');
   const [companyName, setCompanyName] = useState('');
@@ -33,6 +34,25 @@ export const CreateClientModal: React.FC<CreateClientModalProps> = ({ visible, o
   const [remarks, setRemarks] = useState('');
   const [error, setError] = useState('');
   const [isDragging, setIsDragging] = useState(false);
+
+  React.useEffect(() => {
+    if (clientToEdit) {
+      setClientCode(clientToEdit.clientCode || '');
+      setCompanyName(clientToEdit.companyName || '');
+      setContactName(clientToEdit.contactName || '');
+      setContactNo(clientToEdit.contactNo || '');
+      setEmail(clientToEdit.email || '');
+      setAddress(clientToEdit.address || '');
+      setGstNumber(clientToEdit.gstNumber || '');
+      setPanNumber(clientToEdit.panNumber || '');
+      setWebsiteUrl(clientToEdit.websiteUrl || '');
+      setIndustry(clientToEdit.industry || '');
+      setRemarks(clientToEdit.remarks || '');
+      if (clientToEdit.profileImage) {
+        setCompanyImageUri(clientToEdit.profileImage);
+      }
+    }
+  }, [clientToEdit, visible]);
 
   React.useEffect(() => {
     if (Platform.OS !== 'web' || !visible) {
@@ -212,7 +232,7 @@ export const CreateClientModal: React.FC<CreateClientModalProps> = ({ visible, o
 
     // Uniqueness validation
     const isDuplicate = clients.some(
-      (c) => (c.clientCode || c.clientCode || '').trim().toLowerCase() === trimmedCode.toLowerCase()
+      (c) => c.id !== clientToEdit?.id && (c.clientCode || '').trim().toLowerCase() === trimmedCode.toLowerCase()
     );
 
     if (isDuplicate) {
@@ -221,6 +241,40 @@ export const CreateClientModal: React.FC<CreateClientModalProps> = ({ visible, o
     }
 
     try {
+      if (clientToEdit) {
+        await updateClient(clientToEdit.id, {
+          clientCode: trimmedCode,
+          companyName: trimmedCompany,
+          contactName: contactName.trim(),
+          contactNo: trimmedContact,
+          email: email.trim(),
+          address: address.trim(),
+          gstNumber: gstNumber.trim(),
+          panNumber: panNumber.trim(),
+          websiteUrl: websiteUrl.trim(),
+          industry: industry.trim(),
+          remarks: remarks.trim(),
+        });
+
+        if (companyImageUri && companyImageUri !== clientToEdit.profileImage) {
+          let filename = companyImageUri.split('/').pop() || 'company.jpg';
+          if (!/\.(jpg|jpeg|png|webp)$/i.test(filename)) { filename = `${filename}.jpg`; }
+          const match = /\.(\w+)$/.exec(filename);
+          const type = match ? `image/${match[1]}` : `image/jpeg`;
+          try {
+            await uploadClientProfileImage(clientToEdit.id, companyImageUri, filename, type);
+          } catch (err) {
+            console.error(err);
+          }
+        }
+
+        setSuccessMsg('Client Details Updated Successfully');
+        setTimeout(() => {
+          handleClose();
+        }, 500);
+        return;
+      }
+
       const newClient = await createClient({
         clientCode: trimmedCode,
         companyName: trimmedCompany,
@@ -335,7 +389,7 @@ export const CreateClientModal: React.FC<CreateClientModalProps> = ({ visible, o
           <TouchableOpacity activeOpacity={1} style={[styles.card, isMobile && { padding: 14, maxHeight: '95%' }]} onPress={(e) => e.stopPropagation()}>
 
             <View style={styles.header}>
-            <Text style={styles.title}>Register New Client</Text>
+            <Text style={styles.title}>{clientToEdit ? `Edit Client Details (${clientToEdit.clientCode})` : 'Register New Client'}</Text>
             <TouchableOpacity onPress={handleClose}>
               <Text style={styles.close}>✕</Text>
             </TouchableOpacity>
@@ -523,9 +577,19 @@ export const CreateClientModal: React.FC<CreateClientModalProps> = ({ visible, o
                 onChangeText={setRemarks}
               />
 
-              <TouchableOpacity style={styles.submitBtn} onPress={handleSubmit}>
-                <Text style={styles.submitBtnText}>+ Register Client</Text>
-              </TouchableOpacity>
+              <View style={{ flexDirection: 'row', gap: 12, marginTop: 12 }}>
+                {clientToEdit && (
+                  <TouchableOpacity
+                    style={[styles.submitBtn, { flex: 1, backgroundColor: Colors.inputBg, borderWidth: 1, borderColor: Colors.borderDark }]}
+                    onPress={handleClose}
+                  >
+                    <Text style={[styles.submitBtnText, { color: Colors.textMuted }]}>Cancel</Text>
+                  </TouchableOpacity>
+                )}
+                <TouchableOpacity style={[styles.submitBtn, clientToEdit ? { flex: 1 } : {}]} onPress={handleSubmit}>
+                  <Text style={styles.submitBtnText}>{clientToEdit ? 'Save Changes' : '+ Register Client'}</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </ScrollView>
         </TouchableOpacity>

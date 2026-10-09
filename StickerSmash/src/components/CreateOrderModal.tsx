@@ -7,7 +7,7 @@ import { useAuth } from '../context/AuthContext';
 import { Colors, Spacing, Radius, Shadows } from '../theme';
 import { SearchableDropdown } from './ui/SearchableDropdown';
 import { CreateClientModal } from './CreateClientModal';
-import { Client, CustomStage } from '../types';
+import { Client, CustomStage, Order } from '../types';
 
 export interface InitialOrderData {
   quotationId?: string;
@@ -29,10 +29,11 @@ interface CreateOrderModalProps {
   visible: boolean;
   onClose: () => void;
   initialData?: InitialOrderData | null;
+  orderToEdit?: Order | null;
 }
 
-export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ visible, onClose, initialData }) => {
-  const { clients, createOrder, updateQuotation, refreshData, createClient, temporaryClients } = useERP();
+export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ visible, onClose, initialData, orderToEdit }) => {
+  const { clients, createOrder, updateOrder, updateQuotation, refreshData, createClient, temporaryClients } = useERP();
   const { users } = useAuth();
   const { width } = useWindowDimensions();
   const isMobile = width < 768;
@@ -115,7 +116,23 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ visible, onC
 
 
   React.useEffect(() => {
-    if (initialData) {
+    if (orderToEdit) {
+      if (orderToEdit.clientId) setClientId(orderToEdit.clientId);
+      if (orderToEdit.poNumber) setPoNumber(orderToEdit.poNumber);
+      if (orderToEdit.budget) setBudget(String(orderToEdit.budget));
+      if (orderToEdit.technicalRequirements) setTechnicalRequirements(orderToEdit.technicalRequirements);
+      if (orderToEdit.materialRequirements) setMaterialRequirements(orderToEdit.materialRequirements);
+      if (orderToEdit.requiredQuantity) setRequiredQuantity(String(orderToEdit.requiredQuantity));
+      if (orderToEdit.purchaseRequired !== undefined) setPurchaseRequired(orderToEdit.purchaseRequired);
+      if (orderToEdit.productionRequired !== undefined) setProductionRequired(orderToEdit.productionRequired);
+      if (orderToEdit.qualityTestingRequired !== undefined) setQualityTestingRequired(orderToEdit.qualityTestingRequired);
+      if (orderToEdit.dispatchRequired !== undefined) setDispatchRequired(orderToEdit.dispatchRequired);
+      if (orderToEdit.items && orderToEdit.items.length > 0) {
+        setItemName(orderToEdit.items[0].itemName || '');
+        setSize(orderToEdit.items[0].size || '');
+        setUnitPrice(orderToEdit.items[0].unitPrice ? String(orderToEdit.items[0].unitPrice) : '');
+      }
+    } else if (initialData) {
       if (initialData.clientId) setClientId(initialData.clientId);
       if (initialData.poNumber) setPoNumber(initialData.poNumber);
       if (initialData.budget) setBudget(String(initialData.budget));
@@ -127,7 +144,7 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ visible, onC
       if (initialData.qualityTestingRequired !== undefined) setQualityTestingRequired(initialData.qualityTestingRequired);
       if (initialData.dispatchRequired !== undefined) setDispatchRequired(initialData.dispatchRequired);
     }
-  }, [initialData]);
+  }, [initialData, orderToEdit, visible]);
 
   const handleClientCreated = (newClient: Client) => {
     setClientId(newClient.id);
@@ -262,6 +279,37 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ visible, onC
     }
 
     try {
+      if (orderToEdit) {
+        const selectedClient = clients.find((c) => c.id === resolvedClientId) || (temporaryClients || []).find((c) => c.id === resolvedClientId);
+        await updateOrder(orderToEdit.id, {
+          poNumber,
+          clientId: resolvedClientId,
+          clientCode: selectedClient?.clientCode,
+          clientName: selectedClient?.companyName,
+          contactNo: selectedClient?.contactNo,
+          email: selectedClient?.email,
+          address: selectedClient?.address,
+          budget: budget ? parseFloat(budget) : undefined,
+          technicalRequirements,
+          materialRequirements,
+          requiredQuantity: parseInt(requiredQuantity, 10) || 1,
+          purchaseRequired,
+          productionRequired,
+          qualityTestingRequired,
+          dispatchRequired,
+          items: [
+            {
+              itemName,
+              size,
+              quantity: parseInt(requiredQuantity, 10) || 1,
+              unitPrice: unitPrice ? parseFloat(unitPrice) : undefined,
+            },
+          ],
+        });
+        handleClose();
+        return;
+      }
+
       const newOrder = await createOrder({
         poNumber,
         clientId: resolvedClientId,
@@ -308,6 +356,9 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ visible, onC
     setTechnicalRequirements('');
     setMaterialRequirements('');
     setRequiredQuantity('');
+    setItemName('');
+    setSize('');
+    setUnitPrice('');
     setPurchaseRequired(true);
     setProductionRequired(true);
     setQualityTestingRequired(true);
@@ -358,7 +409,7 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ visible, onC
         <TouchableOpacity style={[styles.backdrop, isMobile && { padding: 10 }]} activeOpacity={1} onPress={handleClose}>
         <TouchableOpacity activeOpacity={1} style={[styles.card, isMobile && { padding: 14, maxHeight: '95%' }]} onPress={(e) => e.stopPropagation()}>
           <View style={styles.header}>
-            <Text style={styles.title}>Sales: Create Order & Custom Pipeline</Text>
+            <Text style={styles.title}>{orderToEdit ? `Edit Order (${orderToEdit.orderNumber})` : 'Sales: Create Order & Custom Pipeline'}</Text>
             <TouchableOpacity onPress={handleClose}>
               <Text style={styles.close}>✕</Text>
             </TouchableOpacity>
@@ -624,9 +675,19 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ visible, onC
               </View>
             </View>
 
-            <TouchableOpacity style={styles.submitBtn} onPress={handleSubmit}>
-              <Text style={styles.submitBtnText}>Initiate Order with Configured Pipeline</Text>
-            </TouchableOpacity>
+            <View style={{ flexDirection: 'row', gap: 12, marginTop: 12 }}>
+              {orderToEdit && (
+                <TouchableOpacity
+                  style={[styles.submitBtn, { flex: 1, backgroundColor: Colors.inputBg, borderWidth: 1, borderColor: Colors.borderDark }]}
+                  onPress={handleClose}
+                >
+                  <Text style={[styles.submitBtnText, { color: Colors.textMuted }]}>Cancel</Text>
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity style={[styles.submitBtn, orderToEdit ? { flex: 1 } : {}]} onPress={handleSubmit}>
+                <Text style={styles.submitBtnText}>{orderToEdit ? 'Save Changes' : 'Initiate Order with Configured Pipeline'}</Text>
+              </TouchableOpacity>
+            </View>
           </ScrollView>
         </TouchableOpacity>
       </TouchableOpacity>

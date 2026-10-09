@@ -799,9 +799,17 @@ export const QuotationsView: React.FC<QuotationsViewProps> = ({ onOpenCreateQuot
                 <Text style={styles.inputLabel}>Remarks & Notes</Text>
                 <TextInput style={[styles.input, { height: 50 }]} multiline value={editRemarks} onChangeText={setEditRemarks} />
 
-                <TouchableOpacity style={styles.submitBtn} onPress={handleSaveEdit}>
-                  <Text style={styles.submitBtnText}>✓ Save Quotation Changes</Text>
-                </TouchableOpacity>
+                <View style={{ flexDirection: 'row', gap: 12, marginTop: 12 }}>
+                  <TouchableOpacity
+                    style={[styles.submitBtn, { flex: 1, backgroundColor: Colors.inputBg, borderWidth: 1, borderColor: Colors.borderDark }]}
+                    onPress={() => setEditQuotation(null)}
+                  >
+                    <Text style={[styles.submitBtnText, { color: Colors.textMuted }]}>Cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={[styles.submitBtn, { flex: 1 }]} onPress={handleSaveEdit}>
+                    <Text style={styles.submitBtnText}>✓ Save Changes</Text>
+                  </TouchableOpacity>
+                </View>
               </ScrollView>
             </TouchableOpacity>
           </TouchableOpacity>

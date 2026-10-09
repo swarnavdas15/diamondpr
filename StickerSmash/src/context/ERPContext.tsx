@@ -121,7 +121,7 @@ interface ERPContextType {
   bulkDeleteTemporaryClientsPermanent: (clientIds: string[]) => Promise<void>;
   uploadClientProfileImage: (clientId: string, uri: string, name: string, type: string) => Promise<void>;
   uploadPrimaryContactProfileImage: (clientId: string, uri: string, name: string, type: string) => Promise<void>;
-  updateOrder: (id: string, data: Partial<Order>) => Promise<void>;
+  updateOrder: (id: string, data: any) => Promise<void>;
   deleteOrder: (id: string) => Promise<void>;
   deleteQuotation: (id: string) => Promise<void>;
   createOrder: (data: {
@@ -1115,7 +1115,7 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  const updateOrder = async (id: string, data: Partial<Order>) => {
+  const updateOrder = async (id: string, data: any) => {
     try {
       await apiClient.patch(`/orders/${id}`, data);
       await fetchLiveDashboardData();

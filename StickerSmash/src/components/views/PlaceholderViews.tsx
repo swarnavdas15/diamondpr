@@ -8,6 +8,7 @@ import { ExportDataPayload } from '../../utils/exportUtils';
 
 interface PlaceholderProps {
   onOpenCreateClient?: () => void;
+  onOpenEditClient?: (client: Client) => void;
   onOpenCreateOrder?: () => void;
   onOpenCreateTask?: () => void;
   onOpenCreateUser?: () => void;
@@ -18,9 +19,10 @@ import { SuperAdminAnalyticsView } from '../analytics/SuperAdminAnalyticsView';
 import { Client } from '../../types';
 
 // 1. Client Directory View
-export const ClientDirectoryView: React.FC<PlaceholderProps> = ({ onOpenCreateClient, onOpenCreateOrder }) => {
+export const ClientDirectoryView: React.FC<PlaceholderProps> = ({ onOpenCreateClient, onOpenEditClient, onOpenCreateOrder }) => {
   const { clients, orders, setSelectedOrder, deleteClient } = useERP();
   const { currentUser } = useAuth();
+  const canManageClient = currentUser ? ['SUPER_ADMIN', 'ADMIN', 'SALES'].includes(currentUser.role) : false;
   const isMasked = currentUser?.clientDataVisibility === 'CODE_ONLY';
   const displayedClients = clients.map(c => isMasked ? {
     ...c,
@@ -135,7 +137,7 @@ export const ClientDirectoryView: React.FC<PlaceholderProps> = ({ onOpenCreateCl
               <Text style={[styles.th, { width: 180 }]}>Email</Text>
               <Text style={[styles.th, { width: 140 }]}>GST Number</Text>
               <Text style={[styles.th, { width: 160 }]}>Org Hierarchy</Text>
-              {currentUser?.role === 'SUPER_ADMIN' && <Text style={[styles.th, { width: 100 }]}>Actions</Text>}
+              {canManageClient && <Text style={[styles.th, { width: 140 }]}>Actions</Text>}
             </View>
 
             {clients.map((c) => (
@@ -181,17 +183,30 @@ export const ClientDirectoryView: React.FC<PlaceholderProps> = ({ onOpenCreateCl
                   </TouchableOpacity>
                 </View>
 
-                {currentUser?.role === 'SUPER_ADMIN' && (
-                  <View style={{ width: 100, flexDirection: 'row', gap: 8, paddingHorizontal: 12 }}>
-                    <TouchableOpacity
-                      style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)', padding: 6, borderRadius: 4 }}
-                      onPress={(e) => {
-                        e.stopPropagation();
-                        setClientToDelete(c);
-                      }}
-                    >
-                      <Text style={{ color: '#ef4444', fontSize: 12, fontWeight: '800' }}>🗑 Delete</Text>
-                    </TouchableOpacity>
+                {canManageClient && (
+                  <View style={{ width: 140, flexDirection: 'row', gap: 6, paddingHorizontal: 12, alignItems: 'center' }}>
+                    {onOpenEditClient && (
+                      <TouchableOpacity
+                        style={{ backgroundColor: 'rgba(2, 132, 199, 0.1)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4, borderWidth: 1, borderColor: '#0284c7' }}
+                        onPress={(e) => {
+                          e.stopPropagation();
+                          onOpenEditClient(c);
+                        }}
+                      >
+                        <Text style={{ color: '#0284c7', fontSize: 11, fontWeight: '800' }}>✏️ Edit</Text>
+                      </TouchableOpacity>
+                    )}
+                    {currentUser?.role === 'SUPER_ADMIN' && (
+                      <TouchableOpacity
+                        style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)', paddingHorizontal: 6, paddingVertical: 4, borderRadius: 4 }}
+                        onPress={(e) => {
+                          e.stopPropagation();
+                          setClientToDelete(c);
+                        }}
+                      >
+                        <Text style={{ color: '#ef4444', fontSize: 11, fontWeight: '800' }}>🗑</Text>
+                      </TouchableOpacity>
+                    )}
                   </View>
                 )}
               </TouchableOpacity>

@@ -73,6 +73,11 @@ export const updateClient = async (id: string, data: any) => {
   if (data.email !== undefined) updateData.email = data.email;
   if (data.address !== undefined) updateData.address = data.address;
   if (data.gstNumber !== undefined) updateData.gstNumber = data.gstNumber;
+  if (data.panNumber !== undefined) updateData.panNumber = data.panNumber;
+  if (data.websiteUrl !== undefined) updateData.websiteUrl = data.websiteUrl;
+  if (data.industry !== undefined) updateData.industry = data.industry;
+  if (data.remarks !== undefined) updateData.remarks = data.remarks;
+  if (data.clientCode !== undefined) updateData.clientcode = data.clientCode;
 
   if (Object.keys(updateData).length > 0) {
     await db.orm.public.Client.where({ id: dbId(id) }).update(updateData);
