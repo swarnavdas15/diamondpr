@@ -44,6 +44,7 @@ export const QuotationsView: React.FC<QuotationsViewProps> = ({ onOpenCreateQuot
   const {
     quotations,
     clients,
+    temporaryClients,
     updateQuotation,
     addQuotationFollowUp,
     markQuotationLost,
@@ -260,7 +261,9 @@ export const QuotationsView: React.FC<QuotationsViewProps> = ({ onOpenCreateQuot
       return;
     }
     const targetClient = clients.find(
-      (c) => (c.clientCode || '').toLowerCase() === (q.clientCode || '').toLowerCase()
+      (c) => (q.clientId && c.id === q.clientId) || (c.clientCode || '').toLowerCase() === (q.clientCode || '').toLowerCase()
+    ) || temporaryClients.find(
+      (c) => (q.clientId && c.id === q.clientId) || (c.clientCode || '').toLowerCase() === (q.clientCode || '').toLowerCase()
     );
     onOpenCreateOrderWithData({
       quotationId: q.id,

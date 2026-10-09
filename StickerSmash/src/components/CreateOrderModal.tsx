@@ -32,7 +32,7 @@ interface CreateOrderModalProps {
 }
 
 export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ visible, onClose, initialData }) => {
-  const { clients, createOrder, updateQuotation, refreshData, createClient } = useERP();
+  const { clients, createOrder, updateQuotation, refreshData, createClient, temporaryClients } = useERP();
   const { users } = useAuth();
   const { width } = useWindowDimensions();
   const isMobile = width < 768;
@@ -67,6 +67,8 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ visible, onC
 
   const [error, setError] = useState('');
   const [isDragging, setIsDragging] = useState(false);
+
+ 
 
   React.useEffect(() => {
     if (Platform.OS !== 'web' || !visible) {
@@ -426,22 +428,32 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ visible, onC
 
             {/* Client Searchable Dropdown */}
             <SearchableDropdown
-              label="Select Client"
-              placeholder="Search or select a registered client..."
-              options={clients.map((c) => ({
-                id: c.id,
-                label: c.companyName,
-                code: c.clientCode,
-                sublabel: c.contactName ? `Contact: ${c.contactName}` : undefined,
-              }))}
-              selectedValue={clientId}
-              onSelect={(id) => setClientId(id)}
-              allowManual={true}
-              manualLabel="+ Manual / New Client"
-              manualId=""
-              onManualPress={() => setCreateClientVisible(true)}
-              required
-            />
+  label="Select Client"
+  placeholder="Search or select a registered client..."
+  options={[
+    // 1. Permanent Clients
+    ...clients.map((c) => ({
+      id: c.id,
+      label: c.companyName,
+      code: c.clientCode,
+      sublabel: c.contactName ? `🏢 Permanent • ${c.contactName}` : '🏢 Permanent',
+    })),
+    // 2. Temporary Prospects / Leads
+    ...(temporaryClients || []).map((c) => ({
+      id: c.id,
+      label: `${c.companyName} [Temporary]`,
+      code: c.clientCode,
+      sublabel: c.contactName ? `⏳ Prospect • ${c.contactName}` : '⏳ Prospect',
+    })),
+  ]}
+  selectedValue={clientId}
+  onSelect={(id) => setClientId(id)}
+  allowManual={true}
+  manualLabel="+ Manual / New Client"
+  manualId=""
+  onManualPress={() => setCreateClientVisible(true)}
+  required
+/>
 
             <Text style={styles.label}>PO Number (Purchase Order Ref) *</Text>
             <TextInput

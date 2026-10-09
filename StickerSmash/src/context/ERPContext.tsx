@@ -35,6 +35,7 @@ interface ERPContextType {
   orders: Order[];
   getMaskedOrders: () => Order[];
   clients: Client[];
+  temporaryClients: Client[];
   companyContacts: CompanyContact[];
   addCompanyContact: (contact: Omit<CompanyContact, 'id' | 'createdAt'>) => Promise<CompanyContact>;
   uploadCompanyContactProfileImage: (contactId: string, uri: string, name: string, type: string) => Promise<void>;
@@ -100,7 +101,7 @@ interface ERPContextType {
   deleteVendor: (vendorId: string) => Promise<void>;
 
   createClient: (data: {
-    clientCode: string;
+    clientCode?: string;
     companyName: string;
     contactName?: string;
     contactNo: string;
@@ -111,9 +112,13 @@ interface ERPContextType {
     websiteUrl?: string;
     industry?: string;
     remarks?: string;
+    isTemporary?: boolean;
   }) => Promise<Client>;
+  promoteTemporaryClient: (clientId: string) => Promise<Client>;
   updateClient: (id: string, data: Partial<Client>) => Promise<void>;
   deleteClient: (id: string) => Promise<void>;
+  deleteTemporaryClientPermanent: (clientId: string) => Promise<void>;
+  bulkDeleteTemporaryClientsPermanent: (clientIds: string[]) => Promise<void>;
   uploadClientProfileImage: (clientId: string, uri: string, name: string, type: string) => Promise<void>;
   uploadPrimaryContactProfileImage: (clientId: string, uri: string, name: string, type: string) => Promise<void>;
   updateOrder: (id: string, data: Partial<Order>) => Promise<void>;
@@ -792,6 +797,7 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const { currentUser, users, isAuthenticated } = useAuth();
   const [orders, setOrders] = useState<Order[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
+  const [temporaryClients, setTemporaryClients] = useState<Client[]>([]);
   // Remaining arrays can stay as mock data for now or empty if you prefer, but I'll empty them since user said remove mock data.
   const [companyContacts, setCompanyContacts] = useState<CompanyContact[]>([]);
   const [companyImportantDates, setCompanyImportantDates] = useState<CompanyImportantDate[]>([]);
@@ -840,19 +846,30 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const fetchLiveDashboardData = async () => {
     try {
-      const [clientsRes, ordersRes, contactsRes, quotationsRes, vendorsRes, tasksRes] = await Promise.all([
+      const [clientsRes, ordersRes, contactsRes, quotationsRes, vendorsRes, tasksRes, tempClientsRes] = await Promise.all([
         apiClient.get('/clients'),
         apiClient.get('/orders'),
         apiClient.get('/clients/contacts'),
         apiClient.get('/quotations'),
         apiClient.get('/vendors').catch(() => ({ data: [] })),
-        apiClient.get('/tasks').catch(() => ({ data: [] }))
+        apiClient.get('/tasks').catch(() => ({ data: [] })),
+        apiClient.get('/clients?temporaryOnly=true').catch(() => ({ data: { clients: [] } })),
       ]);
       const clientsArray = clientsRes.data.clients || clientsRes.data;
       const normalizedClients = Array.isArray(clientsArray) 
         ? clientsArray.map((c: any) => ({ ...c, clientCode: c.clientCode || c.clientcode })) 
         : [];
       setClients(normalizedClients);
+      const tempArray = tempClientsRes?.data?.clients || tempClientsRes?.data || [];
+      const normalizedTempClients = Array.isArray(tempArray)
+  ? tempArray.map((c: any) => ({
+      ...c,
+      clientCode: c.clientCode || c.clientcode,
+      isTemporary: true,
+      status: c.status || 'PROSPECT',
+    }))
+  : [];
+      setTemporaryClients(normalizedTempClients);
       setOrders(ordersRes.data.orders || ordersRes.data);
       setCompanyContacts(contactsRes.data.contacts || []);
       setQuotations(quotationsRes.data.quotations || []);
@@ -987,7 +1004,7 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const createClient = async (data: {
-    clientCode: string;
+    clientCode?: string;
     companyName: string;
     contactName?: string;
     contactNo: string;
@@ -998,8 +1015,27 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     websiteUrl?: string;
     industry?: string;
     remarks?: string;
+    isTemporary?: boolean;
   }) => {
-      try { const res = await apiClient.post(`/orders/client`, data); await fetchLiveDashboardData(); return res.data.client; } catch (e) { console.error(e); throw e; }
+    try {
+      const res = await apiClient.post(`/orders/client`, data);
+      await fetchLiveDashboardData();
+      return res.data.client;
+    } catch (e) {
+      console.error(e);
+      throw e;
+    }
+  };
+
+  const promoteTemporaryClient = async (clientId: string) => {
+    try {
+      const res = await apiClient.post(`/clients/${clientId}/promote`);
+      await fetchLiveDashboardData();
+      return res.data.client;
+    } catch (e) {
+      console.error(e);
+      throw e;
+    }
   };
 
   const uploadClientProfileImage = async (clientId: string, uri: string, name: string, type: string) => {
@@ -1056,6 +1092,26 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       } else {
         alert('Failed to delete client at DB level.');
       }
+    }
+  };
+
+  const deleteTemporaryClientPermanent = async (clientId: string) => {
+    try {
+      await apiClient.delete(`/clients/temporary/${clientId}/permanent`);
+      await fetchLiveDashboardData();
+    } catch (e: any) {
+      console.error('Failed to permanently delete temporary client:', e);
+      throw new Error(e.response?.data?.error || e.message || 'Failed to permanently delete temporary client');
+    }
+  };
+
+  const bulkDeleteTemporaryClientsPermanent = async (clientIds: string[]) => {
+    try {
+      await apiClient.post(`/clients/temporary/bulk-delete-permanent`, { ids: clientIds });
+      await fetchLiveDashboardData();
+    } catch (e: any) {
+      console.error('Failed to bulk delete temporary clients:', e);
+      throw new Error(e.response?.data?.error || e.message || 'Failed to bulk delete temporary clients');
     }
   };
 
@@ -1391,7 +1447,9 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     let targetClient = clients.find(
-      (c) => c.clientCode.toLowerCase() === targetQuotation.clientCode.toLowerCase()
+      (c) => (targetQuotation.clientId && c.id === targetQuotation.clientId) || c.clientCode.toLowerCase() === targetQuotation.clientCode.toLowerCase()
+    ) || temporaryClients.find(
+      (c) => (targetQuotation.clientId && c.id === targetQuotation.clientId) || c.clientCode.toLowerCase() === targetQuotation.clientCode.toLowerCase()
     );
 
     if (!targetClient) {
@@ -1401,6 +1459,7 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         contactName: targetQuotation.contactPerson,
         contactNo: targetQuotation.mobileNumber,
         email: targetQuotation.email,
+        isTemporary: false,
       });
     }
 
@@ -1464,6 +1523,7 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         orders,
         getMaskedOrders,
         clients,
+        temporaryClients,
         companyContacts,
         addCompanyContact,
         uploadCompanyContactProfileImage,
@@ -1486,8 +1546,11 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         markQuotationLost,
 
         createClient,
+        promoteTemporaryClient,
         updateClient,
         deleteClient,
+        deleteTemporaryClientPermanent,
+        bulkDeleteTemporaryClientsPermanent,
         uploadClientProfileImage,
     uploadPrimaryContactProfileImage,
         createVendor,

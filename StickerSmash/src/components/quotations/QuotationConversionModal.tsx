@@ -13,6 +13,7 @@ import {
 import { Quotation, LostReason, CustomStage } from '../../types';
 import { Colors, Spacing, Radius, Shadows } from '../../theme';
 import { useAuth } from '../../context/AuthContext';
+import { useERP } from '../../context/ERPContext';
 
 export interface QuotationConversionData {
   approvedAmount: number;
@@ -68,6 +69,7 @@ export const QuotationConversionModal: React.FC<QuotationConversionModalProps> =
   const [error, setError] = useState<string>('');
 
   const { currentUser, users } = useAuth();
+  const { temporaryClients } = useERP();
   const [customStages, setCustomStages] = useState<Omit<CustomStage, 'id' | 'createdAt' | 'status'>[]>([]);
   const [isAddingStage, setIsAddingStage] = useState(false);
   const [newStageName, setNewStageName] = useState('');
@@ -93,6 +95,9 @@ export const QuotationConversionModal: React.FC<QuotationConversionModalProps> =
   }, [externalError]);
 
   if (!quotation) return null;
+
+  // Check if quotation is linked to a temporary client
+  const isTemporaryClient = quotation.clientId && temporaryClients.some((c: { id: string }) => c.id === quotation.clientId);
 
   const originalAmount = quotation.quotationAmount;
   const approvedNum = Number(approvedAmount) || 0;
@@ -191,6 +196,7 @@ export const QuotationConversionModal: React.FC<QuotationConversionModalProps> =
         activeOpacity={1}
         onPress={handleClose}
       >
+        
         <TouchableOpacity
           activeOpacity={1}
           style={[styles.card, isMobile && { padding: 14, maxHeight: '96%' }]}
@@ -214,6 +220,16 @@ export const QuotationConversionModal: React.FC<QuotationConversionModalProps> =
               📜 Original Quotation Amount: {formatCurrency(originalAmount)}
             </Text>
           </View>
+
+          {/* Temporary Client Promotion Banner */}
+          {isTemporaryClient && (
+            <View style={styles.promoBanner}>
+              <Text style={styles.promoBannerText}>
+                ⚠️ This quotation is linked to a Temporary Prospect. 
+                The client will be auto-promoted to the Permanent Directory on order creation.
+              </Text>
+            </View>
+          )}
 
           {error ? <Text style={styles.errorText}>⚠️ {error}</Text> : null}
 
@@ -506,6 +522,20 @@ const styles = StyleSheet.create({
     color: Colors.accentTeal,
     fontSize: 12,
     fontWeight: '700',
+  },
+  promoBanner: {
+    backgroundColor: 'rgba(245, 158, 11, 0.15)',
+    borderRadius: Radius.md,
+    padding: Spacing.sm,
+    borderWidth: 1,
+    borderColor: '#f59e0b',
+    marginBottom: Spacing.sm,
+  },
+  promoBannerText: {
+    color: '#fbbf24',
+    fontSize: 11,
+    fontWeight: '700',
+    textAlign: 'center',
   },
   errorText: {
     color: '#ef4444',

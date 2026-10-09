@@ -14,13 +14,14 @@ interface CreateQuotationModalProps {
 }
 
 export const CreateQuotationModal: React.FC<CreateQuotationModalProps> = ({ visible, onClose }) => {
-  const { clients, quotations, createQuotation } = useERP();
+  const { clients, temporaryClients, quotations, createQuotation, createClient } = useERP();
   const { currentUser } = useAuth();
   const { width } = useWindowDimensions();
   const isMobile = width < 768;
 
   const [createClientVisible, setCreateClientVisible] = useState(false);
   const [selectedClientId, setSelectedClientId] = useState<string>('');
+  const [isTemporaryClient, setIsTemporaryClient] = useState(false);
   const [clientCode, setClientCode] = useState('');
   const [companyName, setCompanyName] = useState('');
   const [contactPerson, setContactPerson] = useState('');
@@ -37,8 +38,27 @@ export const CreateQuotationModal: React.FC<CreateQuotationModalProps> = ({ visi
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
 
-  // Auto-generate next Quotation Number preview
+  // Auto-generate preview codes
   const nextQNum = `QT-2026-${String(quotations.length + 1).padStart(3, '0')}`;
+  
+// Calculate next TMP code from actual client data
+  const getNextTempCode = () => {
+    let maxNum = 1000;
+    const allClients = [...clients, ...(temporaryClients || [])];
+    for (const c of allClients) {
+      const code = c.clientCode || '';
+      if (code.startsWith('TMP-')) {
+        const numStr = code.slice(4);
+        const num = parseInt(numStr, 10);
+        if (!isNaN(num) && num > maxNum) {
+          maxNum = num;
+        }
+      }
+    }
+    return `TMP-${maxNum + 1}`;
+  };
+  
+  const nextTempCode = getNextTempCode();
 
   const handleSelectClient = (cId: string) => {
     setSelectedClientId(cId);
@@ -48,15 +68,18 @@ export const CreateQuotationModal: React.FC<CreateQuotationModalProps> = ({ visi
       setContactPerson('');
       setMobileNumber('');
       setEmail('');
+      setIsTemporaryClient(false);
       return;
     }
-    const found = clients.find((c) => c.id === cId);
+    const allKnown = [...clients, ...(temporaryClients || [])];
+    const found = allKnown.find((c) => c.id === cId);
     if (found) {
       setClientCode(found.clientCode);
       setCompanyName(found.companyName);
       setContactPerson(found.contactName || '');
       setMobileNumber(found.contactNo);
       setEmail(found.email || '');
+      setIsTemporaryClient(!!found.isTemporary);
     }
   };
 
@@ -67,19 +90,16 @@ export const CreateQuotationModal: React.FC<CreateQuotationModalProps> = ({ visi
     setContactPerson(newClient.contactName || '');
     setMobileNumber(newClient.contactNo);
     setEmail(newClient.email || '');
+    setIsTemporaryClient(!!newClient.isTemporary);
     setSuccessMsg('Client Registered Successfully');
   };
 
-  const handleSubmit = async () => {
+ const handleSubmit = async () => {
     setErrorMsg('');
     setSuccessMsg('');
 
     if (!companyName.trim()) {
       setErrorMsg('Company / Client Name is required.');
-      return;
-    }
-    if (!clientCode.trim()) {
-      setErrorMsg('Client Code is required.');
       return;
     }
     if (!contactPerson.trim()) {
@@ -100,10 +120,31 @@ export const CreateQuotationModal: React.FC<CreateQuotationModalProps> = ({ visi
     }
 
     try {
+      let finalClientId = selectedClientId;
+      let finalClientCode = clientCode.trim() || nextTempCode;
+
+      // AGAR DROP-DOWN ME CLIENT SELECT NAHI KIYA GAYA HAI:
+      if (!finalClientId) {
+        const newTemp = await createClient({
+          companyName: companyName.trim(),
+          clientCode: finalClientCode,
+          contactName: contactPerson.trim(),
+          contactNo: mobileNumber.trim(),
+          email: email.trim(),
+          isTemporary: true,
+        });
+
+        // Ensure newly generated id & code are assigned immediately
+        finalClientId = newTemp?.id;
+        if (newTemp?.clientCode) {
+          finalClientCode = newTemp.clientCode;
+        }
+      }
+
       const created = await createQuotation({
         companyName: companyName.trim(),
-        clientCode: clientCode.trim(),
-        clientId: selectedClientId || undefined,
+        clientCode: finalClientCode,
+        clientId: finalClientId, // Ab yeh guaranteed valid id rahegi
         contactPerson: contactPerson.trim(),
         mobileNumber: mobileNumber.trim(),
         email: email.trim(),
@@ -116,10 +157,10 @@ export const CreateQuotationModal: React.FC<CreateQuotationModalProps> = ({ visi
         remarks: remarks.trim() || undefined,
       });
 
-      setSuccessMsg(`Quotation ${created.quotationNumber} created successfully!`);
+      setSuccessMsg(`Quotation ${created.quotationNumber} successfully created!`);
       setTimeout(() => {
         handleReset();
-      }, 1200);
+      }, 1400);
     } catch (err: any) {
       setErrorMsg(err.message || 'Failed to create quotation.');
     }
@@ -127,6 +168,7 @@ export const CreateQuotationModal: React.FC<CreateQuotationModalProps> = ({ visi
 
   const handleReset = () => {
     setSelectedClientId('');
+    setIsTemporaryClient(false);
     setClientCode('');
     setCompanyName('');
     setContactPerson('');
@@ -175,23 +217,76 @@ export const CreateQuotationModal: React.FC<CreateQuotationModalProps> = ({ visi
                 </View>
               ) : null}
 
-              {/* Registered Client Searchable Dropdown */}
+              {/* Client Searchable Dropdown */}
               <SearchableDropdown
-                label="Select Registered Client (Optional Pre-fill)"
-                placeholder="Search or select a registered client..."
-                options={clients.map((c) => ({
-                  id: c.id,
-                  label: c.companyName,
-                  code: c.clientCode,
-                  sublabel: c.contactName ? `Contact: ${c.contactName}` : undefined,
-                }))}
+                label="Select Client (Directory or Temporary)"
+                placeholder="Search registered client or select prospect..."
+                options={[
+                  ...clients.map((c) => ({
+                    id: c.id,
+                    label: c.companyName,
+                    code: c.clientCode,
+                    sublabel: c.contactName ? `🏢 Permanent Directory • Contact: ${c.contactName}` : '🏢 Permanent Directory',
+                  })),
+                  ...(temporaryClients || []).map((c) => ({
+                    id: c.id,
+                    label: `${c.companyName} [Temporary]`,
+                    code: c.clientCode,
+                    sublabel: c.contactName ? `⏳ Temporary DB • Contact: ${c.contactName}` : '⏳ Temporary DB',
+                  })),
+                ]}
                 selectedValue={selectedClientId}
                 onSelect={handleSelectClient}
                 allowManual={true}
-                manualLabel="+ Manual / New Client"
+                manualLabel="+ Register Temporary Client"
                 manualId=""
-                onManualPress={() => setCreateClientVisible(true)}
+                onManualPress={() => {
+                  setSelectedClientId('');
+                  setIsTemporaryClient(true);
+                  setClientCode(nextTempCode);
+                  setCompanyName('');
+                  setContactPerson('');
+                  setMobileNumber('');
+                  setEmail('');
+                }}
               />
+
+              {/* Temporary Client Registration Option Box */}
+              {!selectedClientId ? (
+                <TouchableOpacity
+                  // style={[styles.tempToggleBox, isTemporaryClient && styles.tempToggleBoxActive]}
+                  onPress={() => {
+                    const nextVal = !isTemporaryClient;
+                    setIsTemporaryClient(nextVal);
+                    if (nextVal && (!clientCode || clientCode.startsWith('CL-'))) {
+                      setClientCode(nextTempCode);
+                    }
+                  }}
+                  activeOpacity={0.8}
+                >
+                  {/* <View style={[styles.tempCheckbox, isTemporaryClient && styles.tempCheckboxChecked]}>
+                    <Text style={styles.tempCheckboxText}>{isTemporaryClient ? '✓' : ''}</Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.tempToggleTitle}>Register client in temporary database (Prospect / Lead)</Text>
+                    <Text style={styles.tempToggleSub}>
+                      {isTemporaryClient
+                        ? '⚡ Client will be saved in the temporary database. They will ONLY move to the permanent Client Directory once this quotation is approved and converted to an order.'
+                        : 'Store client details as a temporary lead without adding them to the permanent Client Directory.'}
+                    </Text>
+                  </View> */}
+                </TouchableOpacity>
+              ) : isTemporaryClient ? (
+                <View style={[styles.tempToggleBox, { backgroundColor: 'rgba(245, 158, 11, 0.12)' }]}>
+                  <Text style={{ fontSize: 16 }}>⏳</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.tempToggleTitle}>Linked to Temporary Prospect ({clientCode})</Text>
+                    <Text style={styles.tempToggleSub}>
+                      This client is currently in the temporary database and will be automatically promoted to permanent when converted to an order.
+                    </Text>
+                  </View>
+                </View>
+              ) : null}
 
               {/* Company Name & Client Code */}
               <View style={styles.rowTwo}>
@@ -524,5 +619,49 @@ const styles = StyleSheet.create({
     color: Colors.successBright,
     fontSize: 12,
     fontWeight: '700',
+  },
+  tempToggleBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(245, 158, 11, 0.08)',
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    borderColor: 'rgba(245, 158, 11, 0.35)',
+    padding: Spacing.sm,
+    marginVertical: Spacing.xs,
+    gap: Spacing.sm,
+  },
+  tempToggleBoxActive: {
+    backgroundColor: 'rgba(245, 158, 11, 0.16)',
+    borderColor: '#f59e0b',
+  },
+  tempCheckbox: {
+    width: 22,
+    height: 22,
+    borderRadius: 5,
+    borderWidth: 2,
+    borderColor: '#f59e0b',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Colors.inputBg,
+  },
+  tempCheckboxChecked: {
+    backgroundColor: '#f59e0b',
+  },
+  tempCheckboxText: {
+    color: '#000',
+    fontSize: 13,
+    fontWeight: '900',
+  },
+  tempToggleTitle: {
+    color: '#fbbf24',
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  tempToggleSub: {
+    color: Colors.textMuted,
+    fontSize: 11,
+    marginTop: 2,
+    lineHeight: 15,
   },
 });

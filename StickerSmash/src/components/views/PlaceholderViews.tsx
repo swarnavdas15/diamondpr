@@ -642,15 +642,65 @@ export { QuotationsView } from './QuotationsView';
 // 7. Settings View
 export const SettingsView: React.FC = () => {
   const { currentUser, users, toggleUserMasking } = useAuth();
+  const { temporaryClients, deleteTemporaryClientPermanent, bulkDeleteTemporaryClientsPermanent, refreshData } = useERP();
+  const [activeTab, setActiveTab] = useState<'security' | 'temp-clients'>('security');
+  const [selectedTempClients, setSelectedTempClients] = useState<string[]>([]);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [error, setError] = useState('');
 
   if (currentUser?.role !== 'SUPER_ADMIN') {
     return (
       <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
-        <Text style={{ fontSize: 18, color: Colors.industrialOrange, fontWeight: 'bold' }}>o" Access Denied</Text>
+        <Text style={{ fontSize: 18, color: Colors.industrialOrange, fontWeight: 'bold' }}>🔒 Access Denied</Text>
         <Text style={{ color: Colors.textMuted, marginTop: 10 }}>Only Super Admin can access the settings panel.</Text>
       </View>
     );
   }
+
+  const handleSelectAll = () => {
+    if (selectedTempClients.length === temporaryClients.length) {
+      setSelectedTempClients([]);
+    } else {
+      setSelectedTempClients(temporaryClients.map(c => c.id));
+    }
+  };
+
+  const handleSelectClient = (id: string) => {
+    setSelectedTempClients(prev => 
+      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    );
+  };
+
+  const handleSingleDelete = async (id: string) => {
+    if (deleteConfirmId === id) {
+      try {
+        setError('');
+        await deleteTemporaryClientPermanent(id);
+        setDeleteConfirmId(null);
+      } catch (e: any) {
+        setError(e.message);
+      }
+    } else {
+      setDeleteConfirmId(id);
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedTempClients.length === 0) return;
+    try {
+      setError('');
+      await bulkDeleteTemporaryClientsPermanent(selectedTempClients);
+      setSelectedTempClients([]);
+    } catch (e: any) {
+      setError(e.message);
+    }
+  };
+
+  const getQuotationCount = (clientId: string) => {
+    // This would need quotations from context, but we can compute or show a placeholder
+    // For now, let's just return a mock or compute from API later
+    return '-';
+  };
 
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
@@ -661,61 +711,184 @@ export const SettingsView: React.FC = () => {
         </View>
       </View>
 
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>User Client Data Masking</Text>
-        <Text style={styles.settingSub} style={{ marginBottom: 15, color: Colors.textMuted, fontSize: 11 }}>
-          Toggle masking for individual users. If masked, they will only see the "Client Code". Names and contacts will be hidden.
-        </Text>
-        
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          <View style={{ minWidth: 600 }}>
-            <View style={{ flexDirection: 'row', backgroundColor: Colors.inputBg, padding: 10, borderRadius: 6, marginBottom: 8, borderWidth: 1, borderColor: Colors.borderDark }}>
-              <Text style={[styles.th, { width: 140 }]}>User Name</Text>
-              <Text style={[styles.th, { width: 120 }]}>Role</Text>
-              <Text style={[styles.th, { width: 120 }]}>Status</Text>
-              <Text style={[styles.th, { width: 150, textAlign: 'center' }]}>Mask Client Data</Text>
-            </View>
-
-            {users.map((u) => {
-              const isMasked = u.clientDataVisibility === 'CODE_ONLY';
-              return (
-                <View key={u.id} style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.cardBg, padding: 10, borderRadius: 6, marginBottom: 4, borderWidth: 1, borderColor: Colors.borderDark }}>
-                  <Text style={{ width: 140, color: Colors.textLight, fontWeight: '700', fontSize: 13 }}>{u.name}</Text>
-                  <Text style={{ width: 120, color: Colors.accentTeal, fontSize: 11 }}>{u.role.replace('_', ' ')}</Text>
-                  
-                  <View style={{ width: 120 }}>
-                    <Text style={{ color: u.isActive ? Colors.successBright : Colors.industrialOrange, fontSize: 11, fontWeight: 'bold' }}>
-                      {u.isActive ? 'Active' : 'Inactive'}
-                    </Text>
-                  </View>
-
-                  <View style={{ width: 150, alignItems: 'center' }}>
-                    {u.role === 'SUPER_ADMIN' ? (
-                      <Text style={{ color: Colors.textSubtle, fontSize: 11, fontStyle: 'italic' }}>Protected</Text>
-                    ) : (
-                      <TouchableOpacity
-                        style={{
-                          backgroundColor: isMasked ? 'rgba(249, 115, 22, 0.1)' : 'rgba(16, 185, 129, 0.1)',
-                          borderWidth: 1,
-                          borderColor: isMasked ? '#f97316' : Colors.successBright,
-                          paddingHorizontal: 12,
-                          paddingVertical: 6,
-                          borderRadius: Radius.xs,
-                        }}
-                        onPress={() => toggleUserMasking(u.id, isMasked ? 'FULL' : 'CODE_ONLY')}
-                      >
-                        <Text style={{ color: isMasked ? '#f97316' : Colors.successBright, fontSize: 11, fontWeight: '800' }}>
-                          {isMasked ? 'MASKED' : 'UNMASKED'}
-                        </Text>
-                      </TouchableOpacity>
-                    )}
-                  </View>
-                </View>
-              );
-            })}
-          </View>
-        </ScrollView>
+      {/* Tab Navigation */}
+      <View style={styles.tabBar}>
+        <TouchableOpacity 
+          style={[styles.tabButton, activeTab === 'security' && styles.tabButtonActive]} 
+          onPress={() => setActiveTab('security')}
+        >
+          <Text style={[styles.tabButtonText, activeTab === 'security' && styles.tabButtonTextActive]}>
+            🔐 Security & Masking
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity 
+          style={[styles.tabButton, activeTab === 'temp-clients' && styles.tabButtonActive]} 
+          onPress={() => setActiveTab('temp-clients')}
+        >
+          <Text style={[styles.tabButtonText, activeTab === 'temp-clients' && styles.tabButtonTextActive]}>
+            ⏳ Temporary Clients Management
+          </Text>
+        </TouchableOpacity>
       </View>
+
+      {activeTab === 'security' && (
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>User Client Data Masking</Text>
+          <Text style={[styles.settingSub, { marginBottom: 15, color: Colors.textMuted, fontSize: 11 }]}>
+            Toggle masking for individual users. If masked, they will only see the "Client Code". Names and contacts will be hidden.
+          </Text>
+          
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            <View style={{ minWidth: 600 }}>
+              <View style={{ flexDirection: 'row', backgroundColor: Colors.inputBg, padding: 10, borderRadius: 6, marginBottom: 8, borderWidth: 1, borderColor: Colors.borderDark }}>
+                <Text style={[styles.th, { width: 140 }]}>User Name</Text>
+                <Text style={[styles.th, { width: 120 }]}>Role</Text>
+                <Text style={[styles.th, { width: 120 }]}>Status</Text>
+                <Text style={[styles.th, { width: 150, textAlign: 'center' }]}>Mask Client Data</Text>
+              </View>
+
+              {users.map((u) => {
+                const isMasked = u.clientDataVisibility === 'CODE_ONLY';
+                return (
+                  <View key={u.id} style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.cardBg, padding: 10, borderRadius: 6, marginBottom: 4, borderWidth: 1, borderColor: Colors.borderDark }}>
+                    <Text style={{ width: 140, color: Colors.textLight, fontWeight: '700', fontSize: 13 }}>{u.name}</Text>
+                    <Text style={{ width: 120, color: Colors.accentTeal, fontSize: 11 }}>{u.role.replace('_', ' ')}</Text>
+                    
+                    <View style={{ width: 120 }}>
+                      <Text style={{ color: u.isActive ? Colors.successBright : Colors.industrialOrange, fontSize: 11, fontWeight: 'bold' }}>
+                        {u.isActive ? 'Active' : 'Inactive'}
+                      </Text>
+                    </View>
+
+                    <View style={{ width: 150, alignItems: 'center' }}>
+                      {u.role === 'SUPER_ADMIN' ? (
+                        <Text style={{ color: Colors.textSubtle, fontSize: 11, fontStyle: 'italic' }}>Protected</Text>
+                      ) : (
+                        <TouchableOpacity
+                          style={{
+                            backgroundColor: isMasked ? 'rgba(249, 115, 22, 0.1)' : 'rgba(16, 185, 129, 0.1)',
+                            borderWidth: 1,
+                            borderColor: isMasked ? '#f97316' : Colors.successBright,
+                            paddingHorizontal: 12,
+                            paddingVertical: 6,
+                            borderRadius: Radius.xs,
+                          }}
+                          onPress={() => toggleUserMasking(u.id, isMasked ? 'FULL' : 'CODE_ONLY')}
+                        >
+                          <Text style={{ color: isMasked ? '#f97316' : Colors.successBright, fontSize: 11, fontWeight: '800' }}>
+                            {isMasked ? 'MASKED' : 'UNMASKED'}
+                          </Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+          </ScrollView>
+        </View>
+      )}
+
+      {activeTab === 'temp-clients' && (
+        <View style={styles.card}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+            <Text style={styles.cardTitle}>Temporary Clients / Leads Management</Text>
+            {selectedTempClients.length > 0 && (
+              <TouchableOpacity 
+                style={[styles.btnRed, { marginLeft: 10 }]} 
+                onPress={handleBulkDelete}
+                disabled={selectedTempClients.length === 0}
+              >
+                <Text style={styles.btnText}>🗑 Delete Selected ({selectedTempClients.length})</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {error ? (
+            <View style={styles.errorBox}>
+              <Text style={styles.errorText}>⚠️ {error}</Text>
+            </View>
+          ) : null}
+
+          <Text style={[styles.settingSub, { marginBottom: 10, color: Colors.textMuted, fontSize: 11 }]}>
+            Manage temporary prospect leads. These are clients created during quotation creation without permanent directory entry.
+            Hard delete permanently removes them from the database.
+          </Text>
+
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            <View style={{ minWidth: 1000 }}>
+              <View style={styles.thRow}>
+                <Text style={[styles.th, { width: 50, textAlign: 'center' }]}>☑</Text>
+                <Text style={[styles.th, { width: 110 }]}>Code</Text>
+                <Text style={[styles.th, { width: 220 }]}>Company Name</Text>
+                <Text style={[styles.th, { width: 170 }]}>Contact Person</Text>
+                <Text style={[styles.th, { width: 130 }]}>Phone</Text>
+                <Text style={[styles.th, { width: 180 }]}>Email</Text>
+                <Text style={[styles.th, { width: 120 }]}>Created Date</Text>
+                <Text style={[styles.th, { width: 80, textAlign: 'center' }]}>Quotations</Text>
+                <Text style={[styles.th, { width: 100, textAlign: 'center' }]}>Actions</Text>
+              </View>
+
+              {temporaryClients.length === 0 ? (
+                <View style={styles.emptyRow}>
+                  <Text style={styles.emptyText}>No temporary clients found. Create a quotation with a new prospect to add one.</Text>
+                </View>
+              ) : (
+                temporaryClients.map((c) => {
+                  const isSelected = selectedTempClients.includes(c.id);
+                  const isConfirming = deleteConfirmId === c.id;
+                  return (
+                    <View key={c.id} style={[{ ...styles.trRow, backgroundColor: isSelected ? 'rgba(245, 158, 11, 0.08)' : Colors.cardBg }]}>
+                      <View style={{ width: 50, alignItems: 'center' }}>
+                        <TouchableOpacity
+                          onPress={() => handleSelectClient(c.id)}
+                          style={{ width: 24, height: 24, borderRadius: 4, borderWidth: 2, borderColor: isSelected ? Colors.accentTeal : Colors.borderDark, backgroundColor: isSelected ? Colors.accentTeal : 'transparent', justifyContent: 'center', alignItems: 'center' }}
+                        >
+                          {isSelected && <Text style={{ color: Colors.white, fontSize: 14, fontWeight: 'bold' }}>✓</Text>}
+                        </TouchableOpacity>
+                      </View>
+                      <Text style={[styles.tdHighlight, { width: 110 }]}>{c.clientCode}</Text>
+                      <Text style={[styles.tdBold, { width: 220 }]}>{c.companyName}</Text>
+                      <Text style={[styles.td, { width: 170 }]}>{c.contactName || 'N/A'}</Text>
+                      <Text style={[styles.td, { width: 130 }]}>{c.contactNo}</Text>
+                      <Text style={[styles.td, { width: 180 }]}>{c.email || 'N/A'}</Text>
+                      <Text style={[styles.td, { width: 120 }]}>{c.createdAt ? new Date(c.createdAt).toLocaleDateString() : 'N/A'}</Text>
+                      <View style={{ width: 80, alignItems: 'center' }}>
+                        <Text style={styles.td}>{getQuotationCount(c.id)}</Text>
+                      </View>
+                      <View style={{ width: 100, flexDirection: 'row', gap: 6, justifyContent: 'center' }}>
+                        {isConfirming ? (
+                          <>
+                            <TouchableOpacity 
+                              style={{ backgroundColor: '#ef4444', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4 }}
+                              onPress={() => handleSingleDelete(c.id)}
+                            >
+                              <Text style={{ color: '#fff', fontSize: 10, fontWeight: '800' }}>✓ Confirm</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity 
+                              style={{ backgroundColor: '#6b7280', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4 }}
+                              onPress={() => setDeleteConfirmId(null)}
+                            >
+                              <Text style={{ color: '#fff', fontSize: 10, fontWeight: '800' }}>✕</Text>
+                            </TouchableOpacity>
+                          </>
+                        ) : (
+                          <TouchableOpacity 
+                            style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4, borderWidth: 1, borderColor: 'rgba(239, 68, 68, 0.3)' }}
+                            onPress={() => handleSingleDelete(c.id)}
+                          >
+                            <Text style={{ color: '#ef4444', fontSize: 10, fontWeight: '800' }}>🗑 Delete</Text>
+                          </TouchableOpacity>
+                        )}
+                      </View>
+                    </View>
+                  );
+                })
+              )}
+            </View>
+          </ScrollView>
+        </View>
+      )}
     </ScrollView>
   );
 };
@@ -1359,5 +1532,44 @@ const styles = StyleSheet.create({
     fontSize: 12,
     textAlign: 'center',
     marginVertical: 14,
+  },
+  tabBar: {
+    flexDirection: 'row',
+    backgroundColor: Colors.inputBg,
+    borderRadius: Radius.md,
+    padding: 4,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: Colors.borderDark,
+  },
+  tabButton: {
+    flex: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: Radius.sm,
+    alignItems: 'center',
+  },
+  tabButtonActive: {
+    backgroundColor: Colors.accentTeal,
+  },
+  tabButtonText: {
+    color: Colors.textMuted,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  tabButtonTextActive: {
+    color: Colors.white,
+  },
+  btnRed: {
+    backgroundColor: '#ef4444',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: Radius.md,
+    ...Shadows.glowOrange,
+  },
+  emptyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 20,
   },
 });
