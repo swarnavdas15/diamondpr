@@ -222,12 +222,14 @@ export const CreateQuotationModal: React.FC<CreateQuotationModalProps> = ({ visi
                 label="Select Client (Directory or Temporary)"
                 placeholder="Search registered client or select prospect..."
                 options={[
-                  ...clients.map((c) => ({
-                    id: c.id,
-                    label: c.companyName,
-                    code: c.clientCode,
-                    sublabel: c.contactName ? `🏢 Permanent Directory • Contact: ${c.contactName}` : '🏢 Permanent Directory',
-                  })),
+                  ...clients
+                    .filter((c) => !(c.clientCode || '').startsWith('TMP-'))
+                    .map((c) => ({
+                      id: c.id,
+                      label: c.companyName,
+                      code: c.clientCode,
+                      sublabel: c.contactName ? `🏢 Permanent Directory • Contact: ${c.contactName}` : '🏢 Permanent Directory',
+                    })),
                   ...(temporaryClients || []).map((c) => ({
                     id: c.id,
                     label: `${c.companyName} [Temporary]`,

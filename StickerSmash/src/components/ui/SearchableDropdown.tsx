@@ -210,14 +210,14 @@ export const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
                   <Text style={styles.emptyText}>No matching options found.</Text>
                 </View>
               ) : (
-                filteredOptions.map((item) => {
+                filteredOptions.map((item, idx) => {
                   const isSelected = isMulti
                     ? selectedValues.includes(item.id)
                     : selectedValue === item.id;
 
                   return (
                     <TouchableOpacity
-                      key={item.id}
+                      key={`${item.id}-${idx}`}
                       style={[styles.optionItem, isSelected && styles.optionItemActive]}
                       onPress={() =>
                         isMulti ? handleToggleMulti(item.id) : handleSelectSingle(item.id)

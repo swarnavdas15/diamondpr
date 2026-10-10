@@ -483,12 +483,14 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ visible, onC
   placeholder="Search or select a registered client..."
   options={[
     // 1. Permanent Clients
-    ...clients.map((c) => ({
-      id: c.id,
-      label: c.companyName,
-      code: c.clientCode,
-      sublabel: c.contactName ? `🏢 Permanent • ${c.contactName}` : '🏢 Permanent',
-    })),
+    ...clients
+      .filter((c) => !(c.clientCode || '').startsWith('TMP-'))
+      .map((c) => ({
+        id: c.id,
+        label: c.companyName,
+        code: c.clientCode,
+        sublabel: c.contactName ? `🏢 Permanent • ${c.contactName}` : '🏢 Permanent',
+      })),
     // 2. Temporary Prospects / Leads
     ...(temporaryClients || []).map((c) => ({
       id: c.id,
