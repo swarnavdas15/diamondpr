@@ -24,17 +24,22 @@ export const createQuotation = async (data: any) => {
       throw new Error('Client selection or Company Name is required');
     }
 
-    // Auto generate TMP code if not provided
-    if (!targetClientCode) {
-      const allClients = await db.orm.public.Client.all();
-      let maxNum = 1000;
-      for (const c of allClients) {
-        const code = c.clientcode || '';
-        if (code.startsWith('TMP-')) {
-          const num = parseInt(code.slice(4), 10);
-          if (!isNaN(num) && num > maxNum) maxNum = num;
-        }
+    // Saare existing clients fetch karo taaki check kar sakein duplicate code toh nahi hai
+    const allClients = await db.orm.public.Client.all();
+    const existingCodes = new Set(allClients.map((c: any) => c.clientcode || c.clientCode));
+
+    // Calculate Highest TMP-XXXX number
+    let maxNum = 1000;
+    for (const c of allClients) {
+      const code = (c.clientcode || c.clientcode || '') as string;
+      if (code.startsWith('TMP-')) {
+        const num = parseInt(code.replace('TMP-', ''), 10);
+        if (!isNaN(num) && num > maxNum) maxNum = num;
       }
+    }
+
+    // Agar targetClientCode nahi hai YA already database mein exist karta hai, toh fresh code do
+    if (!targetClientCode || existingCodes.has(targetClientCode)) {
       targetClientCode = `TMP-${maxNum + 1}`;
     }
 
