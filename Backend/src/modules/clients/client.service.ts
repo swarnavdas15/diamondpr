@@ -1,6 +1,27 @@
 import { db } from '../../prisma/db';
 import { dbId } from '../../prisma/ids';
 
+async function generateNextClientCode(isTemporary: boolean): Promise<string> {
+  const prefix = isTemporary ? 'TMP' : 'CL';
+  const pattern = `${prefix}-`;
+  
+  const existingClients = await db.orm.public.Client.where({ isDeleted: 0 }).all();
+  let maxNum = 1000;
+  
+  for (const c of existingClients) {
+    const code = c.clientcode || '';
+    if (code.startsWith(pattern)) {
+      const numStr = code.slice(pattern.length);
+      const num = parseInt(numStr, 10);
+      if (!isNaN(num) && num > maxNum) {
+        maxNum = num;
+      }
+    }
+  }
+  
+  return `${prefix}-${maxNum + 1}`;
+}
+
 export const createClient = async (data: {
   companyName: string;
   contactName?: string;
@@ -11,10 +32,14 @@ export const createClient = async (data: {
   panNumber?: string;
   websiteUrl?: string;
   createdById: string;
+  isTemporary?: boolean;
+  clientCode?: string;
 }) => {
-  // Auto-generate Client Code
-  const count = await db.orm.public.Client.count();
-  const clientcode = `CL-${1001 + Number(count)}`;
+  const isTemp = !!data.isTemporary;
+  
+  let clientcode = data.clientCode && data.clientCode.trim() ? data.clientCode.trim() : await generateNextClientCode(isTemp);
+  
+  const clientStatus = isTemp ? 'PROSPECT' : 'ACTIVE';
 
   const client = await db.orm.public.Client.create({
     clientcode,
@@ -26,7 +51,9 @@ export const createClient = async (data: {
     gstNumber: data.gstNumber ?? null,
     panNumber: data.panNumber ?? null,
     websiteUrl: data.websiteUrl ?? null,
-    createdById: dbId(data.createdById),
+    createdById: data.createdById ? dbId(data.createdById) : undefined,
+    isTemporary: isTemp,
+    status: clientStatus,
   });
 
   // Automatically create a CompanyContact for the primary contact
@@ -41,9 +68,59 @@ export const createClient = async (data: {
   return client;
 };
 
-export const listClients = async () => {
-  const clients = await db.orm.public.Client.where({ isDeleted: 0 }).orderBy((c) => c.createdAt.desc()).all();
+export const listClients = async (filter?: { includeTemporary?: boolean; temporaryOnly?: boolean }) => {
+  let query = db.orm.public.Client.where({ isDeleted: 0 });
+  if (filter?.temporaryOnly) {
+    query = query.where({ isTemporary: true });
+  } else if (!filter?.includeTemporary) {
+    query = query.where({ isTemporary: false });
+  }
+  const clients = await query.orderBy((c) => c.createdAt.desc()).all();
   return clients;
+};
+
+export const promoteTemporaryClient = async (id: string) => {
+  const client = await db.orm.public.Client.where({ id: dbId(id), isDeleted: 0 }).first();
+  if (!client) throw new Error('Client not found');
+
+  if (!client.isTemporary) {
+    return client;
+  }
+
+  let finalClientCode = client.clientcode;
+  if (finalClientCode.startsWith('TMP-')) {
+    finalClientCode = await generateNextClientCode(false);
+  }
+
+  await db.orm.public.Client
+    .where({ id: dbId(id) })
+    .update({
+      isTemporary: false,
+      clientcode: finalClientCode,
+      status: 'ACTIVE',
+    });
+
+  // Update clientCode on any linked quotations
+  try {
+    const quotations = await db.orm.public.Quotation.where({ clientId: dbId(id) }).all();
+    for (const q of quotations) {
+      await db.orm.public.Quotation.where({ id: q.id }).update({ clientCode: finalClientCode });
+    }
+  } catch (err) {
+    console.warn('Could not update quotations clientCode on promote:', err);
+  }
+
+  // Update clientCode on any linked orders
+  try {
+    const orders = await db.orm.public.Order.where({ clientId: dbId(id) }).all();
+    for (const o of orders) {
+      await db.orm.public.Order.where({ id: o.id }).update({ clientCode: finalClientCode });
+    }
+  } catch (err) {
+    console.warn('Could not update orders clientCode on promote:', err);
+  }
+
+  return await getClientById(id);
 };
 
 export const getClientById = async (id: string) => {
@@ -74,6 +151,10 @@ export const updateClient = async (id: string, data: any) => {
   if (data.address !== undefined) updateData.address = data.address;
   if (data.gstNumber !== undefined) updateData.gstNumber = data.gstNumber;
 
+  if (data.panNumber !== undefined) updateData.panNumber = data.panNumber;
+  if (data.websiteUrl !== undefined) updateData.websiteUrl = data.websiteUrl;
+  if (data.status !== undefined) updateData.status = data.status;
+
   if (Object.keys(updateData).length > 0) {
     await db.orm.public.Client.where({ id: dbId(id) }).update(updateData);
   }
@@ -83,6 +164,60 @@ export const updateClient = async (id: string, data: any) => {
 export const deleteClient = async (id: string) => {
   await db.orm.public.Client.where({ id: dbId(id) }).update({ isDeleted: 1 });
   return true;
+};
+
+export const deleteTemporaryClientPermanent = async (id: string) => {
+  const client = await db.orm.public.Client.where({ id: dbId(id), isDeleted: 0 }).first();
+  if (!client) {
+    throw new Error('Client not found');
+  }
+
+  if (!client.isTemporary) {
+    throw new Error('Only temporary clients can be permanently deleted via this endpoint');
+  }
+
+  const clientId = dbId(id);
+
+  // Delete linked quotations (orphan draft quotations)
+  await db.orm.public.Quotation.where({ clientId }).delete();
+
+  // Hard delete the client
+  await db.orm.public.Client.where({ id: clientId }).delete();
+
+  return { success: true, message: 'Temporary client permanently deleted' };
+};
+
+export const bulkDeleteTemporaryClientsPermanent = async (ids: string[]) => {
+  const results = { deleted: 0, failed: [] as { id: string; error: string }[] };
+
+  for (const id of ids) {
+    try {
+      const client = await db.orm.public.Client.where({ id: dbId(id), isDeleted: 0 }).first();
+      if (!client) {
+        results.failed.push({ id, error: 'Client not found' });
+        continue;
+      }
+
+      if (!client.isTemporary) {
+        results.failed.push({ id, error: 'Client is not temporary' });
+        continue;
+      }
+
+      const clientId = dbId(id);
+
+      // Delete linked quotations
+      await db.orm.public.Quotation.where({ clientId }).delete();
+
+      // Hard delete the client
+      await db.orm.public.Client.where({ id: clientId }).delete();
+
+      results.deleted++;
+    } catch (err: any) {
+      results.failed.push({ id, error: err.message || 'Unknown error' });
+    }
+  }
+
+  return results;
 };
 
 export const createCompanyContact = async (data: any) => {

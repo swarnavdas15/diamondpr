@@ -34,6 +34,8 @@ model Client {
   description String?
   logo        String?
   remarks     String?
+  isTemporary Boolean  @default(false)
+  status      String   @default("ACTIVE")
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 

@@ -117,6 +117,8 @@ export const contract = defineContract(
         remarks: field.text().optional(),
         profileImage: field.text().optional(),
         createdById: field.uuidString().optional(),
+        isTemporary: field.boolean().default(false),
+        status: field.text().default('ACTIVE'),
         isDeleted: field.int().default(0),
         createdAt: field.temporal.createdAtString(),
       },

@@ -2,6 +2,27 @@ import { db } from '../../prisma/db';
 import { dbId } from '../../prisma/ids';
 import { OrderStage } from '../../types/enums';
 
+async function generateNextClientCode(tx: any, isTemporary: boolean): Promise<string> {
+  const prefix = isTemporary ? 'TMP' : 'CL';
+  const pattern = `${prefix}-`;
+  
+  const existingClients = await tx.orm.public.Client.where({ isDeleted: 0 }).all();
+  let maxNum = 1000;
+  
+  for (const c of existingClients) {
+    const code = c.clientcode || c.clientCode || '';
+    if (code.startsWith(pattern)) {
+      const numStr = code.slice(pattern.length);
+      const num = parseInt(numStr, 10);
+      if (!isNaN(num) && num > maxNum) {
+        maxNum = num;
+      }
+    }
+  }
+  
+  return `${prefix}-${maxNum + 1}`;
+}
+
 const serializeStageSequence = (stages: OrderStage[]) => stages.join(',');
 const toOptionalBigInt = (value?: number | string | null) => {
   if (value === null || value === undefined || value === '') return null;
@@ -23,12 +44,17 @@ export class OrderService {
       address?: string;
       industry?: string;
       remarks?: string;
-      clientCode: string;
+      clientCode?: string;
+      isTemporary?: boolean;
     },
     userId: string
   ) {
+    const isTemp = !!data.isTemporary;
+    
+    let clientcode = data.clientCode && data.clientCode.trim() ? data.clientCode.trim() : await generateNextClientCode(db, isTemp);
+
     const client = await db.orm.public.Client.create({
-      clientcode: data.clientCode,
+      clientcode,
       companyName: data.companyName,
       contactName: data.contactName ?? null,
       contactNo: data.contactNo,
@@ -39,7 +65,9 @@ export class OrderService {
       address: data.address ?? null,
       industry: data.industry ?? null,
       remarks: data.remarks ?? null,
-      createdById: userId ? dbId(userId) : undefined
+      createdById: userId ? dbId(userId) : undefined,
+      isTemporary: isTemp,
+      status: isTemp ? 'PROSPECT' : 'ACTIVE',
     });
 
     await db.orm.public.CompanyContact.create({
@@ -53,7 +81,7 @@ export class OrderService {
     return client;
   }
 
-  static async createOrder(
+static async createOrder(
     data: {
       poNumber: string;
       clientId: string;
@@ -79,8 +107,42 @@ export class OrderService {
     const initialStage = pipeline[0];
 
     return await db.transaction(async (tx) => {
-      const client = await tx.orm.public.Client.where({ id: dbId(data.clientId) }).first();
+      let client = await tx.orm.public.Client.where({ id: dbId(data.clientId) }).first();
       if (!client) throw new Error('Client not found');
+
+      let clientCode = client.clientcode;
+      if (client.isTemporary) {
+        if (clientCode.startsWith('TMP-')) {
+          clientCode = await generateNextClientCode(tx, false);
+        }
+
+        // Promote client to permanent
+        await tx.orm.public.Client.where({ id: client.id }).update({
+          isTemporary: false,
+          clientcode: clientCode,
+          status: 'ACTIVE',
+        });
+
+        // 1. Sync all linked Quotations
+        try {
+          const quotes = await tx.orm.public.Quotation.where({ clientId: client.id }).all();
+          for (const q of quotes) {
+            await tx.orm.public.Quotation.where({ id: q.id }).update({ clientCode });
+          }
+        } catch (e) {
+          console.warn('Sync quote clientCode warning:', e);
+        }
+
+        // 2. Sync any previously linked Orders (if any exist)
+        try {
+          const existingClientOrders = await tx.orm.public.Order.where({ clientId: client.id }).all();
+          for (const o of existingClientOrders) {
+            await tx.orm.public.Order.where({ id: o.id }).update({ clientCode });
+          }
+        } catch (e) {
+          console.warn('Sync existing order clientCode warning:', e);
+        }
+      }
 
       const poNumber = String(data.poNumber || '').trim();
       if (!poNumber) throw new Error('PO Number is required');
@@ -92,7 +154,7 @@ export class OrderService {
       
       const order = await tx.orm.public.Order.create({
         orderNumber: `ORD-2026-${1000 + Number(orderCount)}`,
-        clientCode: client.clientcode,
+        clientCode: clientCode, // Uses promoted permanent CL-xxxx code
         poNumber,
         clientId: dbId(data.clientId),
         requirements: data.requirements || data.technicalRequirements || '',

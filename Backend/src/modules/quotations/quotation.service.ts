@@ -3,7 +3,6 @@ import { dbId } from '../../prisma/ids';
 
 export const listQuotations = async () => {
   const quotations = await db.orm.public.Quotation
-    
     .include('followUps', (f) => f.orderBy((log) => log.createdAt.desc()))
     .orderBy((q) => q.createdAt.desc())
     .all();
@@ -16,17 +15,53 @@ export const createQuotation = async (data: any) => {
   const count = existingQuotations.length;
   const quotationNumber = `QT-2026-${String(1001 + count).padStart(3, '0')}`;
 
+  let targetClientId = data.clientId;
+  let targetClientCode = data.clientCode;
+
+  // AGAR CLIENT ID NAHI MILI TOH BACKEND KHUD TEMPORARY CLIENT BANAYEGA
+  if (!targetClientId) {
+    if (!data.companyName) {
+      throw new Error('Client selection or Company Name is required');
+    }
+
+    // Auto generate TMP code if not provided
+    if (!targetClientCode) {
+      const allClients = await db.orm.public.Client.all();
+      let maxNum = 1000;
+      for (const c of allClients) {
+        const code = c.clientcode || '';
+        if (code.startsWith('TMP-')) {
+          const num = parseInt(code.slice(4), 10);
+          if (!isNaN(num) && num > maxNum) maxNum = num;
+        }
+      }
+      targetClientCode = `TMP-${maxNum + 1}`;
+    }
+
+    // Create Temporary Client in DB
+    const newTempClient = await db.orm.public.Client.create({
+      companyName: data.companyName,
+      clientcode: targetClientCode,
+      contactName: data.contactPerson || null,
+      contactNo: data.mobileNumber || null,
+      email: data.email || null,
+      isTemporary: true,
+    });
+
+    targetClientId = newTempClient.id;
+  }
+
   const quotation = await db.orm.public.Quotation.create({
     quotationNumber: data.quotationNumber || quotationNumber,
     companyName: data.companyName,
-    clientCode: data.clientCode,
-    clientId: data.clientId ? dbId(data.clientId) : null,
+    clientCode: targetClientCode || 'TMP-1001',
+    clientId: dbId(targetClientId),
     contactPerson: data.contactPerson,
     mobileNumber: data.mobileNumber,
     email: data.email,
     inquiryRef: data.inquiryRef ?? null,
-    quotationAmount: BigInt(data.quotationAmount || 0),
-    expectedOrderValue: data.expectedOrderValue ? BigInt(data.expectedOrderValue) : null,
+    quotationAmount: Number(data.quotationAmount || 0),
+    expectedOrderValue: data.expectedOrderValue ? Number(data.expectedOrderValue) : null,
     salesExecutive: data.salesExecutive || 'Sales Executive',
     salesExecutiveUserId: data.salesExecutiveUserId ? dbId(data.salesExecutiveUserId) : null,
     followUpDate: data.followUpDate ?? null,
@@ -47,16 +82,16 @@ export const updateQuotation = async (id: string, data: any) => {
   delete updatePayload.id;
 
   if (updatePayload.quotationAmount !== undefined) {
-    updatePayload.quotationAmount = BigInt(updatePayload.quotationAmount);
+    updatePayload.quotationAmount = Number(updatePayload.quotationAmount);
   }
   if (updatePayload.convertedOrderValue !== undefined) {
-    updatePayload.convertedOrderValue = BigInt(updatePayload.convertedOrderValue);
+    updatePayload.convertedOrderValue = Number(updatePayload.convertedOrderValue);
   }
   if (updatePayload.lostValue !== undefined) {
-    updatePayload.lostValue = BigInt(updatePayload.lostValue);
+    updatePayload.lostValue = Number(updatePayload.lostValue);
   }
   if (updatePayload.expectedOrderValue !== undefined) {
-    updatePayload.expectedOrderValue = BigInt(updatePayload.expectedOrderValue);
+    updatePayload.expectedOrderValue = Number(updatePayload.expectedOrderValue);
   }
 
   const updated = await db.orm.public.Quotation

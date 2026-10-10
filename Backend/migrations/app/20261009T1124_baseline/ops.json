@@ -1,0 +1,778 @@
+[
+  {
+    "id": "schema.public",
+    "label": "Create schema \"public\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres"
+    },
+    "precheck": [],
+    "execute": [
+      {
+        "description": "Create schema \"public\"",
+        "sql": "CREATE SCHEMA IF NOT EXISTS \"public\"",
+        "params": []
+      }
+    ],
+    "postcheck": []
+  },
+  {
+    "id": "table.CalendarEvent",
+    "label": "Create table \"CalendarEvent\"",
+    "summary": "Creates table \"CalendarEvent\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "CalendarEvent"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"CalendarEvent\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"CalendarEvent\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"CalendarEvent\"",
+        "sql": "CREATE TABLE \"public\".\"CalendarEvent\" (\n  \"createdAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"createdByName\" text,\n  \"description\" text,\n  \"eventDate\" text NOT NULL,\n  \"id\" character(36) NOT NULL,\n  \"title\" text NOT NULL,\n  \"type\" text DEFAULT 'MEETING' NOT NULL,\n  PRIMARY KEY (\"id\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"CalendarEvent\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"CalendarEvent\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "table.Client",
+    "label": "Create table \"Client\"",
+    "summary": "Creates table \"Client\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "Client"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"Client\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"Client\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"Client\"",
+        "sql": "CREATE TABLE \"public\".\"Client\" (\n  \"address\" text,\n  \"clientcode\" text NOT NULL,\n  \"companyName\" text NOT NULL,\n  \"contactName\" text,\n  \"contactNo\" text NOT NULL,\n  \"createdAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"createdById\" character(36),\n  \"email\" text,\n  \"gstNumber\" text,\n  \"id\" character(36) NOT NULL,\n  \"industry\" text,\n  \"isDeleted\" int4 DEFAULT 0 NOT NULL,\n  \"profileImage\" text,\n  \"remarks\" text,\n  PRIMARY KEY (\"id\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"Client\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"Client\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "table.CompanyContact",
+    "label": "Create table \"CompanyContact\"",
+    "summary": "Creates table \"CompanyContact\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "CompanyContact"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"CompanyContact\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"CompanyContact\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"CompanyContact\"",
+        "sql": "CREATE TABLE \"public\".\"CompanyContact\" (\n  \"companyId\" character(36) NOT NULL,\n  \"createdAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"department\" text,\n  \"designation\" text,\n  \"email\" text,\n  \"fullName\" text NOT NULL,\n  \"id\" character(36) NOT NULL,\n  \"isDeleted\" int4 DEFAULT 0 NOT NULL,\n  \"mobile\" text,\n  \"notes\" text,\n  \"profileImage\" text,\n  \"reportsToId\" character(36),\n  \"whatsapp\" text,\n  PRIMARY KEY (\"id\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"CompanyContact\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"CompanyContact\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "table.Drawing",
+    "label": "Create table \"Drawing\"",
+    "summary": "Creates table \"Drawing\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "Drawing"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"Drawing\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"Drawing\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"Drawing\"",
+        "sql": "CREATE TABLE \"public\".\"Drawing\" (\n  \"createdAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"fileUrl\" text NOT NULL,\n  \"filename\" text NOT NULL,\n  \"id\" character(36) NOT NULL,\n  \"orderId\" character(36) NOT NULL,\n  \"uploadedById\" character(36),\n  PRIMARY KEY (\"id\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"Drawing\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"Drawing\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "table.Note",
+    "label": "Create table \"Note\"",
+    "summary": "Creates table \"Note\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "Note"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"Note\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"Note\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"Note\"",
+        "sql": "CREATE TABLE \"public\".\"Note\" (\n  \"content\" text NOT NULL,\n  \"createdAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"id\" character(36) NOT NULL,\n  \"orderId\" character(36) NOT NULL,\n  \"userId\" character(36),\n  PRIMARY KEY (\"id\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"Note\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"Note\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "table.Order",
+    "label": "Create table \"Order\"",
+    "summary": "Creates table \"Order\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "Order"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"Order\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"Order\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"Order\"",
+        "sql": "CREATE TABLE \"public\".\"Order\" (\n  \"budget\" int8,\n  \"clientCode\" text,\n  \"clientId\" character(36) NOT NULL,\n  \"clientName\" text,\n  \"createdAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"createdById\" character(36),\n  \"currentStage\" text DEFAULT 'QUOTATION' NOT NULL,\n  \"dispatchNotes\" text,\n  \"dispatchQuantity\" int4 DEFAULT 0 NOT NULL,\n  \"dispatchRequired\" bool DEFAULT true NOT NULL,\n  \"dispatchStatus\" text DEFAULT 'PENDING' NOT NULL,\n  \"id\" character(36) NOT NULL,\n  \"isDeleted\" int4 DEFAULT 0 NOT NULL,\n  \"logisticsEntry\" text,\n  \"materialRequirements\" text,\n  \"orderNumber\" text,\n  \"poNumber\" text NOT NULL,\n  \"procurementNotes\" text,\n  \"productionQuantity\" int4 DEFAULT 0 NOT NULL,\n  \"productionRequired\" bool DEFAULT true NOT NULL,\n  \"productionStatus\" text DEFAULT 'PENDING' NOT NULL,\n  \"purchaseQuantity\" int4 DEFAULT 0 NOT NULL,\n  \"purchaseRequired\" bool DEFAULT true NOT NULL,\n  \"purchaseStatus\" text DEFAULT 'PENDING' NOT NULL,\n  \"qcFailedQuantity\" int4 DEFAULT 0 NOT NULL,\n  \"qcPassedQuantity\" int4 DEFAULT 0 NOT NULL,\n  \"qcQuantity\" int4 DEFAULT 0 NOT NULL,\n  \"qcRemarks\" text,\n  \"qcResult\" text,\n  \"qualityStatus\" text DEFAULT 'PENDING' NOT NULL,\n  \"qualityTestingRequired\" bool DEFAULT true NOT NULL,\n  \"requiredQuantity\" int4 DEFAULT 1 NOT NULL,\n  \"requirements\" text,\n  \"reworkQuantity\" int4 DEFAULT 0 NOT NULL,\n  \"shopFloorNotes\" text,\n  \"stageSequence\" text,\n  \"technicalRequirements\" text,\n  \"transportRef\" text,\n  \"unit\" text DEFAULT 'pcs' NOT NULL,\n  \"updatedAt\" timestamptz NOT NULL,\n  \"vendorSelected\" text,\n  PRIMARY KEY (\"id\"),\n  CONSTRAINT \"Order_currentStage_check_55524ddc\" CHECK (\"currentStage\" IN ('QUOTATION', 'PURCHASE', 'CUTTING', 'FORGING', 'MACHINING', 'HEAT_TREATMENT', 'TESTING', 'DISPATCH', 'COMPLETED'))\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"Order\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"Order\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "table.OrderItem",
+    "label": "Create table \"OrderItem\"",
+    "summary": "Creates table \"OrderItem\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "OrderItem"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"OrderItem\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"OrderItem\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"OrderItem\"",
+        "sql": "CREATE TABLE \"public\".\"OrderItem\" (\n  \"id\" character(36) NOT NULL,\n  \"itemName\" text NOT NULL,\n  \"orderId\" character(36) NOT NULL,\n  \"quantity\" int4 NOT NULL,\n  \"size\" text NOT NULL,\n  \"unitPrice\" int8,\n  PRIMARY KEY (\"id\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"OrderItem\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"OrderItem\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "table.Quotation",
+    "label": "Create table \"Quotation\"",
+    "summary": "Creates table \"Quotation\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "Quotation"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"Quotation\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"Quotation\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"Quotation\"",
+        "sql": "CREATE TABLE \"public\".\"Quotation\" (\n  \"clientCode\" text NOT NULL,\n  \"clientId\" character(36),\n  \"companyName\" text NOT NULL,\n  \"competitorName\" text,\n  \"contactPerson\" text NOT NULL,\n  \"convertedOrderId\" text,\n  \"convertedOrderNumber\" text,\n  \"convertedOrderValue\" int8,\n  \"createdAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"email\" text NOT NULL,\n  \"expectedClosureDate\" text,\n  \"expectedOrderValue\" int8,\n  \"followUpDate\" text,\n  \"id\" character(36) NOT NULL,\n  \"inquiryRef\" text,\n  \"isDeleted\" int4 DEFAULT 0 NOT NULL,\n  \"isLocked\" bool DEFAULT false NOT NULL,\n  \"lostDate\" text,\n  \"lostReason\" text,\n  \"lostRemarks\" text,\n  \"lostValue\" int8,\n  \"mobileNumber\" text NOT NULL,\n  \"negotiationDate\" text,\n  \"quotationAmount\" int8 NOT NULL,\n  \"quotationDate\" timestamptz DEFAULT (now()) NOT NULL,\n  \"quotationNumber\" text NOT NULL,\n  \"remarks\" text,\n  \"salesExecutive\" text NOT NULL,\n  \"salesExecutiveUserId\" character(36),\n  \"sentAt\" text,\n  \"sentNotes\" text,\n  \"sentVia\" text,\n  \"status\" text DEFAULT 'SENT' NOT NULL,\n  \"updatedAt\" timestamptz NOT NULL,\n  PRIMARY KEY (\"id\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"Quotation\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"Quotation\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "table.QuotationFollowUp",
+    "label": "Create table \"QuotationFollowUp\"",
+    "summary": "Creates table \"QuotationFollowUp\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "QuotationFollowUp"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"QuotationFollowUp\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"QuotationFollowUp\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"QuotationFollowUp\"",
+        "sql": "CREATE TABLE \"public\".\"QuotationFollowUp\" (\n  \"createdAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"createdByName\" text NOT NULL,\n  \"followUpDate\" text NOT NULL,\n  \"id\" character(36) NOT NULL,\n  \"notes\" text NOT NULL,\n  \"quotationId\" character(36) NOT NULL,\n  \"status\" text DEFAULT 'PENDING' NOT NULL,\n  PRIMARY KEY (\"id\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"QuotationFollowUp\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"QuotationFollowUp\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "table.StageLog",
+    "label": "Create table \"StageLog\"",
+    "summary": "Creates table \"StageLog\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "StageLog"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"StageLog\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"StageLog\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"StageLog\"",
+        "sql": "CREATE TABLE \"public\".\"StageLog\" (\n  \"changedById\" character(36),\n  \"createdAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"id\" character(36) NOT NULL,\n  \"orderId\" character(36) NOT NULL,\n  \"stage\" text NOT NULL,\n  PRIMARY KEY (\"id\"),\n  CONSTRAINT \"StageLog_stage_check_ec6aa522\" CHECK (\"stage\" IN ('QUOTATION', 'PURCHASE', 'CUTTING', 'FORGING', 'MACHINING', 'HEAT_TREATMENT', 'TESTING', 'DISPATCH', 'COMPLETED'))\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"StageLog\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"StageLog\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "table.Task",
+    "label": "Create table \"Task\"",
+    "summary": "Creates table \"Task\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "Task"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"Task\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"Task\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"Task\"",
+        "sql": "CREATE TABLE \"public\".\"Task\" (\n  \"assignedToDepartment\" text,\n  \"assignedToId\" character(36),\n  \"assignedToName\" text,\n  \"assignedToUserId\" character(36),\n  \"createdAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"createdById\" character(36),\n  \"createdByName\" text,\n  \"createdByRole\" text,\n  \"createdByUserId\" character(36),\n  \"description\" text,\n  \"dueDate\" text,\n  \"id\" character(36) NOT NULL,\n  \"isDeleted\" int4 DEFAULT 0 NOT NULL,\n  \"orderId\" character(36),\n  \"orderNumber\" text,\n  \"priority\" text DEFAULT 'MEDIUM' NOT NULL,\n  \"status\" text DEFAULT 'PENDING' NOT NULL,\n  \"title\" text NOT NULL,\n  PRIMARY KEY (\"id\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"Task\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"Task\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "table.User",
+    "label": "Create table \"User\"",
+    "summary": "Creates table \"User\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "User"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"User\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"User\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"User\"",
+        "sql": "CREATE TABLE \"public\".\"User\" (\n  \"clientDataVisibility\" text,\n  \"createdAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"email\" text NOT NULL,\n  \"employeeId\" text,\n  \"fcmToken\" text,\n  \"id\" character(36) NOT NULL,\n  \"isActive\" bool DEFAULT true NOT NULL,\n  \"isDeleted\" int4 DEFAULT 0 NOT NULL,\n  \"mobileNumber\" text,\n  \"name\" text NOT NULL,\n  \"password\" text NOT NULL,\n  \"refreshToken\" text,\n  \"role\" text DEFAULT 'PRODUCTION' NOT NULL,\n  \"updatedAt\" timestamptz NOT NULL,\n  \"username\" text,\n  PRIMARY KEY (\"id\"),\n  CONSTRAINT \"User_role_check_0a4f4b6e\" CHECK (\"role\" IN ('SUPER_ADMIN', 'ADMIN', 'SALES', 'PURCHASE', 'PRODUCTION', 'QUALITY_TESTING', 'DISPATCH'))\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"User\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"User\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "table.Vendor",
+    "label": "Create table \"Vendor\"",
+    "summary": "Creates table \"Vendor\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "Vendor"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"Vendor\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"public\".\"Vendor\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"Vendor\"",
+        "sql": "CREATE TABLE \"public\".\"Vendor\" (\n  \"addressLine1\" text,\n  \"addressLine2\" text,\n  \"alternateMobile\" text,\n  \"city\" text,\n  \"companyName\" text,\n  \"contactPerson\" text NOT NULL,\n  \"country\" text,\n  \"createdAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"email\" text NOT NULL,\n  \"gstNumber\" text,\n  \"id\" character(36) NOT NULL,\n  \"isDeleted\" int4 DEFAULT 0 NOT NULL,\n  \"leadTime\" text,\n  \"materialSupplied\" text NOT NULL,\n  \"mobileNumber\" text NOT NULL,\n  \"notes\" text,\n  \"panNumber\" text,\n  \"paymentTerms\" text,\n  \"pinCode\" text,\n  \"remarks\" text,\n  \"state\" text,\n  \"status\" text DEFAULT 'ACTIVE' NOT NULL,\n  \"updatedAt\" timestamptz NOT NULL,\n  \"vendorCategory\" text,\n  \"vendorCode\" text NOT NULL,\n  \"vendorName\" text NOT NULL,\n  \"website\" text,\n  PRIMARY KEY (\"id\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"Vendor\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"public\".\"Vendor\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "unique.Client.Client_clientcode_key",
+    "label": "Add unique constraint on \"Client\" (clientcode)",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "unique",
+        "name": "Client_clientcode_key",
+        "table": "Client"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"Client_clientcode_key\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "Client_clientcode_key",
+          "public",
+          "\"public\".\"Client\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add unique constraint \"Client_clientcode_key\"",
+        "sql": "ALTER TABLE \"public\".\"Client\" ADD CONSTRAINT \"Client_clientcode_key\" UNIQUE (\"clientcode\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"Client_clientcode_key\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "Client_clientcode_key",
+          "public",
+          "\"public\".\"Client\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "unique.Order.Order_poNumber_key",
+    "label": "Add unique constraint on \"Order\" (poNumber)",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "unique",
+        "name": "Order_poNumber_key",
+        "table": "Order"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"Order_poNumber_key\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "Order_poNumber_key",
+          "public",
+          "\"public\".\"Order\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add unique constraint \"Order_poNumber_key\"",
+        "sql": "ALTER TABLE \"public\".\"Order\" ADD CONSTRAINT \"Order_poNumber_key\" UNIQUE (\"poNumber\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"Order_poNumber_key\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "Order_poNumber_key",
+          "public",
+          "\"public\".\"Order\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "unique.Quotation.Quotation_quotationNumber_key",
+    "label": "Add unique constraint on \"Quotation\" (quotationNumber)",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "unique",
+        "name": "Quotation_quotationNumber_key",
+        "table": "Quotation"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"Quotation_quotationNumber_key\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "Quotation_quotationNumber_key",
+          "public",
+          "\"public\".\"Quotation\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add unique constraint \"Quotation_quotationNumber_key\"",
+        "sql": "ALTER TABLE \"public\".\"Quotation\" ADD CONSTRAINT \"Quotation_quotationNumber_key\" UNIQUE (\"quotationNumber\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"Quotation_quotationNumber_key\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "Quotation_quotationNumber_key",
+          "public",
+          "\"public\".\"Quotation\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "unique.User.User_username_key",
+    "label": "Add unique constraint on \"User\" (username)",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "unique",
+        "name": "User_username_key",
+        "table": "User"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"User_username_key\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "User_username_key",
+          "public",
+          "\"public\".\"User\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add unique constraint \"User_username_key\"",
+        "sql": "ALTER TABLE \"public\".\"User\" ADD CONSTRAINT \"User_username_key\" UNIQUE (\"username\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"User_username_key\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "User_username_key",
+          "public",
+          "\"public\".\"User\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "unique.User.User_email_key",
+    "label": "Add unique constraint on \"User\" (email)",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "unique",
+        "name": "User_email_key",
+        "table": "User"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"User_email_key\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "User_email_key",
+          "public",
+          "\"public\".\"User\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add unique constraint \"User_email_key\"",
+        "sql": "ALTER TABLE \"public\".\"User\" ADD CONSTRAINT \"User_email_key\" UNIQUE (\"email\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"User_email_key\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "User_email_key",
+          "public",
+          "\"public\".\"User\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "unique.Vendor.Vendor_vendorCode_key",
+    "label": "Add unique constraint on \"Vendor\" (vendorCode)",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "unique",
+        "name": "Vendor_vendorCode_key",
+        "table": "Vendor"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"Vendor_vendorCode_key\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "Vendor_vendorCode_key",
+          "public",
+          "\"public\".\"Vendor\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add unique constraint \"Vendor_vendorCode_key\"",
+        "sql": "ALTER TABLE \"public\".\"Vendor\" ADD CONSTRAINT \"Vendor_vendorCode_key\" UNIQUE (\"vendorCode\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"Vendor_vendorCode_key\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "Vendor_vendorCode_key",
+          "public",
+          "\"public\".\"Vendor\""
+        ]
+      }
+    ]
+  }
+]

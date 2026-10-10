@@ -4,7 +4,7 @@ import * as clientService from './client.service';
 
 export const handleCreateClient = async (req: AuthRequest, res: Response) => {
   try {
-    const { companyName, contactName, contactNo, email, address, gstNumber, panNumber, websiteUrl } = req.body;
+    const { companyName, contactName, contactNo, email, address, gstNumber, panNumber, websiteUrl, isTemporary, clientCode } = req.body;
     if (!companyName || !contactNo) {
       return res.status(400).json({ error: 'Company name and contact number are required' });
     }
@@ -20,6 +20,8 @@ export const handleCreateClient = async (req: AuthRequest, res: Response) => {
       panNumber,
       websiteUrl,
       createdById,
+      isTemporary: !!isTemporary,
+      clientCode,
     });
 
     return res.status(201).json({ message: 'Client created successfully', client });
@@ -30,11 +32,46 @@ export const handleCreateClient = async (req: AuthRequest, res: Response) => {
 
 export const handleListClients = async (req: AuthRequest, res: Response) => {
   try {
-    const clients = await clientService.listClients();
+    const includeTemporary = req.query.includeTemporary === 'true';
+    const temporaryOnly = req.query.temporaryOnly === 'true';
+    const clients = await clientService.listClients({ includeTemporary, temporaryOnly });
     return res.status(200).json({ clients });
   } catch (err: any) {
     console.error('List clients error:', err);
     return res.status(500).json({ error: err.message || 'Failed to fetch clients' });
+  }
+};
+
+export const handlePromoteClient = async (req: AuthRequest, res: Response) => {
+  try {
+    const id = req.params.id as string;
+    const client = await clientService.promoteTemporaryClient(id);
+    return res.status(200).json({ success: true, message: 'Client successfully promoted to permanent directory', client });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message || 'Failed to promote client' });
+  }
+};
+
+export const handleDeleteTemporaryClientPermanent = async (req: AuthRequest, res: Response) => {
+  try {
+    const id = req.params.id as string;
+    const result = await clientService.deleteTemporaryClientPermanent(id);
+    return res.status(200).json(result);
+  } catch (err: any) {
+    return res.status(400).json({ error: err.message || 'Failed to permanently delete temporary client' });
+  }
+};
+
+export const handleBulkDeleteTemporaryClientsPermanent = async (req: AuthRequest, res: Response) => {
+  try {
+    const { ids } = req.body;
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ error: 'ids array is required' });
+    }
+    const result = await clientService.bulkDeleteTemporaryClientsPermanent(ids);
+    return res.status(200).json(result);
+  } catch (err: any) {
+    return res.status(400).json({ error: err.message || 'Failed to bulk delete temporary clients' });
   }
 };
 

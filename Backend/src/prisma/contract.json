@@ -267,6 +267,13 @@
                   "kind": "scalar"
                 }
               },
+              "isTemporary": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/bool@1",
+                  "kind": "scalar"
+                }
+              },
               "panNumber": {
                 "nullable": true,
                 "type": {
@@ -283,6 +290,13 @@
               },
               "remarks": {
                 "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "status": {
+                "nullable": false,
                 "type": {
                   "codecId": "pg/text@1",
                   "kind": "scalar"
@@ -382,6 +396,9 @@
                 "isDeleted": {
                   "column": "isDeleted"
                 },
+                "isTemporary": {
+                  "column": "isTemporary"
+                },
                 "panNumber": {
                   "column": "panNumber"
                 },
@@ -390,6 +407,9 @@
                 },
                 "remarks": {
                   "column": "remarks"
+                },
+                "status": {
+                  "column": "status"
                 },
                 "websiteUrl": {
                   "column": "websiteUrl"
@@ -3091,6 +3111,15 @@
                   "nativeType": "int4",
                   "nullable": false
                 },
+                "isTemporary": {
+                  "codecId": "pg/bool@1",
+                  "default": {
+                    "kind": "literal",
+                    "value": false
+                  },
+                  "nativeType": "bool",
+                  "nullable": false
+                },
                 "panNumber": {
                   "codecId": "pg/text@1",
                   "nativeType": "text",
@@ -3105,6 +3134,15 @@
                   "codecId": "pg/text@1",
                   "nativeType": "text",
                   "nullable": true
+                },
+                "status": {
+                  "codecId": "pg/text@1",
+                  "default": {
+                    "kind": "literal",
+                    "value": "ACTIVE"
+                  },
+                  "nativeType": "text",
+                  "nullable": false
                 },
                 "websiteUrl": {
                   "codecId": "pg/text@1",
@@ -4615,7 +4653,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "9766403f80a8bc5eb018ec589f86c89bad166ffb46b20217812b8b2f4b3e7ced"
+    "storageHash": "22e6aa716630caf25c9d97623752d5287b9788accbe0a71aa06d5a27524296d3"
   },
   "execution": {
     "executionHash": "3d16e588986f4e68f6beb9c43c843e83529868ca8afe54361bc3b71edece10b7",
