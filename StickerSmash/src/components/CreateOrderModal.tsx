@@ -484,7 +484,10 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ visible, onC
   options={[
     // 1. Permanent Clients
     ...clients
-      .filter((c) => !(c.clientCode || '').startsWith('TMP-'))
+      .filter((c) => {
+        const u = (c.clientCode || '').toUpperCase();
+        return !u.startsWith('TMP') && !u.startsWith('TEMP');
+      })
       .map((c) => ({
         id: c.id,
         label: c.companyName,
@@ -492,12 +495,17 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ visible, onC
         sublabel: c.contactName ? `🏢 Permanent • ${c.contactName}` : '🏢 Permanent',
       })),
     // 2. Temporary Prospects / Leads
-    ...(temporaryClients || []).map((c) => ({
-      id: c.id,
-      label: `${c.companyName} [Temporary]`,
-      code: c.clientCode,
-      sublabel: c.contactName ? `⏳ Prospect • ${c.contactName}` : '⏳ Prospect',
-    })),
+    ...(temporaryClients || [])
+      .filter((c) => {
+        const u = (c.clientCode || '').toUpperCase();
+        return u.startsWith('TMP') || u.startsWith('TEMP');
+      })
+      .map((c) => ({
+        id: c.id,
+        label: c.companyName,
+        code: c.clientCode,
+        sublabel: c.contactName ? `⏳ Prospect • ${c.contactName}` : '⏳ Prospect',
+      })),
   ]}
   selectedValue={clientId}
   onSelect={(id) => setClientId(id)}

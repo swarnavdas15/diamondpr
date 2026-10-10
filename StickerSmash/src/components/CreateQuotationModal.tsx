@@ -223,19 +223,27 @@ export const CreateQuotationModal: React.FC<CreateQuotationModalProps> = ({ visi
                 placeholder="Search registered client or select prospect..."
                 options={[
                   ...clients
-                    .filter((c) => !(c.clientCode || '').startsWith('TMP-'))
+                    .filter((c) => {
+                      const u = (c.clientCode || '').toUpperCase();
+                      return !u.startsWith('TMP') && !u.startsWith('TEMP');
+                    })
                     .map((c) => ({
                       id: c.id,
                       label: c.companyName,
                       code: c.clientCode,
                       sublabel: c.contactName ? `🏢 Permanent Directory • Contact: ${c.contactName}` : '🏢 Permanent Directory',
                     })),
-                  ...(temporaryClients || []).map((c) => ({
-                    id: c.id,
-                    label: `${c.companyName} [Temporary]`,
-                    code: c.clientCode,
-                    sublabel: c.contactName ? `⏳ Temporary DB • Contact: ${c.contactName}` : '⏳ Temporary DB',
-                  })),
+                  ...(temporaryClients || [])
+                    .filter((c) => {
+                      const u = (c.clientCode || '').toUpperCase();
+                      return u.startsWith('TMP') || u.startsWith('TEMP');
+                    })
+                    .map((c) => ({
+                      id: c.id,
+                      label: c.companyName,
+                      code: c.clientCode,
+                      sublabel: c.contactName ? `⏳ Temporary DB • Contact: ${c.contactName}` : '⏳ Temporary DB',
+                    })),
                 ]}
                 selectedValue={selectedClientId}
                 onSelect={handleSelectClient}

@@ -1030,8 +1030,22 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const promoteTemporaryClient = async (clientId: string) => {
     try {
       const res = await apiClient.post(`/clients/${clientId}/promote`);
+      const updatedClient = res.data.client || res.data;
+      const normalizedCode = updatedClient.clientCode || updatedClient.clientcode;
+      const updatedObj = { ...updatedClient, clientCode: normalizedCode, isTemporary: false };
+
+      setClients((prev) => {
+        const exists = prev.some((c) => c.id === clientId);
+        if (exists) {
+          return prev.map((c) => (c.id === clientId ? updatedObj : c));
+        } else {
+          return [updatedObj, ...prev];
+        }
+      });
+      setTemporaryClients((prev) => prev.filter((c) => c.id !== clientId));
+
       await fetchLiveDashboardData();
-      return res.data.client;
+      return updatedObj;
     } catch (e) {
       console.error(e);
       throw e;
