@@ -112,6 +112,7 @@ interface ERPContextType {
     websiteUrl?: string;
     industry?: string;
     remarks?: string;
+    dateOfBirth?: string;
     isTemporary?: boolean;
   }) => Promise<Client>;
   promoteTemporaryClient: (clientId: string) => Promise<Client>;
@@ -1015,6 +1016,7 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     websiteUrl?: string;
     industry?: string;
     remarks?: string;
+    dateOfBirth?: string;
     isTemporary?: boolean;
   }) => {
     try {

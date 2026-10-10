@@ -8,6 +8,7 @@ import { Colors, Spacing, Radius, Shadows } from '../theme';
 
 import { Client } from '../types';
 import { PhoneInput } from './ui/PhoneInput';
+import { DatePickerInput } from './ui/DatePickerInput';
 
 interface CreateClientModalProps {
   visible: boolean;
@@ -32,6 +33,7 @@ export const CreateClientModal: React.FC<CreateClientModalProps> = ({ visible, o
   const [websiteUrl, setWebsiteUrl] = useState('');
   const [industry, setIndustry] = useState('');
   const [remarks, setRemarks] = useState('');
+  const [dateOfBirth, setDateOfBirth] = useState('');
   const [error, setError] = useState('');
   const [isDragging, setIsDragging] = useState(false);
 
@@ -48,6 +50,7 @@ export const CreateClientModal: React.FC<CreateClientModalProps> = ({ visible, o
       setWebsiteUrl(clientToEdit.websiteUrl || '');
       setIndustry(clientToEdit.industry || '');
       setRemarks(clientToEdit.remarks || '');
+      setDateOfBirth(clientToEdit.dateOfBirth || '');
       if (clientToEdit.profileImage) {
         setCompanyImageUri(clientToEdit.profileImage);
       }
@@ -254,6 +257,7 @@ export const CreateClientModal: React.FC<CreateClientModalProps> = ({ visible, o
           websiteUrl: websiteUrl.trim(),
           industry: industry.trim(),
           remarks: remarks.trim(),
+          dateOfBirth: dateOfBirth.trim(),
         });
 
         if (companyImageUri && companyImageUri !== clientToEdit.profileImage) {
@@ -287,6 +291,7 @@ export const CreateClientModal: React.FC<CreateClientModalProps> = ({ visible, o
         websiteUrl: websiteUrl.trim(),
         industry: industry.trim(),
         remarks: remarks.trim(),
+        dateOfBirth: dateOfBirth.trim(),
       });
 
       if (companyImageUri || contactImageUri) {
@@ -342,6 +347,7 @@ export const CreateClientModal: React.FC<CreateClientModalProps> = ({ visible, o
     setWebsiteUrl('');
     setIndustry('');
     setRemarks('');
+    setDateOfBirth('');
     setError('');
     setSuccessMsg('');
     setCompanyImageUri(null);
@@ -500,6 +506,13 @@ export const CreateClientModal: React.FC<CreateClientModalProps> = ({ visible, o
                 placeholderTextColor="#94a3b8"
                 value={contactName}
                 onChangeText={setContactName}
+              />
+
+              <DatePickerInput
+                label="Date of Birth (DOB)"
+                value={dateOfBirth}
+                onChangeDate={setDateOfBirth}
+                placeholder="YYYY-MM-DD"
               />
 
               <Text style={styles.label}>Mobile / Contact Number *</Text>

@@ -118,6 +118,7 @@ export interface Client {
   logo?: string;
   profileImage?: string;
   remarks?: string;
+  dateOfBirth?: string;
   isTemporary?: boolean;
   status?: 'PROSPECT' | 'ACTIVE' | 'INACTIVE';
   createdAt: string;
