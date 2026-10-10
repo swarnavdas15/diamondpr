@@ -30,11 +30,23 @@ export const handleCreateClient = async (req: AuthRequest, res: Response) => {
 
 export const handleListClients = async (req: AuthRequest, res: Response) => {
   try {
-    const clients = await clientService.listClients();
+    const temporaryOnly = req.query.temporaryOnly === 'true';
+    const clients = await clientService.listClients(temporaryOnly);
     return res.status(200).json({ clients });
   } catch (err: any) {
     console.error('List clients error:', err);
     return res.status(500).json({ error: err.message || 'Failed to fetch clients' });
+  }
+};
+
+export const handlePromoteClient = async (req: AuthRequest, res: Response) => {
+  try {
+    const id = req.params.id as string;
+    const client = await clientService.promoteClient(id);
+    return res.status(200).json({ success: true, message: 'Client promoted to permanent successfully', client });
+  } catch (err: any) {
+    console.error('Promote client error:', err);
+    return res.status(400).json({ success: false, error: err.message || 'Failed to promote client' });
   }
 };
 

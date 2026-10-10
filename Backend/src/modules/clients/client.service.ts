@@ -41,13 +41,52 @@ export const createClient = async (data: {
   return client;
 };
 
-export const listClients = async () => {
+export const listClients = async (temporaryOnly?: boolean) => {
   const clients = await db.orm.public.Client.where({ isDeleted: 0 }).orderBy((c) => c.createdAt.desc()).all();
+  if (temporaryOnly) {
+    return clients.filter((c: any) => (c.clientcode || '').startsWith('TMP-'));
+  }
   return clients;
 };
 
 export const getClientById = async (id: string) => {
   const client = await db.orm.public.Client.where({ id: dbId(id), isDeleted: 0 }).first();
+  return client;
+};
+
+export const promoteClient = async (id: string) => {
+  const client = await getClientById(id);
+  if (!client) throw new Error('Client not found');
+
+  const currentCode = (client as any).clientcode || (client as any).clientCode || '';
+  if (currentCode.startsWith('TMP-')) {
+    const allClients = await db.orm.public.Client.where({ isDeleted: 0 }).all();
+    const permClients = allClients.filter((c: any) => (c.clientcode || '').startsWith('CL-'));
+    let maxNum = 1000;
+    for (const c of permClients) {
+      const match = (c.clientcode || '').match(/^CL-(\d+)$/i);
+      if (match) {
+        const num = parseInt(match[1], 10);
+        if (num > maxNum) maxNum = num;
+      }
+    }
+    const newClientCode = `CL-${maxNum + 1}`;
+
+    await db.orm.public.Client.where({ id: dbId(id) }).update({ clientcode: newClientCode });
+
+    const linkedQuotations = await db.orm.public.Quotation.where({ clientId: dbId(id) }).all();
+    for (const q of linkedQuotations) {
+      await db.orm.public.Quotation.where({ id: q.id }).update({ clientCode: newClientCode });
+    }
+
+    const linkedOrders = await db.orm.public.Order.where({ clientId: dbId(id) }).all();
+    for (const o of linkedOrders) {
+      await db.orm.public.Order.where({ id: o.id }).update({ clientCode: newClientCode });
+    }
+
+    return await getClientById(id);
+  }
+
   return client;
 };
 

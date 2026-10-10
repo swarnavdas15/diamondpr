@@ -1452,6 +1452,15 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       (c) => (targetQuotation.clientId && c.id === targetQuotation.clientId) || c.clientCode.toLowerCase() === targetQuotation.clientCode.toLowerCase()
     );
 
+    if (targetClient && (targetClient.clientCode || '').startsWith('TMP-')) {
+      try {
+        const promoted = await promoteTemporaryClient(targetClient.id);
+        if (promoted) targetClient = promoted;
+      } catch (e) {
+        console.warn('Auto promotion warning:', e);
+      }
+    }
+
     if (!targetClient) {
       targetClient = await createClient({
         clientCode: targetQuotation.clientCode,

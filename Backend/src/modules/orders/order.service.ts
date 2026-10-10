@@ -82,6 +82,26 @@ export class OrderService {
       const client = await tx.orm.public.Client.where({ id: dbId(data.clientId) }).first();
       if (!client) throw new Error('Client not found');
 
+      let effectiveClientCode = (client as any).clientcode || (client as any).clientCode || '';
+      if (effectiveClientCode.startsWith('TMP-')) {
+        const allClients = await tx.orm.public.Client.where({ isDeleted: 0 }).all();
+        const permClients = allClients.filter((c: any) => (c.clientcode || '').startsWith('CL-'));
+        let maxNum = 1000;
+        for (const c of permClients) {
+          const match = (c.clientcode || '').match(/^CL-(\d+)$/i);
+          if (match) {
+            const num = parseInt(match[1], 10);
+            if (num > maxNum) maxNum = num;
+          }
+        }
+        effectiveClientCode = `CL-${maxNum + 1}`;
+        await tx.orm.public.Client.where({ id: dbId(data.clientId) }).update({ clientcode: effectiveClientCode });
+        const linkedQuotations = await tx.orm.public.Quotation.where({ clientId: dbId(data.clientId) }).all();
+        for (const q of linkedQuotations) {
+          await tx.orm.public.Quotation.where({ id: q.id }).update({ clientCode: effectiveClientCode });
+        }
+      }
+
       const poNumber = String(data.poNumber || '').trim();
       if (!poNumber) throw new Error('PO Number is required');
       const existingPo = await tx.orm.public.Order.where({ poNumber }).first();
@@ -92,7 +112,7 @@ export class OrderService {
       
       const order = await tx.orm.public.Order.create({
         orderNumber: `ORD-2026-${1000 + Number(orderCount)}`,
-        clientCode: client.clientcode,
+        clientCode: effectiveClientCode,
         poNumber,
         clientId: dbId(data.clientId),
         requirements: data.requirements || data.technicalRequirements || '',
