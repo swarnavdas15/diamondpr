@@ -1457,15 +1457,15 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const deleteTask = async (taskId: string) => {
     const role = currentUser?.role;
-    if (role !== 'SUPER_ADMIN' && role !== 'ADMIN') {
-      throw new Error('Permission Denied: Only Super Admin and Admin are authorized to delete tasks.');
+    if (role !== 'SUPER_ADMIN') {
+      throw new Error('Permission Denied: Only Super Admin is authorized to delete tasks.');
     }
     try {
       await apiClient.delete(`/tasks/${taskId}`);
       await fetchLiveDashboardData();
     } catch (e: any) {
       console.error(e);
-      throw new Error(e.response?.data?.message || 'Failed to delete task');
+      throw new Error(e.response?.data?.error || e.response?.data?.message || e.message || 'Failed to delete task');
     }
   };
 

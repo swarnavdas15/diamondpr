@@ -49,8 +49,27 @@ export const handleUpdateTaskStatus = async (req: AuthRequest, res: Response) =>
       return res.status(400).json({ error: 'Status is required', message: 'Status is required' });
     }
 
-    const task = await TaskService.updateTaskStatus(taskId, status);
-    return res.status(200).json({ success: true, message: 'Task status updated', task });
+    const task = await TaskService.getTaskById(taskId);
+    if (task) {
+      const currentUser = req.user!;
+      const isSuperAdmin = currentUser.role === 'SUPER_ADMIN';
+      const assignedUserIdStr = (task as any).assignedToUserId
+        ? String((task as any).assignedToUserId)
+        : ((task as any).assignedToId ? String((task as any).assignedToId) : null);
+      
+      const isAssignedUser = assignedUserIdStr ? assignedUserIdStr === String(currentUser.userId) : false;
+      const isDeptUser = !assignedUserIdStr && (task as any).assignedToDepartment === currentUser.role;
+
+      if (!isSuperAdmin && !isAssignedUser && !isDeptUser) {
+        return res.status(403).json({
+          error: 'Permission Denied: Only the specific assigned user can update this task status.',
+          message: 'Permission Denied: Only the specific assigned user can update this task status.'
+        });
+      }
+    }
+
+    const updatedTask = await TaskService.updateTaskStatus(taskId, status);
+    return res.status(200).json({ success: true, message: 'Task status updated', task: updatedTask });
   } catch (err: any) {
     return res.status(400).json({ success: false, error: err.message || 'Failed to update task status', message: err.message });
   }
@@ -73,8 +92,8 @@ export const handleDeleteTask = async (req: AuthRequest, res: Response) => {
   try {
     const taskId = req.params.id as string;
     const role = req.user?.role;
-    if (role !== 'SUPER_ADMIN' && role !== 'ADMIN') {
-      return res.status(403).json({ error: 'Permission denied. Only Super Admin and Admin can delete tasks.' });
+    if (role !== 'SUPER_ADMIN') {
+      return res.status(403).json({ error: 'Permission denied. Only Super Admin can delete tasks.' });
     }
 
     await TaskService.deleteTask(taskId);

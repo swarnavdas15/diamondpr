@@ -60,12 +60,20 @@ export class TaskService {
       .all();
   }
 
+  static async getTaskById(taskId: string) {
+    return await db.orm.public.Task
+      .where({ id: dbId(taskId) })
+      .first();
+  }
+
   static async deleteTask(taskId: string) {
     return await db.orm.public.Task
       .where({ id: dbId(taskId) })
       .update({ isDeleted: 1 });
   }
 }
+
+export const getTaskById = TaskService.getTaskById;
 
 export const createTask = TaskService.createTask;
 export const listTasks = TaskService.listTasks;

@@ -23,7 +23,7 @@ router.get('/my-tasks', getMyTasksHandler);
 router.patch('/:id/status', handleUpdateTaskStatus);
 router.patch('/:taskId/status', updateTaskStatusHandler);
 
-// STRICT: Only SUPER_ADMIN and ADMIN can delete tasks
-router.delete('/:id', requireRole(['SUPER_ADMIN', 'ADMIN']), handleDeleteTask);
+// STRICT: Only SUPER_ADMIN can delete tasks
+router.delete('/:id', requireRole(['SUPER_ADMIN']), handleDeleteTask);
 
 export default router;

@@ -34,6 +34,7 @@ export const TaskManagement: React.FC<TaskManagementProps> = ({ onOpenCreateTask
 
   if (!currentUser) return null;
 
+  const isSuperAdmin = currentUser.role === 'SUPER_ADMIN';
   const isSuperAdminOrAdmin = currentUser.role === 'SUPER_ADMIN' || currentUser.role === 'ADMIN';
   const todayStr = new Date().toISOString().split('T')[0];
 
@@ -41,13 +42,17 @@ export const TaskManagement: React.FC<TaskManagementProps> = ({ onOpenCreateTask
   const accessibleTasks = tasks;
 
   // Helper to determine if current user is authorized to update a specific task's status
+  // STRICT RULE: Status change can ONLY be performed by SUPER_ADMIN or the specific assigned user/department. All other users see read-only status.
   const canUpdateTaskStatus = (task: Task): boolean => {
-    if (isSuperAdminOrAdmin) return true;
-    if (task.createdByUserId === currentUser.id || task.createdByName === currentUser.name) return true;
-    if (task.assignedToUserId && task.assignedToUserId === currentUser.id) return true;
-    if (task.assignedToName && currentUser.name && task.assignedToName.toLowerCase() === currentUser.name.toLowerCase()) return true;
-    if (task.assignedToDepartment === currentUser.role) {
-      if (!task.assignedToUserId || task.assignedToUserId === currentUser.id) return true;
+    if (currentUser.role === 'SUPER_ADMIN') return true;
+    if (task.assignedToUserId) {
+      return task.assignedToUserId === currentUser.id;
+    }
+    if (task.assignedToName) {
+      return !!currentUser.name && task.assignedToName.toLowerCase() === currentUser.name.toLowerCase();
+    }
+    if (task.assignedToDepartment) {
+      return currentUser.role === task.assignedToDepartment;
     }
     return false;
   };
@@ -340,7 +345,7 @@ export const TaskManagement: React.FC<TaskManagementProps> = ({ onOpenCreateTask
                                 </TouchableOpacity>
                               );
                             })}
-                            {isSuperAdminOrAdmin && (
+                            {isSuperAdmin && (
                               <TouchableOpacity style={styles.deleteBtn} onPress={() => handleDelete(task.id)}>
                                 <Text style={styles.deleteBtnText}>Delete Task</Text>
                               </TouchableOpacity>
@@ -475,9 +480,9 @@ export const TaskManagement: React.FC<TaskManagementProps> = ({ onOpenCreateTask
                       )}
                     </View>
 
-                    {/* Actions (RBAC: Delete only Super Admin & Admin) */}
+                    {/* Actions (RBAC: Delete only Super Admin) */}
                     <View style={{ width: 95, justifyContent: 'center' }}>
-                      {isSuperAdminOrAdmin ? (
+                      {isSuperAdmin ? (
                         <TouchableOpacity style={styles.deleteBtn} onPress={() => handleDelete(task.id)}>
                           <Text style={styles.deleteBtnText}>Delete</Text>
                         </TouchableOpacity>

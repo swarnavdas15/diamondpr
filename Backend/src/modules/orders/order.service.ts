@@ -141,6 +141,49 @@ export class OrderService {
         }
       }
 
+      if ((data as any).customStages && Array.isArray((data as any).customStages) && (data as any).customStages.length > 0) {
+        for (const stage of (data as any).customStages) {
+          const stageName = stage.stageName || stage.name || 'Custom Stage';
+          const stageDesc = stage.description || '';
+          const dept = stage.department || 'CUSTOM_STAGE';
+          const userIds: string[] = stage.assignedUserIds || (stage.assignedToUserId ? [stage.assignedToUserId] : []);
+          const userNames: string[] = stage.assignedUserNames || (stage.assignedToName ? [stage.assignedToName] : []);
+
+          if (userIds.length > 0) {
+            for (let i = 0; i < userIds.length; i++) {
+              const uId = userIds[i];
+              const uName = userNames[i] || undefined;
+              await tx.orm.public.Task.create({
+                title: `[Custom Stage] ${stageName} - ${order.orderNumber}`,
+                description: stageDesc ? `Stage Details: ${stageDesc}` : `Custom Workflow Stage: ${stageName}`,
+                priority: 'HIGH',
+                status: 'PENDING',
+                orderId: order.id,
+                orderNumber: order.orderNumber,
+                assignedToDepartment: dept,
+                assignedToUserId: dbId(uId),
+                assignedToId: dbId(uId),
+                assignedToName: uName,
+                createdByName: 'System',
+                createdByRole: 'SUPER_ADMIN',
+              });
+            }
+          } else {
+            await tx.orm.public.Task.create({
+              title: `[Custom Stage] ${stageName} - ${order.orderNumber}`,
+              description: stageDesc ? `Stage Details: ${stageDesc}` : `Custom Workflow Stage: ${stageName}`,
+              priority: 'HIGH',
+              status: 'PENDING',
+              orderId: order.id,
+              orderNumber: order.orderNumber,
+              assignedToDepartment: dept,
+              createdByName: 'System',
+              createdByRole: 'SUPER_ADMIN',
+            });
+          }
+        }
+      }
+
       await tx.orm.public.StageLog.create({
         orderId: order.id,
         stage: initialStage,
