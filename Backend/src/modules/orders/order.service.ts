@@ -82,10 +82,10 @@ export class OrderService {
       const client = await tx.orm.public.Client.where({ id: dbId(data.clientId) }).first();
       if (!client) throw new Error('Client not found');
 
-      let effectiveClientCode = (client as any).clientcode || (client as any).clientCode || '';
-      if (effectiveClientCode.startsWith('TMP-')) {
+      let effectiveClientCode = ((client as any).clientcode || (client as any).clientCode || '').toUpperCase();
+      if (effectiveClientCode.startsWith('TMP') || effectiveClientCode.startsWith('TEMP')) {
         const allClients = await tx.orm.public.Client.where({ isDeleted: 0 }).all();
-        const permClients = allClients.filter((c: any) => (c.clientcode || '').startsWith('CL-'));
+        const permClients = allClients.filter((c: any) => (c.clientcode || '').toUpperCase().startsWith('CL-'));
         let maxNum = 1000;
         for (const c of permClients) {
           const match = (c.clientcode || '').match(/^CL-(\d+)$/i);

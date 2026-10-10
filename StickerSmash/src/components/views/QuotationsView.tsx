@@ -253,18 +253,30 @@ export const QuotationsView: React.FC<QuotationsViewProps> = ({ onOpenCreateQuot
 
   // Step 1: Conversion form submitted -> Step 2: open Create Order form pre-filled.
   // The order itself (and quotation linking) is created when the user submits the order form.
-  const handleSaveConversion = (data: QuotationConversionData) => {
+  const handleSaveConversion = async (data: QuotationConversionData) => {
     const q = conversionModalQuotation;
     if (!q) return;
     if (!onOpenCreateOrderWithData) {
       setConversionError('Order form is not available from this screen.');
       return;
     }
-    const targetClient = clients.find(
+    let targetClient = clients.find(
       (c) => (q.clientId && c.id === q.clientId) || (c.clientCode || '').toLowerCase() === (q.clientCode || '').toLowerCase()
     ) || temporaryClients.find(
       (c) => (q.clientId && c.id === q.clientId) || (c.clientCode || '').toLowerCase() === (q.clientCode || '').toLowerCase()
     );
+
+    if (targetClient) {
+      const code = (targetClient.clientCode || '').toUpperCase();
+      if (code.startsWith('TMP') || code.startsWith('TEMP') || targetClient.isTemporary) {
+        try {
+          const promoted = await promoteTemporaryClient(targetClient.id);
+          if (promoted) targetClient = promoted;
+        } catch (e) {
+          console.warn('Auto client promotion before order modal error:', e);
+        }
+      }
+    }
     onOpenCreateOrderWithData({
       quotationId: q.id,
       quotationNumber: q.quotationNumber,

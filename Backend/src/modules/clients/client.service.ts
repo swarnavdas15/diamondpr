@@ -58,10 +58,10 @@ export const promoteClient = async (id: string) => {
   const client = await getClientById(id);
   if (!client) throw new Error('Client not found');
 
-  const currentCode = (client as any).clientcode || (client as any).clientCode || '';
-  if (currentCode.startsWith('TMP-')) {
+  const currentCode = ((client as any).clientcode || (client as any).clientCode || '').toUpperCase();
+  if (currentCode.startsWith('TMP') || currentCode.startsWith('TEMP')) {
     const allClients = await db.orm.public.Client.where({ isDeleted: 0 }).all();
-    const permClients = allClients.filter((c: any) => (c.clientcode || '').startsWith('CL-'));
+    const permClients = allClients.filter((c: any) => (c.clientcode || '').toUpperCase().startsWith('CL-'));
     let maxNum = 1000;
     for (const c of permClients) {
       const match = (c.clientcode || '').match(/^CL-(\d+)$/i);
