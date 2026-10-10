@@ -129,6 +129,22 @@ export const deleteClient = async (id: string) => {
   return true;
 };
 
+export const deleteTemporaryClientPermanent = async (id: string) => {
+  await db.orm.public.CompanyContact.where({ companyId: dbId(id) }).delete();
+  await db.orm.public.Client.where({ id: dbId(id) }).delete();
+  return true;
+};
+
+export const bulkDeleteTemporaryClientsPermanent = async (ids: string[]) => {
+  for (const id of ids) {
+    if (id) {
+      await db.orm.public.CompanyContact.where({ companyId: dbId(id) }).delete();
+      await db.orm.public.Client.where({ id: dbId(id) }).delete();
+    }
+  }
+  return true;
+};
+
 export const createCompanyContact = async (data: any) => {
   return await db.orm.public.CompanyContact.create({
     companyId: data.companyId,

@@ -70,6 +70,31 @@ export const handleDeleteClient = async (req: AuthRequest, res: Response) => {
   }
 };
 
+export const handleDeleteTemporaryClientPermanent = async (req: AuthRequest, res: Response) => {
+  try {
+    const id = req.params.id as string;
+    await clientService.deleteTemporaryClientPermanent(id);
+    return res.status(200).json({ success: true, message: 'Temporary client permanently deleted' });
+  } catch (err: any) {
+    console.error('Delete temporary client error:', err);
+    return res.status(500).json({ success: false, error: err.message || 'Failed to delete temporary client' });
+  }
+};
+
+export const handleBulkDeleteTemporaryClientsPermanent = async (req: AuthRequest, res: Response) => {
+  try {
+    const { ids } = req.body;
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ success: false, error: 'Client IDs array is required' });
+    }
+    await clientService.bulkDeleteTemporaryClientsPermanent(ids);
+    return res.status(200).json({ success: true, message: 'Temporary clients permanently deleted' });
+  } catch (err: any) {
+    console.error('Bulk delete temporary clients error:', err);
+    return res.status(500).json({ success: false, error: err.message || 'Failed to bulk delete temporary clients' });
+  }
+};
+
 import { uploadToCloudinary } from '../../utils/cloudinary';
 
 export const handleUploadProfileImage = async (req: AuthRequest, res: Response) => {
