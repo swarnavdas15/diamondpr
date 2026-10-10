@@ -18,18 +18,7 @@ export const CompactCalendarModal: React.FC<CompactCalendarModalProps> = ({ visi
   const todayDateObj = new Date();
   const todayStr = todayDateObj.toISOString().split('T')[0];
 
-  const combinedEvents = [
-    ...calendarEvents,
-    ...(companyImportantDates || []).map(d => ({
-      id: d.id,
-      title: (clients.find(c => c.id === d.companyId)?.companyName || "Client") + " - " + d.title,
-      type: 'IMPORTANT_DATE' as CalendarEventType,
-      eventDate: d.eventDate,
-      description: d.description || '',
-      createdByName: d.createdByName || 'System',
-      isCompanyDate: true
-    }))
-  ];
+  const combinedEvents = calendarEvents;
 
   // Calendar View Month State (defaults to current date)
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -57,6 +46,7 @@ export const CompactCalendarModal: React.FC<CompactCalendarModalProps> = ({ visi
     { id: 'FOLLOW_UP', label: 'Follow-ups', color: '#8b5cf6' },
     { id: 'IMPORTANT_DATE', label: 'Important', color: '#ef4444' },
     { id: 'MILESTONE', label: 'Milestones', color: '#10b981' },
+    { id: 'BIRTHDAY', label: 'Birthdays', color: '#ec4899' },
   ];
 
   const getTypeBadgeColor = (t: CalendarEventType) => {
@@ -109,10 +99,13 @@ export const CompactCalendarModal: React.FC<CompactCalendarModalProps> = ({ visi
   };
 
   const handleDeleteEvent = (id: string) => {
-    if (companyImportantDates && companyImportantDates.some(d => d.id === id)) {
+    if (id.startsWith('cid-')) {
+      const realId = id.replace('cid-', '');
+      deleteCompanyImportantDate(realId);
+    } else if (companyImportantDates && companyImportantDates.some(d => d.id === id)) {
       deleteCompanyImportantDate(id);
     } else {
-      handleDeleteEvent(id);
+      deleteCalendarEvent(id);
     }
   };
 

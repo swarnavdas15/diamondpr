@@ -808,34 +808,104 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([]);
 
   const computedCalendarEvents = React.useMemo(() => {
-    // 1. Existing quotation follow-ups
-    const quotationEvents = quotations
-      .filter(q => q.followUpDate && q.status !== 'FULLY_CONVERTED' && q.status !== 'LOST')
-      .map(q => ({
-        id: `qf-${q.id}`,
-        title: `Follow-up: ${q.companyName}`,
-        type: 'FOLLOW_UP' as CalendarEventType,
-        eventDate: q.followUpDate as string,
-        description: `Quotation ${q.quotationNumber} follow-up for ${q.quotationAmount}`,
-        createdByName: q.salesExecutive || 'System',
-        createdAt: q.createdAt
-      }));
+    // 1. Manual / Static calendar events
+    const baseEvents = calendarEvents || [];
 
-    // 2. Task Deadlines
-    const taskEvents = tasks
+    // 2. Quotation Follow-Ups & Expected Closures
+    const quotationEvents: CalendarEvent[] = [];
+    quotations.forEach(q => {
+      if (q.followUpDate && q.status !== 'FULLY_CONVERTED' && q.status !== 'LOST') {
+        quotationEvents.push({
+          id: `qf-${q.id}`,
+          title: `Follow-up: ${q.companyName}`,
+          type: 'FOLLOW_UP',
+          eventDate: String(q.followUpDate).split('T')[0],
+          description: `Quotation ${q.quotationNumber} follow-up for ₹${(q.quotationAmount || 0).toLocaleString()}`,
+          createdByName: q.salesExecutive || 'System',
+          createdAt: q.createdAt
+        });
+      }
+      if (q.expectedClosureDate && q.status !== 'FULLY_CONVERTED' && q.status !== 'LOST') {
+        quotationEvents.push({
+          id: `qc-${q.id}`,
+          title: `Expected Closure: ${q.companyName}`,
+          type: 'MILESTONE',
+          eventDate: String(q.expectedClosureDate).split('T')[0],
+          description: `Target closure date for Quotation ${q.quotationNumber}`,
+          createdByName: q.salesExecutive || 'System',
+          createdAt: q.createdAt
+        });
+      }
+    });
+
+    // 3. Task Deadlines
+    const taskEvents: CalendarEvent[] = tasks
       .filter(t => t.dueDate && t.status !== 'COMPLETED')
       .map(t => ({
         id: `td-${t.id}`,
         title: `Deadline: ${t.title}`,
         type: 'DEADLINE' as CalendarEventType,
-        eventDate: (t.dueDate as string).split('T')[0],
+        eventDate: String(t.dueDate).split('T')[0],
         description: `Priority: ${t.priority} | ${t.description || 'No description'}`,
         createdByName: t.assignedToName || t.assignedToDepartment || 'System',
         createdAt: t.createdAt
       }));
 
-    return [...calendarEvents, ...quotationEvents, ...taskEvents].sort((a, b) => new Date(a.eventDate).getTime() - new Date(b.eventDate).getTime());
-  }, [calendarEvents, quotations, tasks]);
+    // 4. Client Birthdays (mapped to current year so they show up on annual calendar grid)
+    const currentYear = new Date().getFullYear();
+    const allClients = [...clients, ...temporaryClients];
+    const birthdayEvents: CalendarEvent[] = [];
+
+    allClients.forEach(c => {
+      if (c.dateOfBirth) {
+        const rawDob = String(c.dateOfBirth).split('T')[0];
+        const dobParts = rawDob.split('-');
+        if (dobParts.length === 3) {
+          const monthDay = `${dobParts[1]}-${dobParts[2]}`;
+          const currentYearDob = `${currentYear}-${monthDay}`;
+          birthdayEvents.push({
+            id: `dob-${c.id}`,
+            title: `🎂 Birthday: ${c.contactName || c.companyName || c.clientCode}`,
+            type: 'BIRTHDAY',
+            eventDate: currentYearDob,
+            description: `Client Date of Birth for ${c.companyName || c.clientCode} (Born ${rawDob})`,
+            createdByName: 'System',
+          });
+        }
+      }
+    });
+
+    // 5. Company Important Dates
+    const companyDateEvents: CalendarEvent[] = (companyImportantDates || []).map(d => ({
+      id: `cid-${d.id}`,
+      title: `${(clients.find(c => c.id === d.companyId)?.companyName || "Company")}: ${d.title}`,
+      type: (d.dateType as CalendarEventType) || 'IMPORTANT_DATE',
+      eventDate: String(d.eventDate).split('T')[0],
+      description: d.description || '',
+      createdByName: d.createdByName || 'System',
+    }));
+
+    // 6. Orders Created / Milestones
+    const orderEvents: CalendarEvent[] = orders.map(o => ({
+      id: `ord-${o.id}`,
+      title: `Order: ${o.orderNumber} - ${o.clientName}`,
+      type: 'MILESTONE',
+      eventDate: String(o.createdAt).split('T')[0],
+      description: `Status: ${o.status} | PO: ${o.poNumber || 'N/A'}`,
+      createdByName: 'System',
+    }));
+
+    const combined = [
+      ...baseEvents,
+      ...quotationEvents,
+      ...taskEvents,
+      ...birthdayEvents,
+      ...companyDateEvents,
+      ...orderEvents
+    ];
+
+    return combined.sort((a, b) => new Date(a.eventDate).getTime() - new Date(b.eventDate).getTime());
+  }, [calendarEvents, quotations, tasks, clients, temporaryClients, companyImportantDates, orders]);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
 
   // Live Backend Fetch
