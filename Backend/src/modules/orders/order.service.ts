@@ -317,17 +317,14 @@ export const verifyAndCompleteOrder = async (id: string, userId: string, remarks
 };
 export const updateOrder = async (id: string, data: any) => {
   const updateData: any = {};
-  if (data.poNumber !== undefined) updateData.poNumber = data.poNumber;
+  if (data.poNumber !== undefined) updateData.poNumber = String(data.poNumber).trim();
   if (data.clientId !== undefined) updateData.clientId = dbId(data.clientId);
   if (data.clientCode !== undefined) updateData.clientCode = data.clientCode;
   if (data.clientName !== undefined) updateData.clientName = data.clientName;
-  if (data.contactNo !== undefined) updateData.contactNo = data.contactNo;
-  if (data.email !== undefined) updateData.email = data.email;
-  if (data.address !== undefined) updateData.address = data.address;
-  if (data.budget !== undefined) updateData.budget = data.budget;
+  if (data.budget !== undefined) updateData.budget = toOptionalBigInt(data.budget);
   if (data.technicalRequirements !== undefined) updateData.technicalRequirements = data.technicalRequirements;
   if (data.materialRequirements !== undefined) updateData.materialRequirements = data.materialRequirements;
-  if (data.requiredQuantity !== undefined) updateData.requiredQuantity = data.requiredQuantity;
+  if (data.requiredQuantity !== undefined) updateData.requiredQuantity = Math.max(1, Math.round(Number(data.requiredQuantity) || 1));
   if (data.purchaseRequired !== undefined) updateData.purchaseRequired = data.purchaseRequired;
   if (data.productionRequired !== undefined) updateData.productionRequired = data.productionRequired;
   if (data.qualityTestingRequired !== undefined) updateData.qualityTestingRequired = data.qualityTestingRequired;
