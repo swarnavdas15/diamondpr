@@ -15,8 +15,8 @@ export const handleListQuotations = async (req: AuthRequest, res: Response) => {
 export const handleCreateQuotation = async (req: AuthRequest, res: Response) => {
   try {
     const { companyName, clientCode, contactPerson, mobileNumber, email, quotationAmount } = req.body;
-    if (!companyName || !clientCode || !mobileNumber) {
-      return res.status(400).json({ success: false, error: 'Company name, client code, and mobile number are required' });
+    if (!companyName || !mobileNumber) {
+      return res.status(400).json({ success: false, error: 'Company name and mobile number are required' });
     }
 
     const quotation = await quotationService.createQuotation(req.body);

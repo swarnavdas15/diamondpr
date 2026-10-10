@@ -1,6 +1,21 @@
 import { db } from '../../prisma/db';
 import { dbId } from '../../prisma/ids';
 
+async function generateNextTempClientCode(): Promise<string> {
+  const allClients = await db.orm.public.Client.where({ isDeleted: 0 }).all();
+  let maxNum = 1000;
+
+  for (const c of allClients) {
+    const code = c.clientcode as string;
+    if (code?.startsWith('TMP-')) {
+      const num = parseInt(code.replace('TMP-', ''), 10);
+      if (!isNaN(num) && num > maxNum) maxNum = num;
+    }
+  }
+
+  return `TMP-${maxNum + 1}`;
+}
+
 export const listQuotations = async () => {
   const quotations = await db.orm.public.Quotation
     .include('followUps', (f) => f.orderBy((log) => log.createdAt.desc()))
@@ -16,34 +31,20 @@ export const createQuotation = async (data: any) => {
   const quotationNumber = `QT-2026-${String(1001 + count).padStart(3, '0')}`;
 
   let targetClientId = data.clientId;
-  let targetClientCode = data.clientCode;
+  let targetClientCode = data.clientCode?.trim() || null;
 
-  // AGAR CLIENT ID NAHI MILI TOH BACKEND KHUD TEMPORARY CLIENT BANAYEGA
   if (!targetClientId) {
     if (!data.companyName) {
       throw new Error('Client selection or Company Name is required');
     }
 
-    // Saare existing clients fetch karo taaki check kar sakein duplicate code toh nahi hai
-    const allClients = await db.orm.public.Client.all();
-    const existingCodes = new Set(allClients.map((c: any) => c.clientcode || c.clientCode));
+    const allClients = await db.orm.public.Client.where({ isDeleted: 0 }).all();
+    const existingCodes = new Set(allClients.map((c: any) => c.clientcode?.toLowerCase()).filter(Boolean));
 
-    // Calculate Highest TMP-XXXX number
-    let maxNum = 1000;
-    for (const c of allClients) {
-      const code = (c.clientcode || c.clientcode || '') as string;
-      if (code.startsWith('TMP-')) {
-        const num = parseInt(code.replace('TMP-', ''), 10);
-        if (!isNaN(num) && num > maxNum) maxNum = num;
-      }
+    if (!targetClientCode || existingCodes.has(targetClientCode.toLowerCase())) {
+      targetClientCode = await generateNextTempClientCode();
     }
 
-    // Agar targetClientCode nahi hai YA already database mein exist karta hai, toh fresh code do
-    if (!targetClientCode || existingCodes.has(targetClientCode)) {
-      targetClientCode = `TMP-${maxNum + 1}`;
-    }
-
-    // Create Temporary Client in DB
     const newTempClient = await db.orm.public.Client.create({
       companyName: data.companyName,
       clientcode: targetClientCode,
@@ -54,12 +55,17 @@ export const createQuotation = async (data: any) => {
     });
 
     targetClientId = newTempClient.id;
+  } else if (targetClientId && !targetClientCode) {
+    const client = await db.orm.public.Client.where({ id: dbId(targetClientId), isDeleted: 0 }).first();
+    if (client) {
+      targetClientCode = client.clientcode;
+    }
   }
 
   const quotation = await db.orm.public.Quotation.create({
     quotationNumber: data.quotationNumber || quotationNumber,
     companyName: data.companyName,
-    clientCode: targetClientCode || 'TMP-1001',
+    clientCode: targetClientCode,
     clientId: dbId(targetClientId),
     contactPerson: data.contactPerson,
     mobileNumber: data.mobileNumber,

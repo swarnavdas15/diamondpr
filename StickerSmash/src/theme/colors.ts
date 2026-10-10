@@ -20,6 +20,7 @@ export const Palette = {
   cardBg: '#FFFFFF',          // Crisp white surface for card containers
   bgDark: '#F8FAFC',          // Soft light slate background
   inputBg: '#F1F5F9',         // Input field background
+  inputBgDisabled: '#E2E8F0', // Disabled input field background
   borderDark: '#E2E8F0',      // Crisp light border
   borderMuted: '#CBD5E1',     // Soft divider border
   overlay: 'rgba(15, 23, 42, 0.4)',

@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, Text, Modal, TouchableOpacity, TextInput, ScrollView, StyleSheet, useWindowDimensions } from 'react-native';
+import React, { useState, useMemo } from 'react';
+import { View, Text, Modal, TouchableOpacity, TextInput, ScrollView, StyleSheet, useWindowDimensions, Keyboard } from 'react-native';
 import { useERP } from '../context/ERPContext';
 import { useAuth } from '../context/AuthContext';
 import { QuotationStatus, Client } from '../types';
@@ -13,17 +13,18 @@ interface CreateQuotationModalProps {
   onClose: () => void;
 }
 
+type ClientType = 'registered' | 'non_registered';
+
 export const CreateQuotationModal: React.FC<CreateQuotationModalProps> = ({ visible, onClose }) => {
-  const { clients, temporaryClients, quotations, createQuotation, createClient } = useERP();
+  const { clients, temporaryClients, quotations, createQuotation } = useERP();
   const { currentUser } = useAuth();
   const { width } = useWindowDimensions();
   const isMobile = width < 768;
 
-  const [createClientVisible, setCreateClientVisible] = useState(false);
+  const [clientType, setClientType] = useState<ClientType>('registered');
   const [selectedClientId, setSelectedClientId] = useState<string>('');
-  const [isTemporaryClient, setIsTemporaryClient] = useState(false);
-  const [clientCode, setClientCode] = useState('');
   const [companyName, setCompanyName] = useState('');
+  const [clientCode, setClientCode] = useState('');
   const [contactPerson, setContactPerson] = useState('');
   const [mobileNumber, setMobileNumber] = useState('');
   const [email, setEmail] = useState('');
@@ -38,49 +39,51 @@ export const CreateQuotationModal: React.FC<CreateQuotationModalProps> = ({ visi
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
 
-  // Auto-generate preview codes
-  const nextQNum = `QT-2026-${String(quotations.length + 1).padStart(3, '0')}`;
-  
-// Calculate next TMP code from actual client data
-  const getNextTempCode = () => {
-    let maxNum = 1000;
-    const allClients = [...clients, ...(temporaryClients || [])];
-    for (const c of allClients) {
-      const code = c.clientCode || '';
-      if (code.startsWith('TMP-')) {
-        const numStr = code.slice(4);
-        const num = parseInt(numStr, 10);
-        if (!isNaN(num) && num > maxNum) {
-          maxNum = num;
-        }
-      }
-    }
-    return `TMP-${maxNum + 1}`;
-  };
-  
-  const nextTempCode = getNextTempCode();
+  const [createClientVisible, setCreateClientVisible] = useState(false);
 
-  const handleSelectClient = (cId: string) => {
-    setSelectedClientId(cId);
-    if (!cId) {
+  const allRegisteredClients = useMemo(() => clients.filter(c => !c.isTemporary), [clients]);
+  const allTemporaryClients = useMemo(() => temporaryClients || [], [temporaryClients]);
+  const allKnownClients = useMemo(() => [...allRegisteredClients, ...allTemporaryClients], [allRegisteredClients, allTemporaryClients]);
+
+  const nextQNum = `QT-2026-${String(quotations.length + 1).padStart(3, '0')}`;
+
+  const selectedClient = useMemo(() => 
+    allKnownClients.find(c => c.id === selectedClientId), 
+    [allKnownClients, selectedClientId]
+  );
+
+  const handleClientTypeChange = (type: ClientType) => {
+    setClientType(type);
+    if (type === 'registered') {
+      if (selectedClient) {
+        setClientCode(selectedClient.clientCode);
+        setCompanyName(selectedClient.companyName);
+        setContactPerson(selectedClient.contactName || '');
+        setMobileNumber(selectedClient.contactNo);
+        setEmail(selectedClient.email || '');
+      }
+    } else {
+      setSelectedClientId('');
       setClientCode('');
       setCompanyName('');
       setContactPerson('');
       setMobileNumber('');
       setEmail('');
-      setIsTemporaryClient(false);
-      return;
     }
-    const allKnown = [...clients, ...(temporaryClients || [])];
-    const found = allKnown.find((c) => c.id === cId);
-    if (found) {
-      setClientCode(found.clientCode);
-      setCompanyName(found.companyName);
-      setContactPerson(found.contactName || '');
-      setMobileNumber(found.contactNo);
-      setEmail(found.email || '');
-      setIsTemporaryClient(!!found.isTemporary);
+    Keyboard.dismiss();
+  };
+
+  const handleClientSelect = (cId: string) => {
+    setSelectedClientId(cId);
+    const client = allKnownClients.find(c => c.id === cId);
+    if (client) {
+      setClientCode(client.clientCode);
+      setCompanyName(client.companyName);
+      setContactPerson(client.contactName || '');
+      setMobileNumber(client.contactNo);
+      setEmail(client.email || '');
     }
+    Keyboard.dismiss();
   };
 
   const handleClientCreated = (newClient: Client) => {
@@ -90,11 +93,17 @@ export const CreateQuotationModal: React.FC<CreateQuotationModalProps> = ({ visi
     setContactPerson(newClient.contactName || '');
     setMobileNumber(newClient.contactNo);
     setEmail(newClient.email || '');
-    setIsTemporaryClient(!!newClient.isTemporary);
-    setSuccessMsg('Client Registered Successfully');
+    setCreateClientVisible(false);
+    setSuccessMsg('New client registered and selected');
+    Keyboard.dismiss();
   };
 
- const handleSubmit = async () => {
+  const handleAddNewClient = () => {
+    setSelectedClientId('');
+    setCreateClientVisible(true);
+  };
+
+  const handleSubmit = async () => {
     setErrorMsg('');
     setSuccessMsg('');
 
@@ -120,31 +129,16 @@ export const CreateQuotationModal: React.FC<CreateQuotationModalProps> = ({ visi
     }
 
     try {
-      let finalClientId = selectedClientId;
-      let finalClientCode = clientCode.trim() || nextTempCode;
-
-      // AGAR DROP-DOWN ME CLIENT SELECT NAHI KIYA GAYA HAI:
-      if (!finalClientId) {
-        const newTemp = await createClient({
-          companyName: companyName.trim(),
-          clientCode: finalClientCode,
-          contactName: contactPerson.trim(),
-          contactNo: mobileNumber.trim(),
-          email: email.trim(),
-          isTemporary: true,
-        });
-
-        // Ensure newly generated id & code are assigned immediately
-        finalClientId = newTemp?.id;
-        if (newTemp?.clientCode) {
-          finalClientCode = newTemp.clientCode;
-        }
-      }
+      const finalClientId = clientType === 'registered' ? selectedClientId : undefined;
+      const finalClientCode =
+        clientType === 'registered'
+          ? clientCode.trim()
+          : clientCode.trim() || undefined;
 
       const created = await createQuotation({
         companyName: companyName.trim(),
         clientCode: finalClientCode,
-        clientId: finalClientId, // Ab yeh guaranteed valid id rahegi
+        clientId: finalClientId,
         contactPerson: contactPerson.trim(),
         mobileNumber: mobileNumber.trim(),
         email: email.trim(),
@@ -167,8 +161,8 @@ export const CreateQuotationModal: React.FC<CreateQuotationModalProps> = ({ visi
   };
 
   const handleReset = () => {
+    setClientType('registered');
     setSelectedClientId('');
-    setIsTemporaryClient(false);
     setClientCode('');
     setCompanyName('');
     setContactPerson('');
@@ -188,6 +182,13 @@ export const CreateQuotationModal: React.FC<CreateQuotationModalProps> = ({ visi
 
   const statusOptions: QuotationStatus[] = ['DRAFT', 'SENT', 'UNDER_DISCUSSION', 'NEGOTIATION', 'APPROVED'];
 
+  const registeredOptions = allRegisteredClients.map((c) => ({
+    id: c.id,
+    label: c.companyName,
+    code: c.clientCode,
+    sublabel: c.contactName ? `Contact: ${c.contactName}` : 'Registered Client',
+  }));
+
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={handleReset}>
       <TouchableOpacity style={[styles.backdrop, isMobile && { padding: 10 }]} activeOpacity={1} onPress={handleReset}>
@@ -204,7 +205,7 @@ export const CreateQuotationModal: React.FC<CreateQuotationModalProps> = ({ visi
             </TouchableOpacity>
           </View>
 
-          <ScrollView style={styles.formScroll} showsVerticalScrollIndicator={false}>
+          <ScrollView style={styles.formScroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
             <View style={styles.formGroup}>
               {errorMsg ? (
                 <View style={styles.errorBanner}>
@@ -217,151 +218,140 @@ export const CreateQuotationModal: React.FC<CreateQuotationModalProps> = ({ visi
                 </View>
               ) : null}
 
-              {/* Client Searchable Dropdown */}
-              <SearchableDropdown
-                label="Select Client (Directory or Temporary)"
-                placeholder="Search registered client or select prospect..."
-                options={[
-                  ...clients.map((c) => ({
-                    id: c.id,
-                    label: c.companyName,
-                    code: c.clientCode,
-                    sublabel: c.contactName ? `🏢 Permanent Directory • Contact: ${c.contactName}` : '🏢 Permanent Directory',
-                  })),
-                  ...(temporaryClients || []).map((c) => ({
-                    id: c.id,
-                    label: `${c.companyName} [Temporary]`,
-                    code: c.clientCode,
-                    sublabel: c.contactName ? `⏳ Temporary DB • Contact: ${c.contactName}` : '⏳ Temporary DB',
-                  })),
-                ]}
-                selectedValue={selectedClientId}
-                onSelect={handleSelectClient}
-                allowManual={true}
-                manualLabel="+ Register Temporary Client"
-                manualId=""
-                onManualPress={() => {
-                  setSelectedClientId('');
-                  setIsTemporaryClient(true);
-                  setClientCode(nextTempCode);
-                  setCompanyName('');
-                  setContactPerson('');
-                  setMobileNumber('');
-                  setEmail('');
-                }}
-              />
-
-              {/* Temporary Client Registration Option Box */}
-              {!selectedClientId ? (
-                <TouchableOpacity
-                  // style={[styles.tempToggleBox, isTemporaryClient && styles.tempToggleBoxActive]}
-                  onPress={() => {
-                    const nextVal = !isTemporaryClient;
-                    setIsTemporaryClient(nextVal);
-                    if (nextVal && (!clientCode || clientCode.startsWith('CL-'))) {
-                      setClientCode(nextTempCode);
-                    }
-                  }}
-                  activeOpacity={0.8}
-                >
-                  {/* <View style={[styles.tempCheckbox, isTemporaryClient && styles.tempCheckboxChecked]}>
-                    <Text style={styles.tempCheckboxText}>{isTemporaryClient ? '✓' : ''}</Text>
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.tempToggleTitle}>Register client in temporary database (Prospect / Lead)</Text>
-                    <Text style={styles.tempToggleSub}>
-                      {isTemporaryClient
-                        ? '⚡ Client will be saved in the temporary database. They will ONLY move to the permanent Client Directory once this quotation is approved and converted to an order.'
-                        : 'Store client details as a temporary lead without adding them to the permanent Client Directory.'}
+              {/* Client Type Selector */}
+              <View style={styles.clientTypeSelector}>
+                <Text style={styles.label}>Client Type *</Text>
+                <View style={styles.segmentedControl}>
+                  <TouchableOpacity
+                    style={[
+                      styles.segmentButton,
+                      clientType === 'registered' && styles.segmentButtonActive,
+                    ]}
+                    onPress={() => handleClientTypeChange('registered')}
+                  >
+                    <Text style={[
+                      styles.segmentButtonText,
+                      clientType === 'registered' && styles.segmentButtonTextActive,
+                    ]}>
+                      Registered
                     </Text>
-                  </View> */}
-                </TouchableOpacity>
-              ) : isTemporaryClient ? (
-                <View style={[styles.tempToggleBox, { backgroundColor: 'rgba(245, 158, 11, 0.12)' }]}>
-                  <Text style={{ fontSize: 16 }}>⏳</Text>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.tempToggleTitle}>Linked to Temporary Prospect ({clientCode})</Text>
-                    <Text style={styles.tempToggleSub}>
-                      This client is currently in the temporary database and will be automatically promoted to permanent when converted to an order.
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      styles.segmentButton,
+                      clientType === 'non_registered' && styles.segmentButtonActive,
+                    ]}
+                    onPress={() => handleClientTypeChange('non_registered')}
+                  >
+                    <Text style={[
+                      styles.segmentButtonText,
+                      clientType === 'non_registered' && styles.segmentButtonTextActive,
+                    ]}>
+                      Non Registered
                     </Text>
-                  </View>
+                  </TouchableOpacity>
                 </View>
-              ) : null}
+              </View>
 
-              {/* Company Name & Client Code */}
-              <View style={styles.rowTwo}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.label}>Company / Client Name *</Text>
+              {/* Company / Client Name */}
+              <View style={styles.formField}>
+                <Text style={styles.label}>Company / Client Name *</Text>
+                {clientType === 'registered' ? (
+                  <SearchableDropdown
+                    label=""
+                    placeholder="Search and select a registered client..."
+                    options={registeredOptions}
+                    selectedValue={selectedClientId}
+                    onSelect={handleClientSelect}
+                    allowManual={true}
+                    manualLabel="+ Add New Client"
+                    onManualPress={handleAddNewClient}
+                  />
+                ) : (
                   <TextInput
                     style={styles.input}
                     placeholder="e.g. Apex Heavy Engineering"
                     placeholderTextColor="#94a3b8"
                     value={companyName}
                     onChangeText={setCompanyName}
+                    autoCapitalize="words"
                   />
-                </View>
-                <View style={{ width: 140 }}>
-                  <Text style={styles.label}>Client Code *</Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="e.g. CL-1001"
-                    placeholderTextColor="#94a3b8"
-                    autoCapitalize="characters"
-                    value={clientCode}
-                    onChangeText={setClientCode}
-                  />
-                </View>
+                )}
               </View>
 
-              {/* Contact Person & Mobile */}
-              <View style={styles.rowTwo}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.label}>Contact Person *</Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="e.g. Rajesh Mehta"
-                    placeholderTextColor="#94a3b8"
-                    value={contactPerson}
-                    onChangeText={setContactPerson}
-                  />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.label}>Mobile Number *</Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="e.g. +91 98765 43210"
-                    placeholderTextColor="#94a3b8"
-                    keyboardType="phone-pad"
-                    value={mobileNumber}
-                    onChangeText={setMobileNumber}
-                  />
-                </View>
+              {/* Client Code */}
+              <View style={styles.formField}>
+                <Text style={styles.label}>Client Code *</Text>
+                <TextInput
+                  style={[
+                    styles.input,
+                    clientType === 'registered' && styles.inputDisabled,
+                  ]}
+                  placeholder={
+                    clientType === 'registered'
+                      ? 'Auto-filled from selected client'
+                      : 'Leave blank for auto-generation (TMP-...)'
+                  }
+                  placeholderTextColor="#94a3b8"
+                  autoCapitalize="characters"
+                  value={clientCode}
+                  onChangeText={setClientCode}
+                  editable={clientType === 'non_registered'}
+                />
               </View>
 
-              {/* Email & Inquiry Ref */}
-              <View style={styles.rowTwo}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.label}>Email Address *</Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="e.g. contact@apexheavy.com"
-                    placeholderTextColor="#94a3b8"
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                    value={email}
-                    onChangeText={setEmail}
-                  />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.label}>Inquiry Reference</Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="e.g. INQ-2026-88"
-                    placeholderTextColor="#94a3b8"
-                    value={inquiryRef}
-                    onChangeText={setInquiryRef}
-                  />
-                </View>
+              {/* Contact Person */}
+              <View style={styles.formField}>
+                <Text style={styles.label}>Contact Person *</Text>
+                <TextInput
+                  style={[styles.input, clientType === 'registered' && selectedClient && styles.inputDisabled]}
+                  placeholder="e.g. Rajesh Mehta"
+                  placeholderTextColor="#94a3b8"
+                  value={contactPerson}
+                  onChangeText={setContactPerson}
+                  editable={clientType === 'non_registered'}
+                />
+              </View>
+
+              {/* Mobile Number */}
+              <View style={styles.formField}>
+                <Text style={styles.label}>Mobile Number *</Text>
+                <TextInput
+                  style={[styles.input, clientType === 'registered' && selectedClient && styles.inputDisabled]}
+                  placeholder="e.g. +91 98765 43210"
+                  placeholderTextColor="#94a3b8"
+                  keyboardType="phone-pad"
+                  value={mobileNumber}
+                  onChangeText={setMobileNumber}
+                  editable={clientType === 'non_registered'}
+                />
+              </View>
+
+              {/* Email Address */}
+              <View style={styles.formField}>
+                <Text style={styles.label}>Email Address *</Text>
+                <TextInput
+                  style={[styles.input, clientType === 'registered' && selectedClient && styles.inputDisabled]}
+                  placeholder="e.g. contact@apexheavy.com"
+                  placeholderTextColor="#94a3b8"
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  value={email}
+                  onChangeText={setEmail}
+                  editable={clientType === 'non_registered'}
+                />
+              </View>
+
+              {/* Inquiry Reference */}
+              <View style={styles.formField}>
+                <Text style={styles.label}>Inquiry Reference</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="e.g. INQ-2026-88"
+                  placeholderTextColor="#94a3b8"
+                  value={inquiryRef}
+                  onChangeText={setInquiryRef}
+                />
               </View>
 
               {/* Quotation Amount & Expected Order Value */}
@@ -413,50 +403,53 @@ export const CreateQuotationModal: React.FC<CreateQuotationModalProps> = ({ visi
               </View>
 
               {/* Initial Status */}
-              <Text style={styles.label}>Initial Quotation Status</Text>
-              <View style={styles.statusChipsRow}>
-                {statusOptions.map((st) => {
-                  const isSel = status === st;
-                  return (
-                    <TouchableOpacity
-                      key={st}
-                      style={[styles.statusChip, isSel && styles.statusChipActive]}
-                      onPress={() => setStatus(st)}
-                    >
-                      <Text style={[styles.statusChipText, isSel && styles.statusChipTextActive]}>
-                        {st.replace(/_/g, ' ')}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
+              <View style={styles.formField}>
+                <Text style={styles.label}>Initial Quotation Status</Text>
+                <View style={styles.statusChipsRow}>
+                  {statusOptions.map((st) => {
+                    const isSel = status === st;
+                    return (
+                      <TouchableOpacity
+                        key={st}
+                        style={[styles.statusChip, isSel && styles.statusChipActive]}
+                        onPress={() => setStatus(st)}
+                      >
+                        <Text style={[styles.statusChipText, isSel && styles.statusChipTextActive]}>
+                          {st.replace(/_/g, ' ')}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
               </View>
 
               {/* Remarks */}
-              <Text style={styles.label}>Remarks & Technical Notes</Text>
-              <TextInput
-                style={[styles.input, { height: 60, textAlignVertical: 'top' }]}
-                placeholder="Enter quotation specifications, payment terms, or lead time notes..."
-                placeholderTextColor="#94a3b8"
-                multiline
-                value={remarks}
-                onChangeText={setRemarks}
-              />
+              <View style={styles.formField}>
+                <Text style={styles.label}>Remarks & Technical Notes</Text>
+                <TextInput
+                  style={[styles.input, { height: 60, textAlignVertical: 'top' }]}
+                  placeholder="Enter quotation specifications, payment terms, or lead time notes..."
+                  placeholderTextColor="#94a3b8"
+                  multiline
+                  value={remarks}
+                  onChangeText={setRemarks}
+                />
+              </View>
 
               {/* Submit Button */}
               <TouchableOpacity style={styles.submitBtn} onPress={handleSubmit}>
                 <Text style={styles.submitBtnText}>✓ Save & Generate Quotation</Text>
               </TouchableOpacity>
             </View>
-          </ScrollView>
+</ScrollView>
         </TouchableOpacity>
-      </TouchableOpacity>
-      {/* Nested Register New Client Modal */}
-      <CreateClientModal
-        visible={createClientVisible}
-        onClose={() => setCreateClientVisible(false)}
-        onClientCreated={handleClientCreated}
-      />
-    </Modal>
+       </TouchableOpacity>
+       <CreateClientModal
+         visible={createClientVisible}
+         onClose={() => setCreateClientVisible(false)}
+         onClientCreated={handleClientCreated}
+       />
+     </Modal>
   );
 };
 
@@ -513,8 +506,8 @@ const styles = StyleSheet.create({
   formGroup: {
     gap: Spacing.px10,
   },
-  clientSelectSection: {
-    marginBottom: 4,
+  formField: {
+    gap: Spacing.xs,
   },
   label: {
     color: Colors.accentTeal,
@@ -532,30 +525,14 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.borderDark,
   },
+  inputDisabled: {
+    backgroundColor: Colors.inputBgDisabled,
+    borderColor: Colors.borderDark,
+    color: Colors.textMuted,
+  },
   rowTwo: {
     flexDirection: 'row',
     gap: Spacing.px10,
-  },
-  clientChip: {
-    backgroundColor: Colors.inputBg,
-    paddingHorizontal: Spacing.px10,
-    paddingVertical: Spacing.xs,
-    borderRadius: Radius.sm,
-    borderWidth: 1,
-    borderColor: Colors.borderDark,
-  },
-  clientChipActive: {
-    backgroundColor: Colors.accentTeal,
-    borderColor: Colors.accentTeal,
-  },
-  clientChipText: {
-    color: Colors.textSubtle,
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  clientChipTextActive: {
-    color: Colors.white,
-    fontWeight: '800',
   },
   statusChipsRow: {
     flexDirection: 'row',
@@ -620,48 +597,35 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
   },
-  tempToggleBox: {
+  clientTypeSelector: {
+    gap: Spacing.xs,
+    marginBottom: Spacing.xs,
+  },
+  segmentedControl: {
     flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(245, 158, 11, 0.08)',
+    backgroundColor: Colors.inputBg,
     borderRadius: Radius.md,
     borderWidth: 1,
-    borderColor: 'rgba(245, 158, 11, 0.35)',
-    padding: Spacing.sm,
-    marginVertical: Spacing.xs,
-    gap: Spacing.sm,
+    borderColor: Colors.borderDark,
+    overflow: 'hidden',
   },
-  tempToggleBoxActive: {
-    backgroundColor: 'rgba(245, 158, 11, 0.16)',
-    borderColor: '#f59e0b',
-  },
-  tempCheckbox: {
-    width: 22,
-    height: 22,
-    borderRadius: 5,
-    borderWidth: 2,
-    borderColor: '#f59e0b',
+  segmentButton: {
+    flex: 1,
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.md,
     alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: Colors.inputBg,
   },
-  tempCheckboxChecked: {
-    backgroundColor: '#f59e0b',
+  segmentButtonActive: {
+    backgroundColor: Colors.accentTeal,
+    borderColor: Colors.accentTeal,
   },
-  tempCheckboxText: {
-    color: '#000',
-    fontSize: 13,
-    fontWeight: '900',
-  },
-  tempToggleTitle: {
-    color: '#fbbf24',
+  segmentButtonText: {
+    color: Colors.textSubtle,
     fontSize: 12,
-    fontWeight: '800',
+    fontWeight: '700',
   },
-  tempToggleSub: {
-    color: Colors.textMuted,
-    fontSize: 11,
-    marginTop: 2,
-    lineHeight: 15,
+  segmentButtonTextActive: {
+    color: Colors.white,
+    fontWeight: '800',
   },
 });
