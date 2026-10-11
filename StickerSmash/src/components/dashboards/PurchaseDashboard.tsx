@@ -1,27 +1,29 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, TextInput, StyleSheet, useWindowDimensions } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, useWindowDimensions } from 'react-native';
 import { useERP } from '../../context/ERPContext';
-import { DepartmentStatus, Order } from '../../types';
-import { Colors, StatusColors, Spacing, Radius, Shadows } from '../../theme';
+import { DepartmentStatus, Order, PurchaseBatch } from '../../types';
+import { Colors, StatusColors, Spacing, Radius } from '../../theme';
 import { TaskKPICards } from './TaskKPICards';
 import { OrderKPICards } from './OrderKPICards';
 import { PurchaseBatchModal } from './PurchaseBatchModal';
+import { ReceiveMaterialModal } from './ReceiveMaterialModal';
 import { OrderQuantityTracker } from '../OrderQuantityTracker';
 import { ExportButton } from '../ui/ExportButton';
 import { ExportDataPayload } from '../../utils/exportUtils';
-import { SearchableDropdown } from '../ui/SearchableDropdown';
 
 export const PurchaseDashboard: React.FC = () => {
   const { width } = useWindowDimensions();
   const isMobile = width < 768;
-  const { getMaskedOrders, addPurchaseBatch, setSelectedOrder, vendors } = useERP();
+  const { getMaskedOrders, addPurchaseBatch, receivePurchaseBatch, setSelectedOrder } = useERP();
   const maskedOrders = getMaskedOrders().filter((o) => o.purchaseRequired);
-
-  const [selectedVendorMap, setSelectedVendorMap] = useState<{ [key: string]: string }>({});
-  const [notesMap, setNotesMap] = useState<{ [key: string]: string }>({});
 
   const [processModalVisible, setProcessModalVisible] = useState(false);
   const [selectedProcessOrder, setSelectedProcessOrder] = useState<Order | null>(null);
+
+  const [receiveModalVisible, setReceiveModalVisible] = useState(false);
+  const [selectedReceiveOrder, setSelectedReceiveOrder] = useState<Order | null>(null);
+  const [selectedReceiveBatch, setSelectedReceiveBatch] = useState<PurchaseBatch | null>(null);
+
   const [activeTab, setActiveTab] = useState<'PENDING' | 'COMPLETED'>('PENDING');
 
   const filteredOrders = maskedOrders.filter((o) =>
@@ -29,32 +31,101 @@ export const PurchaseDashboard: React.FC = () => {
   );
 
   const getPurchaseExportPayload = (): ExportDataPayload => {
+    const headers = [
+      'Order No',
+      'PO Number',
+      'Material Spec',
+      'Order Required Qty',
+      'Vendor Name',
+      'Qty Ordered with Vendor',
+      'Qty Received',
+      'Pending Qty',
+      'Receiving Date',
+      'Invoice / Bill Number',
+      'Batch Status',
+      'Overall Purchase Status',
+      'Remarks',
+    ];
+
+    const rows: (string | number)[][] = [];
+
+    maskedOrders.forEach((o) => {
+      if (o.purchaseBatches && o.purchaseBatches.length > 0) {
+        o.purchaseBatches.forEach((b: any) => {
+          const qtyOrdered = b.quantityOrdered || b.quantityReceived || 0;
+          const qtyReceived = b.quantityReceived || 0;
+          const pending = Math.max(0, qtyOrdered - qtyReceived);
+          rows.push([
+            o.orderNumber,
+            o.poNumber || 'N/A',
+            o.materialRequirements || 'Standard Spec',
+            o.requiredQuantity,
+            b.vendorName || 'N/A',
+            qtyOrdered,
+            qtyReceived,
+            pending,
+            b.receivingDate || b.deliveryDate || 'N/A',
+            b.invoiceNumber || b.invoiceRef || 'N/A',
+            b.status === 'FULLY_RECEIVED'
+              ? 'Fully Received'
+              : qtyReceived > 0
+              ? 'Partially Received'
+              : 'Order Placed (Pending Receive)',
+            o.purchaseStatus === 'COMPLETED'
+              ? 'Purchase Done'
+              : qtyReceived > 0
+              ? 'Partially Received'
+              : 'Order Placed / Pending Receive',
+            b.remarks || '',
+          ]);
+        });
+      } else {
+        rows.push([
+          o.orderNumber,
+          o.poNumber || 'N/A',
+          o.materialRequirements || 'Standard Spec',
+          o.requiredQuantity,
+          o.vendorSelected || 'Pending Sourcing',
+          0,
+          o.purchaseQuantity || 0,
+          Math.max(0, o.requiredQuantity - (o.purchaseQuantity || 0)),
+          'N/A',
+          'N/A',
+          'Pending Order Placement',
+          o.purchaseStatus || 'PENDING',
+          o.procurementNotes || '',
+        ]);
+      }
+    });
+
     return {
-      title: 'Purchase & Procurement Queue Report',
-      filename: 'Purchase_Orders_Report',
-      headers: ['Order No', 'PO Number', 'Material Spec', 'Required Qty', 'Procured Qty', 'Vendor Selected', 'Status'],
-      rows: maskedOrders.map((o) => [
-        o.orderNumber,
-        o.poNumber,
-        o.materialRequirements || 'SS316L Raw Bars',
-        o.requiredQuantity,
-        o.purchaseQuantity || 0,
-        o.vendorSelected || 'Pending Sourcing',
-        o.purchaseStatus,
-      ]),
+      title: 'Purchase & Vendor Procurement Detailed Breakup Report',
+      filename: 'Purchase_Detailed_Procurement_Report',
+      headers,
+      rows,
     };
   };
-
-  const sampleVendors = vendors.length > 0
-    ? vendors.filter((v) => v.status === 'ACTIVE').map((v) => v.vendorName)
-    : ['Jindal Stainless Steel Works', 'Global Steel Supply Inc.', 'Bharat Forgings Vendor Unit A', 'Apex Alloys & Tubes Ltd'];
 
   const handleOpenProcessModal = (ord: Order) => {
     setSelectedProcessOrder(ord);
     setProcessModalVisible(true);
   };
 
-  const handleAddBatch = async (data: { vendorName: string; quantityReceived: number; cost: number; remarks: string }) => {
+  const handleOpenReceiveModal = (ord: Order, batch: PurchaseBatch) => {
+    setSelectedReceiveOrder(ord);
+    setSelectedReceiveBatch(batch);
+    setReceiveModalVisible(true);
+  };
+
+  const handleAddBatch = async (data: {
+    vendorName: string;
+    quantityOrdered: number;
+    quantityReceived?: number;
+    cost?: number;
+    invoiceNumber?: string;
+    receivingDate?: string;
+    remarks?: string;
+  }) => {
     if (!selectedProcessOrder) return;
     try {
       await addPurchaseBatch(selectedProcessOrder.id, data as any);
@@ -62,27 +133,86 @@ export const PurchaseDashboard: React.FC = () => {
       setSelectedProcessOrder(null);
     } catch (err: any) {
       console.error('Failed to add purchase batch:', err);
+      alert(err.message || 'Failed to place purchase batch order');
     }
   };
 
-  const getStatusBadgeStyle = (status: DepartmentStatus, purQty: number = 0, reqQty: number = 50) => {
-    if (purQty >= reqQty && reqQty > 0) {
-      return { bg: StatusColors.COMPLETED.bg, text: StatusColors.COMPLETED.text, border: StatusColors.COMPLETED.border, label: 'COMPLETED (100%)' };
+  const handleReceiveBatch = async (data: {
+    receivedQuantity: number;
+    invoiceNumber: string;
+    receivingDate: string;
+    remarks?: string;
+  }) => {
+    if (!selectedReceiveOrder || !selectedReceiveBatch) return;
+    try {
+      await receivePurchaseBatch(selectedReceiveOrder.id, selectedReceiveBatch.id, data);
+      setReceiveModalVisible(false);
+      setSelectedReceiveOrder(null);
+      setSelectedReceiveBatch(null);
+    } catch (err: any) {
+      console.error('Failed to receive batch:', err);
+      alert(err.message || 'Failed to record material receipt');
+    }
+  };
+
+  const getStatusBadgeStyle = (ord: Order) => {
+    const purQty = ord.purchaseQuantity || 0;
+    const reqQty = ord.requiredQuantity || 1;
+    const batches = ord.purchaseBatches || [];
+    const hasBatches = batches.length > 0;
+    const allFullyReceived =
+      hasBatches &&
+      batches.every((b) => (b.quantityReceived || 0) >= (b.quantityOrdered || b.quantityReceived || 0));
+
+    if (ord.purchaseStatus === 'COMPLETED' || (purQty >= reqQty && reqQty > 0 && allFullyReceived)) {
+      return {
+        bg: StatusColors.COMPLETED.bg,
+        text: StatusColors.COMPLETED.text,
+        border: StatusColors.COMPLETED.border,
+        label: '✓ PURCHASE DONE (100%)',
+      };
     }
     if (purQty > 0) {
-      return { bg: StatusColors.IN_PROGRESS.bg, text: StatusColors.IN_PROGRESS.text, border: StatusColors.IN_PROGRESS.border, label: `PARTIALLY RECEIVED (${purQty}/${reqQty})` };
+      return {
+        bg: StatusColors.IN_PROGRESS.bg,
+        text: StatusColors.IN_PROGRESS.text,
+        border: StatusColors.IN_PROGRESS.border,
+        label: `PARTIALLY RECEIVED (${purQty}/${reqQty} PCS)`,
+      };
     }
-    return { bg: StatusColors.PENDING.bg, text: StatusColors.PENDING.text, border: StatusColors.PENDING.border, label: 'PENDING' };
+    if (hasBatches) {
+      return {
+        bg: 'rgba(2, 132, 199, 0.15)',
+        text: '#0284c7',
+        border: '#0284c7',
+        label: `ORDER PLACED / PENDING RECEIVE (0/${reqQty} PCS)`,
+      };
+    }
+    return {
+      bg: StatusColors.PENDING.bg,
+      text: StatusColors.PENDING.text,
+      border: StatusColors.PENDING.border,
+      label: 'PENDING SOURCING',
+    };
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={isMobile ? { paddingBottom: 24 } : { paddingBottom: 32 }} showsVerticalScrollIndicator={false}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={isMobile ? { paddingBottom: 24 } : { paddingBottom: 32 }}
+      showsVerticalScrollIndicator={false}
+    >
       {/* Top Banner */}
-      <View style={[styles.banner, isMobile && { flexDirection: 'column', alignItems: 'flex-start', gap: 10 }]}>
+      <View
+        style={[
+          styles.banner,
+          isMobile && { flexDirection: 'column', alignItems: 'flex-start', gap: 10 },
+        ]}
+      >
         <View style={{ flex: 1 }}>
           <Text style={styles.bannerTitle}>Purchase & Material Procurement Queue</Text>
           <Text style={styles.bannerSub}>
-            Track raw material requirements, select vendors, and verify stock receipt with quantity tracking.
+            Split orders across vendors, track Order Placed / Pending Receive status, and confirm physical warehouse receipt.
           </Text>
         </View>
         <ExportButton getData={getPurchaseExportPayload} buttonText="Export Purchase Data" />
@@ -101,7 +231,7 @@ export const PurchaseDashboard: React.FC = () => {
           onPress={() => setActiveTab('PENDING')}
         >
           <Text style={[styles.tabBtnText, activeTab === 'PENDING' && styles.tabBtnTextActive]}>
-            ⏳ Pending Purchase ({maskedOrders.filter((o) => o.purchaseStatus !== 'COMPLETED').length})
+            ⏳ Pending / In-Progress Purchase ({maskedOrders.filter((o) => o.purchaseStatus !== 'COMPLETED').length})
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -117,18 +247,28 @@ export const PurchaseDashboard: React.FC = () => {
       {/* Procurement Order Queue */}
       <View style={styles.sectionCard}>
         <Text style={styles.sectionTitle}>
-          {activeTab === 'PENDING' ? 'Pending Procurement Work Orders' : 'Completed Procurement Work Orders'}
+          {activeTab === 'PENDING'
+            ? 'Active Procurement Orders & Delivery Tracking'
+            : 'Completed Procurement Work Orders'}
         </Text>
 
         {filteredOrders.length === 0 ? (
-          <Text style={styles.emptyText}>No {activeTab.toLowerCase()} purchase orders.</Text>
+          <Text style={styles.emptyText}>No {activeTab.toLowerCase()} purchase orders found.</Text>
         ) : (
           filteredOrders.map((ord) => {
             const purQty = ord.purchaseQuantity || 0;
-            const badgeStyle = getStatusBadgeStyle(ord.purchaseStatus, purQty, ord.requiredQuantity);
+            const badgeStyle = getStatusBadgeStyle(ord);
+            const batches = ord.purchaseBatches || [];
+            const totalOrdered = batches.reduce(
+              (sum, b) => sum + (b.quantityOrdered || b.quantityReceived || 0),
+              0
+            );
 
             return (
-              <View key={ord.id} style={[styles.orderCard, { borderLeftWidth: 4, borderLeftColor: badgeStyle.bg }]}>
+              <View
+                key={ord.id}
+                style={[styles.orderCard, { borderLeftWidth: 4, borderLeftColor: badgeStyle.bg }]}
+              >
                 <View style={styles.cardHeader}>
                   <TouchableOpacity onPress={() => setSelectedOrder(ord)}>
                     <View style={styles.orderRefRow}>
@@ -137,125 +277,198 @@ export const PurchaseDashboard: React.FC = () => {
                         <Text style={styles.codeBadgeText}>Client Code: {ord.clientCode}</Text>
                       </View>
                     </View>
-                    <Text style={styles.poNumberText}>PO Ref: {ord.poNumber}</Text>
+                    <Text style={styles.poNumberText}>PO Ref: {ord.poNumber || 'N/A'}</Text>
                   </TouchableOpacity>
 
-                  <View style={[styles.statusBadge, { backgroundColor: badgeStyle.bg, borderWidth: 1, borderColor: badgeStyle.border }]}>
-                    <Text style={[styles.statusBadgeText, { color: badgeStyle.text }]}>{badgeStyle.label}</Text>
+                  <View
+                    style={[
+                      styles.statusBadge,
+                      {
+                        backgroundColor: badgeStyle.bg,
+                        borderWidth: 1,
+                        borderColor: badgeStyle.border,
+                      },
+                    ]}
+                  >
+                    <Text style={[styles.statusBadgeText, { color: badgeStyle.text }]}>
+                      {badgeStyle.label}
+                    </Text>
                   </View>
                 </View>
 
-                {/* Dynamic Content based on Status */}
-                {ord.purchaseStatus === 'COMPLETED' ? (
-                  <View style={styles.purchaseReportCard}>
-                    <Text style={styles.purchaseReportTitle}>✓ PURCHASE & SOURCING REPORT</Text>
-                    {ord.purchaseBatches && ord.purchaseBatches.length > 0 ? (
-                      <View>
-                        <View style={{ flexDirection: 'row', borderBottomWidth: 1, borderColor: Colors.borderMuted || '#CBD5E1', paddingBottom: 6, marginBottom: 6 }}>
-                          <Text style={[styles.purchaseReportLabel, { flex: 2 }]}>Vendor</Text>
-                          <Text style={[styles.purchaseReportLabel, { flex: 1 }]}>Qty</Text>
-                          <Text style={[styles.purchaseReportLabel, { flex: 1, textAlign: 'right' }]}>Cost</Text>
-                        </View>
-                        {ord.purchaseBatches.map(b => (
-                          <View key={b.id} style={{ flexDirection: 'row', marginBottom: 4 }}>
-                            <Text style={[styles.purchaseReportValue, { flex: 2, color: Colors.accentTeal || '#29585C' }]}>{b.vendorName}</Text>
-                            <Text style={[styles.purchaseReportValue, { flex: 1 }]}>{b.quantityReceived}</Text>
-                            <Text style={[styles.purchaseReportValue, { flex: 1, textAlign: 'right' }]}>{b.cost ? `₹${b.cost}` : '-'}</Text>
-                          </View>
-                        ))}
-                        <View style={{ flexDirection: 'row', borderTopWidth: 1, borderColor: Colors.borderMuted || '#CBD5E1', paddingTop: 6, marginTop: 6 }}>
-                          <Text style={[styles.purchaseReportLabel, { flex: 2 }]}>TOTAL:</Text>
-                          <Text style={[styles.purchaseReportValueHighlight, { flex: 1 }]}>{ord.purchaseQuantity} / {ord.requiredQuantity} pcs</Text>
-                          <Text style={[styles.purchaseReportValueHighlight, { flex: 1, textAlign: 'right', color: '#10b981' }]}>
-                            ₹{ord.purchaseBatches.reduce((sum, b) => sum + (b.cost || 0), 0)}
-                          </Text>
-                        </View>
-                      </View>
-                    ) : (
-                      <>
-                        <View style={styles.purchaseReportRow}>
-                          <Text style={styles.purchaseReportLabel}>Item / Material:</Text>
-                          <Text style={styles.purchaseReportValue}>{ord.materialRequirements || 'Steel Billet'}</Text>
-                        </View>
-                        <View style={styles.purchaseReportRow}>
-                          <Text style={styles.purchaseReportLabel}>Vendor / Supplier:</Text>
-                          <Text style={styles.purchaseReportValueHighlight}>{ord.vendorSelected || 'None'}</Text>
-                        </View>
-                        <View style={styles.purchaseReportRow}>
-                          <Text style={styles.purchaseReportLabel}>Procurement Notes:</Text>
-                          <Text style={styles.purchaseReportValue}>{ord.procurementNotes || 'Material fully procured.'}</Text>
-                        </View>
-                        <View style={styles.purchaseReportRow}>
-                          <Text style={styles.purchaseReportLabel}>Total Quantity Sourced:</Text>
-                          <Text style={styles.purchaseReportValue}>{ord.purchaseQuantity || ord.requiredQuantity} / {ord.requiredQuantity} pcs</Text>
-                        </View>
-                      </>
-                    )}
-                  </View>
-                  ) : (
-                  <OrderQuantityTracker order={ord} style={{ marginTop: Spacing.xs }} />
-                )}
+                {/* Live Quantity Tracking Bar */}
+                <OrderQuantityTracker order={ord} style={{ marginTop: Spacing.xs }} />
 
                 {/* Technical Spec & Raw Material Requirements */}
                 <View style={styles.specBox}>
                   <Text style={styles.specTitle}>RAW MATERIAL & TECHNICAL REQUIREMENT</Text>
-                  <Text style={styles.specVal}>Material: {ord.materialRequirements || 'Steel Billet'}</Text>
-                  <Text style={styles.specVal}>Quantity Required: <Text style={styles.bold}>{ord.requiredQuantity} pcs</Text></Text>
-                  <Text style={styles.specVal}>Material Received: <Text style={styles.bold}>{purQty} / {ord.requiredQuantity} pcs</Text></Text>
-                  <Text style={styles.specVal}>Technical Specs: {ord.technicalRequirements || 'Standard Flange Spec'}</Text>
+                  <Text style={styles.specVal}>
+                    Material: <Text style={styles.bold}>{ord.materialRequirements || 'Steel Billet / Raw Bars'}</Text>
+                  </Text>
+                  <View style={{ flexDirection: 'row', gap: 16, flexWrap: 'wrap', marginTop: 4 }}>
+                    <Text style={styles.specVal}>
+                      Order Required:{' '}
+                      <Text style={[styles.bold, { color: '#38bdf8' }]}>{ord.requiredQuantity} pcs</Text>
+                    </Text>
+                    <Text style={styles.specVal}>
+                      Vendor Ordered:{' '}
+                      <Text style={[styles.bold, { color: '#f59e0b' }]}>{totalOrdered} pcs</Text>
+                    </Text>
+                    <Text style={styles.specVal}>
+                      Received at Store:{' '}
+                      <Text style={[styles.bold, { color: '#10b981' }]}>{purQty} pcs</Text>
+                    </Text>
+                  </View>
+                  {ord.technicalRequirements ? (
+                    <Text style={[styles.specVal, { marginTop: 4 }]}>
+                      Technical Specs: {ord.technicalRequirements}
+                    </Text>
+                  ) : null}
                 </View>
 
-                {/* Vendor Selection & Notes (Only if Pending) */}
-                {ord.purchaseStatus !== 'COMPLETED' && (
-                  <>
-                    <View style={styles.vendorBox}>
-                      <SearchableDropdown
-                        label="Select Material Vendor / Supplier:"
-                        placeholder="Search or select material vendor..."
-                        options={sampleVendors.map((v) => ({
-                          id: v,
-                          label: v,
-                          sublabel: 'Approved Material Supplier',
-                          icon: '🏭',
-                        }))}
-                        selectedValue={selectedVendorMap[ord.id] || ord.vendorSelected || ''}
-                        onSelect={(v) => setSelectedVendorMap({ ...selectedVendorMap, [ord.id]: v })}
-                      />
+                {/* VENDOR BREAKDOWN & MATERIAL RECEIVING SECTION */}
+                <View style={styles.batchesSection}>
+                  <View style={styles.batchesSectionHeader}>
+                    <Text style={styles.batchesSectionTitle}>
+                      📋 VENDOR PURCHASE ORDERS & RECEIVING STATUS ({batches.length})
+                    </Text>
+                    <TouchableOpacity
+                      style={styles.addBatchSmallBtn}
+                      onPress={() => handleOpenProcessModal(ord)}
+                    >
+                      <Text style={styles.addBatchSmallBtnText}>+ Place Vendor Order</Text>
+                    </TouchableOpacity>
+                  </View>
 
-                      <Text style={[styles.inputLabel, { marginTop: 10 }]}>Procurement Remarks / Delivery Notes:</Text>
-                      <TextInput
-                        style={styles.input}
-                        placeholder="Enter warehouse gate receipt number or MTC ref..."
-                        placeholderTextColor="#94a3b8"
-                        value={notesMap[ord.id] !== undefined ? notesMap[ord.id] : ord.procurementNotes || ''}
-                        onChangeText={(txt) => setNotesMap({ ...notesMap, [ord.id]: txt })}
-                      />
+                  {batches.length === 0 ? (
+                    <View style={styles.noBatchesBox}>
+                      <Text style={styles.noBatchesText}>
+                        No purchase orders placed with vendors yet. Click "+ Place Vendor Order" to assign quantity to a vendor.
+                      </Text>
                     </View>
+                  ) : (
+                    <View style={styles.batchesList}>
+                      {batches.map((b) => {
+                        const bOrdered = b.quantityOrdered || b.quantityReceived || 0;
+                        const bReceived = b.quantityReceived || 0;
+                        const bPending = Math.max(0, bOrdered - bReceived);
+                        const isFullyReceived = bReceived >= bOrdered && bOrdered > 0;
+                        const isPartiallyReceived = bReceived > 0 && !isFullyReceived;
 
-                    {/* Action Buttons */}
-                    <View style={styles.actionRow}>
-                      <TouchableOpacity
-                        style={[styles.actionBtn, styles.btnProg, { flex: 1 }]}
-                        onPress={() => handleOpenProcessModal(ord)}
-                      >
-                        <Text style={styles.actionBtnText}>📦 Record Material Received (Batch)</Text>
-                      </TouchableOpacity>
+                        let batchStatusLabel = 'Order Placed (Pending Receive)';
+                        let batchStatusColor = '#0284c7';
+                        let batchStatusBg = 'rgba(2, 132, 199, 0.15)';
+
+                        if (isFullyReceived) {
+                          batchStatusLabel = '✓ Fully Received';
+                          batchStatusColor = '#10b981';
+                          batchStatusBg = 'rgba(16, 185, 129, 0.15)';
+                        } else if (isPartiallyReceived) {
+                          batchStatusLabel = `Partially Received (${bReceived}/${bOrdered})`;
+                          batchStatusColor = '#f59e0b';
+                          batchStatusBg = 'rgba(245, 158, 11, 0.15)';
+                        }
+
+                        return (
+                          <View key={b.id} style={styles.batchRowCard}>
+                            <View style={{ flex: 1 }}>
+                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                                <Text style={styles.batchVendorName}>🏭 {b.vendorName}</Text>
+                                <View
+                                  style={[
+                                    styles.batchStatusChip,
+                                    { backgroundColor: batchStatusBg, borderColor: batchStatusColor },
+                                  ]}
+                                >
+                                  <Text style={[styles.batchStatusChipText, { color: batchStatusColor }]}>
+                                    {batchStatusLabel}
+                                  </Text>
+                                </View>
+                              </View>
+
+                              {/* Quantity breakdown */}
+                              <View style={styles.batchQtyRow}>
+                                <Text style={styles.batchQtyItem}>
+                                  Ordered: <Text style={styles.batchQtyBold}>{bOrdered} pcs</Text>
+                                </Text>
+                                <Text style={styles.batchQtyItem}>
+                                  Received: <Text style={[styles.batchQtyBold, { color: '#10b981' }]}>{bReceived} pcs</Text>
+                                </Text>
+                                <Text style={styles.batchQtyItem}>
+                                  Pending: <Text style={[styles.batchQtyBold, { color: '#f59e0b' }]}>{bPending} pcs</Text>
+                                </Text>
+                                {b.cost ? (
+                                  <Text style={styles.batchQtyItem}>
+                                    Cost: <Text style={styles.batchQtyBold}>₹{b.cost}</Text>
+                                  </Text>
+                                ) : null}
+                              </View>
+
+                              {/* Delivery & Invoice Details */}
+                              <View style={styles.batchMetaRow}>
+                                {b.invoiceNumber || b.invoiceRef ? (
+                                  <Text style={styles.batchMetaText}>
+                                    📄 Invoice: <Text style={styles.batchMetaVal}>{b.invoiceNumber || b.invoiceRef}</Text>
+                                  </Text>
+                                ) : (
+                                  <Text style={styles.batchMetaPending}>📄 Invoice: Pending Delivery</Text>
+                                )}
+                                {b.receivingDate || b.deliveryDate ? (
+                                  <Text style={styles.batchMetaText}>
+                                    📅 Recv Date: <Text style={styles.batchMetaVal}>{b.receivingDate || b.deliveryDate}</Text>
+                                  </Text>
+                                ) : null}
+                                {b.remarks ? (
+                                  <Text style={styles.batchMetaText}>
+                                    📝 Notes: <Text style={styles.batchMetaVal}>{b.remarks}</Text>
+                                  </Text>
+                                ) : null}
+                              </View>
+                            </View>
+
+                            {/* Action: Receive Button */}
+                            <View style={styles.batchActionCol}>
+                              {!isFullyReceived ? (
+                                <TouchableOpacity
+                                  style={styles.receiveBtn}
+                                  onPress={() => handleOpenReceiveModal(ord, b)}
+                                >
+                                  <Text style={styles.receiveBtnText}>📥 Receive</Text>
+                                </TouchableOpacity>
+                              ) : (
+                                <View style={styles.receivedBadge}>
+                                  <Text style={styles.receivedBadgeText}>✓ Received</Text>
+                                </View>
+                              )}
+                            </View>
+                          </View>
+                        );
+                      })}
                     </View>
-                  </>
-                )}
+                  )}
+                </View>
               </View>
             );
           })
         )}
       </View>
 
-      {/* Stage-Wise Quantity Process Modal */}
+      {/* Place Vendor Order Modal */}
       <PurchaseBatchModal
-          visible={processModalVisible}
-          order={selectedProcessOrder}
-          onClose={() => setProcessModalVisible(false)}
-          onSubmit={handleAddBatch}
-        />
+        visible={processModalVisible}
+        order={selectedProcessOrder}
+        onClose={() => setProcessModalVisible(false)}
+        onSubmit={handleAddBatch}
+      />
+
+      {/* Receive Material Modal (3 Inputs: Received Qty, Invoice No, Receiving Date) */}
+      <ReceiveMaterialModal
+        visible={receiveModalVisible}
+        order={selectedReceiveOrder}
+        batch={selectedReceiveBatch}
+        onClose={() => setReceiveModalVisible(false)}
+        onSubmit={handleReceiveBatch}
+      />
     </ScrollView>
   );
 };
@@ -284,19 +497,6 @@ const styles = StyleSheet.create({
     color: Colors.primaryLight,
     fontSize: 12,
     marginTop: 2,
-  },
-  maskingBadge: {
-    backgroundColor: 'rgba(179, 75, 32, 0.2)',
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.px6,
-    borderRadius: Radius.sm,
-    borderWidth: 1,
-    borderColor: Colors.industrialOrange,
-  },
-  maskingBadgeText: {
-    color: Colors.highlightOrange,
-    fontSize: 11,
-    fontWeight: '800',
   },
   sectionCard: {
     backgroundColor: Colors.darkBlue,
@@ -350,53 +550,35 @@ const styles = StyleSheet.create({
   codeBadgeText: {
     color: Colors.white,
     fontSize: 11,
-    fontWeight: '800',
-  },
-  maskedTag: {
-    backgroundColor: 'rgba(179, 75, 32, 0.2)',
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: 3,
-    borderRadius: Radius.xs,
-  },
-  maskedTagText: {
-    color: Colors.highlightOrange,
-    fontSize: 11,
     fontWeight: '700',
   },
   poNumberText: {
     color: Colors.primaryLight,
-    fontSize: 12,
+    fontSize: 11,
     marginTop: 2,
   },
   statusBadge: {
-    paddingHorizontal: Spacing.px10,
-    paddingVertical: Spacing.xs,
-    borderRadius: Radius.sm,
-  },
-  doneBg: {
-    backgroundColor: Colors.secondary,
-  },
-  inProgBg: {
-    backgroundColor: Colors.industrialOrange,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 5,
+    borderRadius: Radius.xs,
   },
   statusBadgeText: {
-    color: Colors.white,
     fontSize: 11,
     fontWeight: '800',
   },
   specBox: {
-    backgroundColor: Colors.darkBlue,
+    backgroundColor: Colors.cardBg,
     borderRadius: Radius.md,
-    padding: Spacing.px10,
-    marginBottom: Spacing.px10,
-    gap: 2,
+    padding: Spacing.sm,
+    marginTop: Spacing.sm,
+    borderWidth: 1,
+    borderColor: Colors.borderDark,
   },
   specTitle: {
-    color: Colors.primaryLight,
-    fontSize: 10,
+    color: Colors.accentTeal,
+    fontSize: 11,
     fontWeight: '800',
-    letterSpacing: 0.5,
-    marginBottom: 2,
+    marginBottom: 4,
   },
   specVal: {
     color: Colors.textLight,
@@ -406,73 +588,143 @@ const styles = StyleSheet.create({
     color: Colors.textLight,
     fontWeight: '700',
   },
-  vendorBox: {
-    gap: Spacing.px6,
-    marginBottom: Spacing.md,
-  },
-  inputLabel: {
-    color: Colors.primaryLight,
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  vendorChips: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Spacing.px6,
-  },
-  vendorChip: {
-    backgroundColor: Colors.darkBlue,
-    paddingHorizontal: Spacing.px10,
-    paddingVertical: 5,
-    borderRadius: Radius.sm,
+  batchesSection: {
+    backgroundColor: '#0a192f',
+    borderRadius: Radius.md,
+    padding: Spacing.md,
+    marginTop: Spacing.md,
     borderWidth: 1,
-    borderColor: Colors.accentTeal,
+    borderColor: 'rgba(2, 132, 199, 0.3)',
   },
-  vendorChipActive: {
-    backgroundColor: Colors.industrialOrange,
-    borderColor: Colors.highlightOrange,
+  batchesSectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: Spacing.sm,
+    flexWrap: 'wrap',
+    gap: 8,
   },
-  vendorChipText: {
-    color: Colors.primaryLight,
+  batchesSectionTitle: {
+    color: '#38bdf8',
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  addBatchSmallBtn: {
+    backgroundColor: '#0284c7',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: Radius.sm,
+  },
+  addBatchSmallBtnText: {
+    color: '#ffffff',
     fontSize: 11,
-  },
-  vendorChipTextActive: {
-    color: Colors.white,
     fontWeight: '700',
   },
-  input: {
-    backgroundColor: Colors.darkBlue,
+  noBatchesBox: {
+    backgroundColor: 'rgba(15, 23, 42, 0.6)',
+    padding: Spacing.md,
     borderRadius: Radius.sm,
-    paddingHorizontal: Spacing.px10,
-    paddingVertical: Spacing.px6,
-    color: Colors.textLight,
-    fontSize: 12,
     borderWidth: 1,
-    borderColor: Colors.accentTeal,
+    borderColor: '#1e293b',
   },
-  actionRow: {
-    flexDirection: 'row',
+  noBatchesText: {
+    color: '#94a3b8',
+    fontSize: 12,
+    fontStyle: 'italic',
+  },
+  batchesList: {
     gap: Spacing.sm,
   },
-  actionBtn: {
-    flex: 1,
-    paddingVertical: Spacing.sm,
+  batchRowCard: {
+    backgroundColor: '#0f172a',
     borderRadius: Radius.sm,
+    padding: Spacing.md,
+    borderWidth: 1,
+    borderColor: '#334155',
+    flexDirection: 'row',
     alignItems: 'center',
+    gap: Spacing.sm,
+    flexWrap: 'wrap',
   },
-  btnProg: {
-    backgroundColor: Colors.accentTeal,
+  batchVendorName: {
+    color: '#f8fafc',
+    fontSize: 13,
+    fontWeight: '700',
   },
-  btnDone: {
-    backgroundColor: Colors.industrialOrange,
+  batchStatusChip: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 4,
+    borderWidth: 1,
   },
-  btnVerify: {
-    backgroundColor: Colors.secondary,
+  batchStatusChipText: {
+    fontSize: 10,
+    fontWeight: '800',
   },
-  actionBtnText: {
-    color: Colors.white,
+  batchQtyRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 6,
+    flexWrap: 'wrap',
+  },
+  batchQtyItem: {
+    color: '#94a3b8',
+    fontSize: 11,
+  },
+  batchQtyBold: {
+    color: '#f8fafc',
+    fontWeight: '700',
+  },
+  batchMetaRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 6,
+    flexWrap: 'wrap',
+  },
+  batchMetaText: {
+    color: '#94a3b8',
+    fontSize: 11,
+  },
+  batchMetaPending: {
+    color: '#f59e0b',
+    fontSize: 11,
+    fontStyle: 'italic',
+  },
+  batchMetaVal: {
+    color: '#38bdf8',
+    fontWeight: '600',
+  },
+  batchActionCol: {
+    justifyContent: 'center',
+    alignItems: 'flex-end',
+    minWidth: 90,
+  },
+  receiveBtn: {
+    backgroundColor: '#10b981',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: Radius.sm,
+    borderWidth: 1,
+    borderColor: '#059669',
+  },
+  receiveBtnText: {
+    color: '#ffffff',
     fontSize: 11,
     fontWeight: '800',
+  },
+  receivedBadge: {
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: '#10b981',
+  },
+  receivedBadgeText: {
+    color: '#10b981',
+    fontSize: 11,
+    fontWeight: '700',
   },
   tabRow: {
     flexDirection: 'row',
@@ -500,42 +752,5 @@ const styles = StyleSheet.create({
   tabBtnTextActive: {
     color: Colors.white,
     fontWeight: '800',
-  },
-  purchaseReportCard: {
-    backgroundColor: '#F8FAFC',
-    borderRadius: Radius.md,
-    padding: Spacing.md,
-    marginTop: Spacing.sm,
-    borderWidth: 1,
-    borderColor: '#22C55E',
-  },
-  purchaseReportTitle: {
-    color: '#10b981',
-    fontSize: 14,
-    fontWeight: '800',
-    marginBottom: Spacing.sm,
-  },
-  purchaseReportRow: {
-    flexDirection: 'row',
-    marginBottom: 6,
-    flexWrap: 'wrap',
-  },
-  purchaseReportLabel: {
-    color: Colors.textMuted,
-    fontSize: 12,
-    width: 150,
-    fontWeight: '700',
-  },
-  purchaseReportValue: {
-    color: Colors.textLight,
-    fontSize: 12,
-    fontWeight: '600',
-    flex: 1,
-  },
-  purchaseReportValueHighlight: {
-      color: Colors.accentTeal || '#29585C', // Colors.accentTeal was too dark for the #0f172a background
-    fontSize: 12,
-    fontWeight: '800',
-    flex: 1,
   },
 });

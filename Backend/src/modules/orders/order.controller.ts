@@ -1,6 +1,6 @@
 import { Response } from 'express';
 import { AuthRequest } from '../../middlewares/auth.middleware';
-import { OrderService, createOrder, getOrders, getOrderById, updateSalesWorkflowStage, updatePurchaseStage, addPurchaseBatch, updateProductionStage, updateQualityStage, updateDispatchStage, verifyAndCompleteOrder } from './order.service';
+import { OrderService, createOrder, getOrders, getOrderById, updateSalesWorkflowStage, updatePurchaseStage, addPurchaseBatch, receivePurchaseBatch, updateProductionStage, updateQualityStage, updateDispatchStage, verifyAndCompleteOrder } from './order.service';
 import { parseBulkOrderExcel } from '../../utils/excelParser';
 import { db } from '../../prisma/db';
 import { maskOrderList, maskOrderData } from '../../middlewares/masking.middleware';
@@ -121,6 +121,39 @@ export const handleAddPurchaseBatch = async (req: AuthRequest, res: Response) =>
     return res.status(201).json({ success: true, message: 'Purchase batch added successfully', batch });
   } catch (err: any) {
     return res.status(400).json({ success: false, error: err.message || 'Failed to add purchase batch' });
+  }
+};
+
+export const handleReceivePurchaseBatch = async (req: AuthRequest, res: Response) => {
+  try {
+    const id = req.params.id as string;
+    const batchId = (req.params.batchId || req.body.batchId) as string;
+    const userId = req.user?.userId || '';
+    const { receivedQuantity, invoiceNumber, receivingDate, remarks } = req.body;
+
+    if (!batchId) {
+      return res.status(400).json({ success: false, error: 'Batch ID is required' });
+    }
+    if (receivedQuantity === undefined || receivedQuantity === null) {
+      return res.status(400).json({ success: false, error: 'Received quantity is required' });
+    }
+    if (!invoiceNumber || !String(invoiceNumber).trim()) {
+      return res.status(400).json({ success: false, error: 'Invoice Number is required' });
+    }
+    if (!receivingDate || !String(receivingDate).trim()) {
+      return res.status(400).json({ success: false, error: 'Receiving Date is required' });
+    }
+
+    const result = await receivePurchaseBatch(id, batchId, {
+      receivedQuantity: Number(receivedQuantity),
+      invoiceNumber: String(invoiceNumber).trim(),
+      receivingDate: String(receivingDate).trim(),
+      remarks: remarks ? String(remarks).trim() : undefined,
+    }, userId);
+
+    return res.status(200).json({ message: 'Material received successfully', ...result });
+  } catch (err: any) {
+    return res.status(400).json({ success: false, error: err.message || 'Failed to record material receipt' });
   }
 };
 

@@ -217,7 +217,9 @@ export interface PurchaseBatch {
   remarks?: string;
   batchNumber?: string;
   deliveryDate?: string;
+  receivingDate?: string;
   invoiceRef?: string;
+  invoiceNumber?: string;
 
   status: 'ORDERED' | 'PARTIALLY_RECEIVED' | 'FULLY_RECEIVED';
   createdByName: string;

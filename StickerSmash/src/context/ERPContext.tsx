@@ -157,7 +157,17 @@ interface ERPContextType {
   deleteOrderDrawing: (orderId: string, drawingId: string) => void;
 
   updatePurchaseStage: (orderId: string, status: DepartmentStatus, vendorSelected?: string, procurementNotes?: string, processedQty?: number) => void;
-  addPurchaseBatch: (orderId: string, batch: Omit<PurchaseBatch, 'id' | 'orderId' | 'createdByName' | 'createdAt'>) => Promise<void>;
+  addPurchaseBatch: (orderId: string, batch: any) => Promise<void>;
+  receivePurchaseBatch: (
+    orderId: string,
+    batchId: string,
+    data: {
+      receivedQuantity: number;
+      invoiceNumber: string;
+      receivingDate: string;
+      remarks?: string;
+    }
+  ) => Promise<void>;
   updateProductionStage: (orderId: string, status: DepartmentStatus, shopFloorNotes?: string, processedQty?: number, isRework?: boolean) => void;
   updateQualityStage: (orderId: string, status: DepartmentStatus, qcResult?: QCResult, qcRemarks?: string, processedQty?: number, passedQty?: number, failedQty?: number) => void;
   updateDispatchStage: (orderId: string, status: DepartmentStatus, logisticsEntry?: string, transportRef?: string, dispatchNotes?: string, processedQty?: number) => void;
@@ -957,8 +967,54 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             };
           })
         : [];
-      setTemporaryClients(normalizedTempClients);
-      setOrders(ordersRes.data.orders || ordersRes.data);
+      const rawOrders = ordersRes.data.orders || ordersRes.data || [];
+      const normalizedOrders = Array.isArray(rawOrders)
+        ? rawOrders.map((ord: any) => {
+            const normalizedBatches = Array.isArray(ord.purchaseBatches)
+              ? ord.purchaseBatches.map((b: any) => {
+                  const rawRemarks = b.remarks || '';
+                  const match = rawRemarks.match(/\[PB_META:(.*?)\]/);
+                  let meta: any = {};
+                  if (match) {
+                    try { meta = JSON.parse(match[1]); } catch {}
+                  }
+                  const qtyOrdered = meta.quantityOrdered !== undefined ? Number(meta.quantityOrdered) : (b.quantityOrdered || b.quantityReceived || 0);
+                  const qtyRec = b.quantityReceived !== undefined ? Number(b.quantityReceived) : 0;
+                  const invoice = meta.invoiceNumber || b.invoiceNumber || b.invoiceRef || '';
+                  const recDate = meta.receivingDate || b.receivingDate || b.deliveryDate || '';
+                  const cleanRemarks = rawRemarks.replace(/\[PB_META:.*?\]\s*/, '').trim();
+                  const status = meta.status || (qtyRec >= qtyOrdered && qtyOrdered > 0 ? 'FULLY_RECEIVED' : (qtyRec > 0 ? 'PARTIALLY_RECEIVED' : 'ORDERED'));
+                  return {
+                    ...b,
+                    quantityOrdered: qtyOrdered,
+                    quantityReceived: qtyRec,
+                    invoiceNumber: invoice,
+                    invoiceRef: invoice,
+                    receivingDate: recDate,
+                    deliveryDate: recDate,
+                    status,
+                    remarks: cleanRemarks || b.remarks,
+                  };
+                })
+              : [];
+
+            let effectiveStage = ord.currentStage;
+            if (!effectiveStage || effectiveStage === 'QUOTATION' || effectiveStage === 'SALES') {
+              if (ord.status === 'COMPLETED' || ord.dispatchStatus === 'COMPLETED') effectiveStage = 'COMPLETED';
+              else if (ord.purchaseRequired && ord.purchaseStatus !== 'COMPLETED') effectiveStage = 'PURCHASE';
+              else if (ord.productionRequired && ord.productionStatus !== 'COMPLETED') effectiveStage = 'CUTTING';
+              else if (ord.qualityTestingRequired && ord.qualityStatus !== 'COMPLETED') effectiveStage = 'TESTING';
+              else effectiveStage = 'DISPATCH';
+            }
+
+            return {
+              ...ord,
+              currentStage: effectiveStage,
+              purchaseBatches: normalizedBatches,
+            };
+          })
+        : [];
+      setOrders(normalizedOrders);
       setCompanyContacts(contactsRes.data.contacts || []);
       setQuotations(quotationsRes.data.quotations || []);
       if (vendorsRes && vendorsRes.data && (vendorsRes.data.vendors || Array.isArray(vendorsRes.data))) {
@@ -1401,7 +1457,7 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const addPurchaseBatch = async (
     orderId: string,
-    batchData: Omit<PurchaseBatch, 'id' | 'orderId' | 'createdByName' | 'createdAt'>
+    batchData: any
   ) => {
     try {
       await apiClient.post(`/orders/${orderId}/purchase-batch`, batchData);
@@ -1409,6 +1465,25 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     } catch (e: any) {
       console.error(e);
       throw new Error(e.response?.data?.message || 'Failed to add purchase batch');
+    }
+  };
+
+  const receivePurchaseBatch = async (
+    orderId: string,
+    batchId: string,
+    data: {
+      receivedQuantity: number;
+      invoiceNumber: string;
+      receivingDate: string;
+      remarks?: string;
+    }
+  ) => {
+    try {
+      await apiClient.post(`/orders/${orderId}/purchase-batch/${batchId}/receive`, data);
+      await fetchLiveDashboardData();
+    } catch (e: any) {
+      console.error(e);
+      throw new Error(e.response?.data?.error || e.response?.data?.message || 'Failed to record material receipt');
     }
   };
 
@@ -1688,6 +1763,7 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
         updatePurchaseStage,
         addPurchaseBatch,
+        receivePurchaseBatch,
         updateProductionStage,
         updateQualityStage,
         updateDispatchStage,

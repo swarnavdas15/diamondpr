@@ -88,12 +88,17 @@ export class OrderService {
     },
     userId: string
   ) {
+    const firstActiveStage =
+      data.purchaseRequired !== false
+        ? OrderStage.PURCHASE
+        : (data.productionRequired !== false ? OrderStage.CUTTING : OrderStage.DISPATCH);
+
     const pipeline =
       data.stageSequence && data.stageSequence.length > 0
-        ? data.stageSequence
-        : [OrderStage.QUOTATION, OrderStage.PURCHASE, OrderStage.DISPATCH, OrderStage.COMPLETED];
+        ? data.stageSequence.filter((s: string) => s !== OrderStage.QUOTATION)
+        : [firstActiveStage, OrderStage.DISPATCH, OrderStage.COMPLETED];
 
-    const initialStage = pipeline[0];
+    const initialStage = pipeline[0] || firstActiveStage;
 
     return await db.transaction(async (tx) => {
       const client = await tx.orm.public.Client.where({ id: dbId(data.clientId) }).first();
@@ -233,7 +238,7 @@ export class OrderService {
       query = query.where({ currentStage: stage });
     }
 
-    return await query
+    const orders = await query
       .include('client', (client) => client.select('clientcode', 'companyName', 'contactNo'))
       .include('items', (items) => items.orderBy((item) => item.itemName.asc()))
       .include('tasks', (tasks) => tasks.orderBy((task) => task.createdAt.desc()))
@@ -241,21 +246,119 @@ export class OrderService {
       .include('stageLogs', (logs) => logs.orderBy((log) => log.createdAt.asc()))
       .orderBy((order) => order.createdAt.desc())
       .all();
+
+    return orders.map((o: any) => formatOrderWithBatches(o));
   }
 }
+
+export const encodeBatchRemarks = (meta: {
+  quantityOrdered: number;
+  invoiceNumber?: string;
+  receivingDate?: string;
+  status?: string;
+  userRemarks?: string;
+}) => {
+  const metaObj = {
+    quantityOrdered: meta.quantityOrdered,
+    invoiceNumber: meta.invoiceNumber || '',
+    receivingDate: meta.receivingDate || '',
+    status: meta.status || 'ORDERED'
+  };
+  const metaStr = `[PB_META:${JSON.stringify(metaObj)}]`;
+  return meta.userRemarks ? `${metaStr} ${meta.userRemarks}`.trim() : metaStr;
+};
+
+export const parseBatchRemarks = (rawRemarks?: string | null, rawQtyReceived?: number) => {
+  const result = {
+    quantityOrdered: rawQtyReceived || 0,
+    invoiceNumber: '',
+    receivingDate: '',
+    status: (rawQtyReceived || 0) > 0 ? 'FULLY_RECEIVED' : 'ORDERED',
+    cleanRemarks: rawRemarks || ''
+  };
+
+  if (!rawRemarks) return result;
+
+  const match = rawRemarks.match(/\[PB_META:(.*?)\]/);
+  if (match) {
+    try {
+      const parsed = JSON.parse(match[1]);
+      if (parsed.quantityOrdered !== undefined) result.quantityOrdered = Number(parsed.quantityOrdered);
+      if (parsed.invoiceNumber) result.invoiceNumber = String(parsed.invoiceNumber);
+      if (parsed.receivingDate) result.receivingDate = String(parsed.receivingDate);
+      if (parsed.status) result.status = String(parsed.status);
+      result.cleanRemarks = rawRemarks.replace(/\[PB_META:.*?\]\s*/, '').trim();
+    } catch {
+      // ignore
+    }
+  }
+
+  const received = rawQtyReceived || 0;
+  if (result.quantityOrdered > 0) {
+    if (received >= result.quantityOrdered) {
+      result.status = 'FULLY_RECEIVED';
+    } else if (received > 0) {
+      result.status = 'PARTIALLY_RECEIVED';
+    } else {
+      result.status = 'ORDERED';
+    }
+  }
+
+  return result;
+};
+
+export const formatOrderWithBatches = (order: any) => {
+  if (!order) return order;
+
+  // Resolve legacy or invalid QUOTATION stage to active manufacturing/procurement stage
+  if (!order.currentStage || order.currentStage === 'QUOTATION' || order.currentStage === 'SALES') {
+    if (order.status === 'COMPLETED' || order.dispatchStatus === 'COMPLETED') {
+      order.currentStage = 'COMPLETED';
+    } else if (order.purchaseRequired && order.purchaseStatus !== 'COMPLETED') {
+      order.currentStage = 'PURCHASE';
+    } else if (order.productionRequired && order.productionStatus !== 'COMPLETED') {
+      order.currentStage = 'CUTTING';
+    } else if (order.qualityTestingRequired && order.qualityStatus !== 'COMPLETED') {
+      order.currentStage = 'TESTING';
+    } else {
+      order.currentStage = 'DISPATCH';
+    }
+  }
+
+  if (order.purchaseBatches && Array.isArray(order.purchaseBatches)) {
+    order.purchaseBatches = order.purchaseBatches.map((b: any) => {
+      const meta = parseBatchRemarks(b.remarks, b.quantityReceived);
+      return {
+        ...b,
+        quantityOrdered: meta.quantityOrdered,
+        quantityReceived: b.quantityReceived || 0,
+        invoiceNumber: meta.invoiceNumber,
+        invoiceRef: meta.invoiceNumber,
+        receivingDate: meta.receivingDate,
+        deliveryDate: meta.receivingDate,
+        status: meta.status,
+        remarks: meta.cleanRemarks,
+      };
+    });
+  }
+  return order;
+};
 
 export const createOrder = async (data: any, userId: string) => OrderService.createOrder(data, userId);
 export const getOrders = async (userRole?: string) => OrderService.getOrdersByRole(userRole || 'ALL');
 export const getOrderById = async (id: string) => {
-  return await db.orm.public.Order
+  const order = await db.orm.public.Order
     .where({ id: dbId(id), isDeleted: 0 })
     .include('client', (client) => client.select('clientcode', 'companyName', 'contactNo'))
     .include('items', (items) => items.orderBy((item) => item.itemName.asc()))
     .include('tasks', (tasks) => tasks.orderBy((task) => task.createdAt.desc()))
-     .include('purchaseBatches', (batches) => batches.orderBy((batch) => batch.createdAt.desc()))
+    .include('purchaseBatches', (batches) => batches.orderBy((batch) => batch.createdAt.desc()))
     .include('stageLogs', (logs) => logs.orderBy((log) => log.createdAt.asc()))
     .first();
+
+  return formatOrderWithBatches(order);
 };
+
 export const updateSalesWorkflowStage = async (id: string, stage: string, userId: string, remarks?: string) => {
   return await db.orm.public.StageLog.create({
     orderId: dbId(id),
@@ -263,33 +366,169 @@ export const updateSalesWorkflowStage = async (id: string, stage: string, userId
     changedById: userId ? dbId(userId) : undefined
   });
 };
+
 export const addPurchaseBatch = async (orderId: string, data: any, userId: string) => {
+  const order = await db.orm.public.Order.where({ id: dbId(orderId) }).first();
+  if (!order) throw new Error('Order not found');
+
+  const qtyOrdered = Math.max(0, Math.round(Number(data.quantityOrdered || data.quantityReceived || 0)));
+  const qtyReceived = Math.max(0, Math.round(Number(data.quantityReceived || 0)));
+  const initialStatus = qtyReceived >= qtyOrdered && qtyOrdered > 0
+    ? 'FULLY_RECEIVED'
+    : (qtyReceived > 0 ? 'PARTIALLY_RECEIVED' : 'ORDERED');
+
+  const encodedRemarks = encodeBatchRemarks({
+    quantityOrdered: qtyOrdered,
+    invoiceNumber: data.invoiceNumber || data.invoiceRef || '',
+    receivingDate: data.receivingDate || data.deliveryDate || '',
+    status: initialStatus,
+    userRemarks: data.remarks
+  });
+
   const batch = await db.orm.public.PurchaseBatch.create({
     orderId: dbId(orderId),
     vendorName: data.vendorName,
-    quantityReceived: Math.round(Number(data.quantityReceived || 0)),
+    quantityReceived: qtyReceived,
     cost: data.cost ? Number(data.cost) : null,
-    remarks: data.remarks || null,
+    remarks: encodedRemarks,
     createdById: dbId(userId)
+  });
+
+  // Calculate totals across ALL batches of the order
+  const allBatches = await db.orm.public.PurchaseBatch.where({ orderId: dbId(orderId) }).all();
+  let totalReceived = 0;
+  let allFullyReceived = true;
+  for (const b of allBatches) {
+    const meta = parseBatchRemarks(b.remarks, b.quantityReceived);
+    const rec = Number(b.quantityReceived || 0);
+    totalReceived += rec;
+    if (meta.quantityOrdered > 0 && rec < meta.quantityOrdered) {
+      allFullyReceived = false;
+    }
+  }
+
+  // REQUIREMENT 3: "Purchase Done" logic:
+  // Order turant "Purchase Done" nahi hoga. Jab poora order cycle complete ho jayega
+  // (yaani jitne order diye the, jaise total 100, wo poore alag-alag vendors se fully receive ho jayenge),
+  // tabhi overall status "Purchase Done" mein convert hoga.
+  let calcStatus = 'IN_PROGRESS';
+  if (totalReceived >= order.requiredQuantity && allFullyReceived) {
+    calcStatus = 'COMPLETED';
+  } else if (totalReceived > 0) {
+    calcStatus = 'IN_PROGRESS';
+  } else {
+    calcStatus = 'IN_PROGRESS'; // Order Placed / Pending Receive
+  }
+
+  await db.orm.public.Order.where({ id: dbId(orderId) }).update({
+    purchaseQuantity: totalReceived,
+    purchaseStatus: calcStatus,
+    vendorSelected: data.vendorName,
+    procurementNotes: calcStatus === 'COMPLETED'
+      ? 'Material fully procured and received.'
+      : (totalReceived > 0
+          ? `Partial receipt: ${totalReceived}/${order.requiredQuantity} pcs`
+          : `Order placed with ${data.vendorName} (${qtyOrdered} pcs) - Pending Receive`)
+  });
+
+  await updateSalesWorkflowStage(
+    orderId,
+    'PURCHASE',
+    userId,
+    qtyReceived > 0
+      ? `Received ${qtyReceived}/${qtyOrdered} pcs from ${data.vendorName}`
+      : `Placed purchase order for ${qtyOrdered} pcs with ${data.vendorName} (Pending Receive)`
+  );
+
+  return {
+    ...batch,
+    quantityOrdered: qtyOrdered,
+    quantityReceived: qtyReceived,
+    invoiceNumber: data.invoiceNumber || '',
+    receivingDate: data.receivingDate || '',
+    status: initialStatus,
+    remarks: data.remarks || ''
+  };
+};
+
+export const receivePurchaseBatch = async (
+  orderId: string,
+  batchId: string,
+  data: {
+    receivedQuantity: number;
+    invoiceNumber: string;
+    receivingDate: string;
+    remarks?: string;
+  },
+  userId: string
+) => {
+  const batch = await db.orm.public.PurchaseBatch.where({ id: dbId(batchId) }).first();
+  if (!batch) throw new Error('Purchase batch not found');
+
+  const meta = parseBatchRemarks(batch.remarks, batch.quantityReceived);
+  const newReceivedQty = Math.max(0, Math.round(Number(data.receivedQuantity || 0)));
+  const qtyOrdered = meta.quantityOrdered || newReceivedQty;
+
+  const newStatus = newReceivedQty >= qtyOrdered && qtyOrdered > 0
+    ? 'FULLY_RECEIVED'
+    : (newReceivedQty > 0 ? 'PARTIALLY_RECEIVED' : 'ORDERED');
+
+  const encodedRemarks = encodeBatchRemarks({
+    quantityOrdered: qtyOrdered,
+    invoiceNumber: data.invoiceNumber || meta.invoiceNumber,
+    receivingDate: data.receivingDate || meta.receivingDate || new Date().toISOString().split('T')[0],
+    status: newStatus,
+    userRemarks: data.remarks || meta.cleanRemarks
+  });
+
+  await db.orm.public.PurchaseBatch.where({ id: dbId(batchId) }).update({
+    quantityReceived: newReceivedQty,
+    remarks: encodedRemarks
   });
 
   const order = await db.orm.public.Order.where({ id: dbId(orderId) }).first();
   if (!order) throw new Error('Order not found');
-  
-  const newPurchaseQty = (order.purchaseQuantity || 0) + Math.round(Number(data.quantityReceived || 0));
-  const calcStatus = newPurchaseQty >= order.requiredQuantity ? 'COMPLETED' : 'IN_PROGRESS';
-  
-  await db.orm.public.Order.where({ id: dbId(orderId) }).update({
-    purchaseQuantity: newPurchaseQty,
-    purchaseStatus: calcStatus,
-    vendorSelected: data.vendorName, // Track the latest vendor on the order itself
-    procurementNotes: data.remarks
-  });
-  
-  // Create stage log for the batch
-  await updateSalesWorkflowStage(orderId, 'PURCHASE', userId, data.remarks);
 
-  return batch;
+  const allBatches = await db.orm.public.PurchaseBatch.where({ orderId: dbId(orderId) }).all();
+  let totalReceived = 0;
+  let allFullyReceived = true;
+  for (const b of allBatches) {
+    const bRec = b.id === batchId ? newReceivedQty : (b.quantityReceived || 0);
+    const bMeta = b.id === batchId
+      ? { quantityOrdered: qtyOrdered, status: newStatus }
+      : parseBatchRemarks(b.remarks, b.quantityReceived);
+    totalReceived += bRec;
+    if (bMeta.quantityOrdered > 0 && bRec < bMeta.quantityOrdered) {
+      allFullyReceived = false;
+    }
+  }
+
+  // REQUIREMENT 3: "Purchase Done" logic:
+  let calcStatus = 'IN_PROGRESS';
+  if (totalReceived >= order.requiredQuantity && allFullyReceived) {
+    calcStatus = 'COMPLETED';
+  } else if (totalReceived > 0) {
+    calcStatus = 'IN_PROGRESS';
+  } else {
+    calcStatus = 'IN_PROGRESS';
+  }
+
+  await db.orm.public.Order.where({ id: dbId(orderId) }).update({
+    purchaseQuantity: totalReceived,
+    purchaseStatus: calcStatus,
+    procurementNotes: calcStatus === 'COMPLETED'
+      ? 'Material fully procured and verified.'
+      : `Material receipt in progress (${totalReceived}/${order.requiredQuantity} pcs received)`
+  });
+
+  await updateSalesWorkflowStage(
+    orderId,
+    'PURCHASE',
+    userId,
+    `Received ${newReceivedQty} pcs from ${batch.vendorName} (Invoice: ${data.invoiceNumber})`
+  );
+
+  return { success: true, batchId, purchaseStatus: calcStatus, totalReceived };
 };
 
 export const updatePurchaseStage = async (id: string, status: string, userId: string, notes?: string, processedQty?: number, vendorSelected?: string) => {
