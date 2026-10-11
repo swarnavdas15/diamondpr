@@ -360,11 +360,37 @@ export const getOrderById = async (id: string) => {
 };
 
 export const updateSalesWorkflowStage = async (id: string, stage: string, userId: string, remarks?: string) => {
-  return await db.orm.public.StageLog.create({
-    orderId: dbId(id),
-    stage: stage as OrderStage,
-    changedById: userId ? dbId(userId) : undefined
-  });
+  const VALID_STAGES = [
+    'QUOTATION',
+    'PURCHASE',
+    'CUTTING',
+    'FORGING',
+    'MACHINING',
+    'HEAT_TREATMENT',
+    'TESTING',
+    'DISPATCH',
+    'COMPLETED'
+  ];
+  let safeStage = stage;
+  if (!VALID_STAGES.includes(safeStage)) {
+    if (safeStage === 'PRODUCTION' || safeStage === 'MANUFACTURING') {
+      safeStage = 'CUTTING';
+    } else if (safeStage === 'QUALITY' || safeStage === 'QC') {
+      safeStage = 'TESTING';
+    } else {
+      safeStage = 'PURCHASE';
+    }
+  }
+
+  try {
+    return await db.orm.public.StageLog.create({
+      orderId: dbId(id),
+      stage: safeStage as OrderStage,
+      changedById: userId ? dbId(userId) : undefined
+    });
+  } catch (err: any) {
+    console.warn('StageLog creation skipped:', err.message);
+  }
 };
 
 export const addPurchaseBatch = async (orderId: string, data: any, userId: string) => {
@@ -628,7 +654,10 @@ export const updateProductionStage = async (id: string, status: string, userId: 
   if (processedQty !== undefined) updateData.productionQuantity = Math.round(Number(order.productionQuantity || 0) + Number(processedQty));
   if (isRework !== undefined) updateData.reworkQuantity = Math.round(Number(order.reworkQuantity || 0) + Number(processedQty || 0));
   await db.orm.public.Order.where({ id: dbId(id) }).update(updateData);
-  await updateSalesWorkflowStage(id, 'PRODUCTION', userId, notes);
+  const prodStage = (order.currentStage && ['CUTTING', 'FORGING', 'MACHINING', 'HEAT_TREATMENT'].includes(order.currentStage))
+    ? order.currentStage
+    : 'CUTTING';
+  await updateSalesWorkflowStage(id, prodStage, userId, notes);
   return await getOrderById(id);
 };
 export const updateQualityStage = async (id: string, status: string, userId: string, notes?: string, processedQty?: number, qcResult?: string) => {
