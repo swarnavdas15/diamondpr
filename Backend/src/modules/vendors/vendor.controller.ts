@@ -19,6 +19,30 @@ export const handleListVendors = async (req: Request, res: Response) => {
 
 export const handleCreateVendor = async (req: Request, res: Response) => {
   try {
+    const vendorList = Array.isArray(req.body)
+      ? req.body
+      : (Array.isArray(req.body?.vendors) ? req.body.vendors : null);
+
+    if (vendorList) {
+      const createdVendors = [];
+      for (const item of vendorList) {
+        if (!item.vendorName) continue;
+        try {
+          const v = await createVendor({
+            ...item,
+            contactPerson: item.contactPerson || 'N/A',
+            mobileNumber: item.mobileNumber || '0000000000',
+            email: item.email || 'N/A',
+            materialSupplied: item.materialSupplied || 'General Procurement',
+          });
+          createdVendors.push(v);
+        } catch (e: any) {
+          console.warn('Skipping duplicate or error in bulk vendor create:', e.message);
+        }
+      }
+      return res.status(201).json({ success: true, count: createdVendors.length, vendors: createdVendors });
+    }
+
     const { vendorName, contactPerson, mobileNumber, email, materialSupplied } = req.body;
     if (!vendorName || !contactPerson || !mobileNumber || !email || !materialSupplied) {
       return res.status(400).json({

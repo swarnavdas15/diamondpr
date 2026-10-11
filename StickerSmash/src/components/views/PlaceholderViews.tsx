@@ -301,6 +301,8 @@ export const VendorsView: React.FC = () => {
       return (
         v.vendorCode.toLowerCase().includes(q) ||
         v.vendorName.toLowerCase().includes(q) ||
+        (v.gstNumber && v.gstNumber.toLowerCase().includes(q)) ||
+        (v.panNumber && v.panNumber.toLowerCase().includes(q)) ||
         v.contactPerson.toLowerCase().includes(q) ||
         v.mobileNumber.toLowerCase().includes(q) ||
         v.email.toLowerCase().includes(q) ||
@@ -323,10 +325,12 @@ export const VendorsView: React.FC = () => {
     return {
       title: 'Vendors & Material Suppliers Directory Report',
       filename: 'Vendors_Directory_Report',
-      headers: ['Vendor Code', 'Vendor Name', 'Contact Person', 'Mobile', 'Email', 'Material Supplied', 'Status'],
+      headers: ['Vendor Code', 'Vendor Name', 'GST Number', 'PAN Number', 'Contact Person', 'Mobile', 'Email', 'Material Supplied', 'Status'],
       rows: vendors.map((v) => [
         v.vendorCode,
         v.vendorName,
+        v.gstNumber || 'N/A',
+        v.panNumber || 'N/A',
         v.contactPerson,
         v.mobileNumber,
         v.email,
@@ -556,11 +560,12 @@ export const VendorsView: React.FC = () => {
             {/* Header */}
             <View style={styles.thRow}>
               <Text style={[styles.th, { width: 110 }]}>Vendor Code</Text>
-              <Text style={[styles.th, { width: 200 }]}>Vendor Name</Text>
+              <Text style={[styles.th, { width: 180 }]}>Vendor Name</Text>
+              <Text style={[styles.th, { width: 150 }]}>GST Number</Text>
               <Text style={[styles.th, { width: 140 }]}>Contact Person</Text>
               <Text style={[styles.th, { width: 130 }]}>Mobile</Text>
               <Text style={[styles.th, { width: 180 }]}>Email</Text>
-              <Text style={[styles.th, { width: 180 }]}>Material Supplied</Text>
+              <Text style={[styles.th, { width: 170 }]}>Material Supplied</Text>
               <Text style={[styles.th, { width: 90 }]}>Status</Text>
               <Text style={[styles.th, { width: 160 }]}>Actions</Text>
             </View>
@@ -572,14 +577,15 @@ export const VendorsView: React.FC = () => {
               filteredVendors.map((v) => (
                 <View key={v.id} style={styles.trRow}>
                   <Text style={[styles.tdHighlight, { width: 110 }]}>{v.vendorCode}</Text>
-                  <View style={{ width: 200 }}>
+                  <View style={{ width: 180 }}>
                     <Text style={styles.tdBold}>{v.vendorName}</Text>
                     {v.companyName ? <Text style={styles.tdSub}>{v.companyName}</Text> : null}
                   </View>
+                  <Text style={[styles.tdBold, { width: 150, color: v.gstNumber ? Colors.accentTeal : '#94a3b8' }]}>{v.gstNumber || 'N/A'}</Text>
                   <Text style={[styles.td, { width: 140 }]}>{v.contactPerson}</Text>
                   <Text style={[styles.td, { width: 130 }]}>{v.mobileNumber}</Text>
                   <Text style={[styles.td, { width: 180 }]}>{v.email}</Text>
-                  <Text style={[styles.tdBold, { width: 180, color: Colors.accentTeal }]}>{v.materialSupplied}</Text>
+                  <Text style={[styles.tdBold, { width: 170, color: Colors.accentTeal }]}>{v.materialSupplied}</Text>
 
                   {/* Status Badge */}
                   <View style={{ width: 90 }}>

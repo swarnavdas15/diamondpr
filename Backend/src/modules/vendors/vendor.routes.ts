@@ -16,6 +16,7 @@ router.use(authenticateToken);
 router.get('/', handleListVendors);
 
 // Create and update vendor details
+router.post('/bulk', requireRole(['SUPER_ADMIN', 'ADMIN', 'PURCHASE', 'SALES']), handleCreateVendor);
 router.post('/', requireRole(['SUPER_ADMIN', 'ADMIN', 'PURCHASE', 'SALES']), handleCreateVendor);
 router.patch('/:id', requireRole(['SUPER_ADMIN', 'ADMIN', 'PURCHASE', 'SALES']), handleUpdateVendor);
 

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, Platform, Modal, TouchableOpacity, TextInput, StyleSheet, ScrollView, useWindowDimensions } from 'react-native';
 import { useERP } from '../context/ERPContext';
+import { apiClient } from '../api/client';
 import { Vendor, VendorStatus } from '../types';
 import { Colors, Spacing, Radius, Shadows } from '../theme';
 import * as XLSX from 'xlsx';
@@ -18,7 +19,7 @@ export const CreateVendorModal: React.FC<CreateVendorModalProps> = ({
 }) => {
   const { width } = useWindowDimensions();
   const isMobile = width < 768;
-  const { createVendor, updateVendor } = useERP();
+  const { createVendor, updateVendor, refreshData } = useERP();
 
   // Basic Info
   const [vendorCode, setVendorCode] = useState('');
@@ -133,54 +134,187 @@ export const CreateVendorModal: React.FC<CreateVendorModalProps> = ({
 
       let successCount = 0;
       const processedCodes = new Set<string>();
-
+      const validVendorRows: any[] = [];
 
       for (const rawRow of data as any[]) {
-        const row: any = {};
+        const row: Record<string, any> = {};
         for (const key in rawRow) {
-          row[key.replace(/\s+/g, '').toLowerCase()] = rawRow[key];
+          if (!Object.prototype.hasOwnProperty.call(rawRow, key)) continue;
+          // Ultra-flexible normalization: strip all symbols, spaces, lowercase
+          const cleanKey = key.toString().trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+          row[cleanKey] = rawRow[key];
         }
 
-        const vCode = row['vendorcode'] || row['code'] || row['vendorid'];
-        const vName = row['vendorname'] || row['name'] || row['companyname'];
-        if (!vCode || !vName) {
-          console.warn('Skipping row due to missing code or name:', rawRow);
+        const vNameRaw = row['vendorname'] || row['name'] || row['companyname'] || row['company'];
+        if (!vNameRaw) {
+          console.warn('Skipping row due to missing vendor name:', rawRow);
           continue;
         }
-          
-        const normalizedCode = vCode.toString().trim().toLowerCase();
+
+        const vName = vNameRaw.toString().trim();
+        const vCodeRaw = row['vendorcode'] || row['code'] || row['vendorid'];
+        let vCode = vCodeRaw ? vCodeRaw.toString().trim() : '';
+        if (!vCode) {
+          vCode = `VND-${Date.now().toString().slice(-4)}${Math.floor(Math.random() * 900 + 100)}`;
+        }
+
+        const normalizedCode = vCode.toLowerCase();
         if (processedCodes.has(normalizedCode)) continue;
         processedCodes.add(normalizedCode);
 
-        try {
-          await createVendor({
-            vendorCode: vCode.toString().trim(),
-            vendorName: vName.toString().trim(),
-            companyName: row['companyname'] ? row['companyname'].toString().trim() : '',
-            contactPerson: row['contactperson'] ? row['contactperson'].toString().trim() : 'N/A',
-            mobileNumber: row['mobilenumber'] || row['contactno'] || row['phone'] ? (row['mobilenumber'] || row['contactno'] || row['phone']).toString().trim() : '0000000000',
-            email: row['email'] ? row['email'].toString().trim() : 'N/A',
-            materialSupplied: row['materialsupplied'] || row['material'] || row['supplied'] ? (row['materialsupplied'] || row['material'] || row['supplied']).toString().trim() : 'Various',
-            vendorCategory: row['vendorcategory'] || row['category'] ? (row['vendorcategory'] || row['category']).toString().trim() : 'General',
-            status: 'ACTIVE',
-            website: row['website'] ? row['website'].toString().trim() : '',
-            addressLine1: row['city'] || row['address'] ? (row['city'] || row['address']).toString().trim() : '',
-            country: 'India',
-          });
-          successCount++;
-        } catch (e: any) {
-          console.warn('Skipping vendor duplicate or error:', e.message || e);
+        // Read GST Number with all variations of column headers
+        const gstRaw =
+          row['gstnumber'] ||
+          row['gstno'] ||
+          row['gstin'] ||
+          row['gst'] ||
+          row['vendorgst'] ||
+          row['vendorgstno'] ||
+          row['vendorgstnumber'] ||
+          row['gstidentificationnumber'] ||
+          row['gstidentificationno'] ||
+          row['gsttaxid'] ||
+          row['taxid'] ||
+          row['taxnumber'] ||
+          row['taxno'] ||
+          '';
+        const gstNumber = gstRaw ? String(gstRaw).trim().toUpperCase() : '';
+
+        // Read PAN Number
+        const panRaw =
+          row['pannumber'] ||
+          row['panno'] ||
+          row['pan'] ||
+          row['vendorpan'] ||
+          row['vendorpanno'] ||
+          '';
+        const panNumber = panRaw ? String(panRaw).trim().toUpperCase() : '';
+
+        const compRaw = row['companyname'] || row['company'] || row['legalname'] || row['legalentity'] || '';
+        const companyName = compRaw ? String(compRaw).trim() : '';
+
+        const contactRaw = row['contactperson'] || row['contactname'] || row['person'] || row['contact'] || '';
+        const contactPerson = contactRaw ? String(contactRaw).trim() : 'N/A';
+
+        const mobileRaw =
+          row['mobilenumber'] ||
+          row['mobile'] ||
+          row['contactno'] ||
+          row['phone'] ||
+          row['phonenumber'] ||
+          row['contactnumber'] ||
+          '';
+        const mobileNumber = mobileRaw ? String(mobileRaw).trim() : '0000000000';
+
+        const altMobileRaw =
+          row['alternatemobile'] ||
+          row['altmobile'] ||
+          row['alternatephone'] ||
+          row['altphone'] ||
+          '';
+        const alternateMobile = altMobileRaw ? String(altMobileRaw).trim() : '';
+
+        const emailRaw = row['email'] || row['emailaddress'] || row['mail'] || '';
+        const email = emailRaw ? String(emailRaw).trim() : 'N/A';
+
+        const materialRaw =
+          row['materialsupplied'] ||
+          row['material'] ||
+          row['supplied'] ||
+          row['materials'] ||
+          row['itemsupplied'] ||
+          '';
+        const materialSupplied = materialRaw ? String(materialRaw).trim() : 'General Procurement';
+
+        const catRaw = row['vendorcategory'] || row['category'] || row['type'] || '';
+        const vendorCategory = catRaw ? String(catRaw).trim() : 'General';
+
+        const webRaw = row['website'] || row['web'] || row['url'] || '';
+        const website = webRaw ? String(webRaw).trim() : '';
+
+        const addr1Raw = row['addressline1'] || row['address1'] || row['address'] || '';
+        const addressLine1 = addr1Raw ? String(addr1Raw).trim() : '';
+
+        const addr2Raw = row['addressline2'] || row['address2'] || '';
+        const addressLine2 = addr2Raw ? String(addr2Raw).trim() : '';
+
+        const cityRaw = row['city'] || '';
+        const city = cityRaw ? String(cityRaw).trim() : '';
+
+        const stateRaw = row['state'] || '';
+        const state = stateRaw ? String(stateRaw).trim() : '';
+
+        const pinRaw = row['pincode'] || row['pin'] || row['postalcode'] || row['zip'] || row['zipcode'] || '';
+        const pinCode = pinRaw ? String(pinRaw).trim() : '';
+
+        const countryRaw = row['country'] || '';
+        const country = countryRaw ? String(countryRaw).trim() : 'India';
+
+        const termsRaw = row['paymentterms'] || row['paymentterm'] || row['terms'] || '';
+        const paymentTerms = termsRaw ? String(termsRaw).trim() : 'Net 30';
+
+        const leadRaw = row['leadtime'] || row['lead'] || '';
+        const leadTime = leadRaw ? String(leadRaw).trim() : '7 Days';
+
+        const remarksRaw = row['remarks'] || row['remark'] || row['notes'] || '';
+        const remarks = remarksRaw ? String(remarksRaw).trim() : '';
+
+        validVendorRows.push({
+          vendorCode: vCode,
+          vendorName: vName,
+          companyName,
+          gstNumber,
+          panNumber,
+          contactPerson,
+          mobileNumber,
+          alternateMobile,
+          email,
+          website,
+          addressLine1: addressLine1 || city,
+          addressLine2,
+          city,
+          state,
+          pinCode,
+          country,
+          materialSupplied,
+          vendorCategory,
+          paymentTerms,
+          leadTime,
+          status: 'ACTIVE',
+          remarks,
+        });
+      }
+
+      if (validVendorRows.length === 0) {
+        setError('No valid vendors found in the Excel file.');
+        setSuccessMsg('');
+        return;
+      }
+
+      try {
+        const res = await apiClient.post('/vendors', validVendorRows);
+        successCount = res.data?.count || validVendorRows.length;
+      } catch {
+        // Fallback to sequential posts
+        for (const item of validVendorRows) {
+          try {
+            await apiClient.post('/vendors', item);
+            successCount++;
+          } catch (e: any) {
+            console.warn('Skipping vendor duplicate or error:', e.message || e);
+          }
         }
       }
 
       if (successCount > 0) {
-        setSuccessMsg(`Successfully imported ${successCount} vendors from Excel.`);
+        await refreshData();
+        setSuccessMsg(`Successfully imported ${successCount} vendors from Excel (including GST details).`);
         setTimeout(() => {
           setSuccessMsg('');
           handleClose();
         }, 2000);
       } else {
-        setError('No valid/new vendors found in the Excel file.');
+        setError('No valid/new vendors could be created from the Excel file.');
         setSuccessMsg('');
       }
     } catch (err) {
@@ -353,7 +487,7 @@ export const CreateVendorModal: React.FC<CreateVendorModalProps> = ({
                     </Text>
                     <Text style={{ color: '#64748b', fontSize: 12, textAlign: 'center', lineHeight: 18, paddingHorizontal: 10 }}>
                       Drag & drop your Excel file here or click below to upload. {'\n'}
-                      <Text style={{ fontWeight: '600' }}>Required Columns:</Text> VendorCode, VendorName
+                      <Text style={{ fontWeight: '600' }}>Supported Columns:</Text> Vendor Name, Vendor Code, <Text style={{ color: Colors.accentTeal, fontWeight: '700' }}>GST Number</Text>, PAN Number, Contact Person, Mobile, Email, Material Supplied, City, State
                     </Text>
                     
                     <TouchableOpacity

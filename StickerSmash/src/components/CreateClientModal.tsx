@@ -114,29 +114,51 @@ export const CreateClientModal: React.FC<CreateClientModalProps> = ({ visible, o
       const processedCodes = new Set<string>();
       const validRows = [];
 
-      for (const row of data as any[]) {
-        const clientCode = row['ClientCode'];
-        const companyName = row['CompanyName'];
-        const contactNo = row['ContactNo'];
-        if (!clientCode || !companyName || !contactNo) continue;
+      for (const rawRow of data as any[]) {
+        const row: Record<string, any> = {};
+        for (const key in rawRow) {
+          if (!Object.prototype.hasOwnProperty.call(rawRow, key)) continue;
+          const cleanKey = key.toString().trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+          row[cleanKey] = rawRow[key];
+        }
+
+        const clientCodeRaw = row['clientcode'] || row['code'] || row['clientid'];
+        const companyNameRaw = row['companyname'] || row['name'] || row['company'];
+        const contactNoRaw = row['contactno'] || row['mobile'] || row['phone'] || row['mobilenumber'] || row['contactnumber'];
+        if (!clientCodeRaw || !companyNameRaw || !contactNoRaw) continue;
+
+        const clientCode = clientCodeRaw.toString().trim();
+        const companyName = companyNameRaw.toString().trim();
+        const contactNo = contactNoRaw.toString().trim();
         
-        const normalizedCode = clientCode.toString().trim().toLowerCase();
+        const normalizedCode = clientCode.toLowerCase();
         const isDuplicateInState = clients.some(
           (c) => (c.clientCode || '').trim().toLowerCase() === normalizedCode
         );
 
         if (!isDuplicateInState && !processedCodes.has(normalizedCode)) {
           processedCodes.add(normalizedCode);
+          const gstRaw =
+            row['gstnumber'] ||
+            row['gstno'] ||
+            row['gstin'] ||
+            row['gst'] ||
+            row['clientgst'] ||
+            row['gstidentificationnumber'] ||
+            row['gstidentificationno'] ||
+            row['taxid'] ||
+            row['taxnumber'] ||
+            '';
           validRows.push({
-            clientCode: clientCode.toString(),
-            companyName: companyName.toString(),
-            contactNo: contactNo.toString(),
-            contactName: row['ContactName'] ? row['ContactName'].toString() : '',
-            email: row['Email'] ? row['Email'].toString() : '',
-            address: row['Address'] ? row['Address'].toString() : '',
-            gstNumber: row['GSTNumber'] ? row['GSTNumber'].toString() : '',
-            industry: row['Industry'] ? row['Industry'].toString() : '',
-            remarks: row['Remarks'] ? row['Remarks'].toString() : '',
+            clientCode,
+            companyName,
+            contactNo,
+            contactName: row['contactname'] || row['contactperson'] ? String(row['contactname'] || row['contactperson']).trim() : '',
+            email: row['email'] ? String(row['email']).trim() : '',
+            address: row['address'] ? String(row['address']).trim() : '',
+            gstNumber: gstRaw ? String(gstRaw).trim().toUpperCase() : '',
+            industry: row['industry'] ? String(row['industry']).trim() : '',
+            remarks: row['remarks'] || row['notes'] ? String(row['remarks'] || row['notes']).trim() : '',
           });
         }
       }
