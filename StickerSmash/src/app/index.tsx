@@ -185,10 +185,6 @@ export default function MainScreen() {
         if (!isSuperAdminOrAdmin) return renderDashboardByRole();
         return <UsersView onOpenCreateUser={() => setCreateUserVisible(true)} />;
 
-      case 'ActivityLogs':
-        if (!isSuperAdminOrAdmin) return renderDashboardByRole();
-        return <AdminDashboard isSuperAdmin={currentUser.role === 'SUPER_ADMIN'} />;
-
       case 'Reports':
         // STRICT RULE: Reports & Analytics module is exclusively accessible by Super Admin
         if (currentUser.role !== 'SUPER_ADMIN') {

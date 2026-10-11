@@ -27,7 +27,6 @@ export type NavMenuItem =
   | 'Users'
   | 'Reports'
   | 'Settings'
-  | 'ActivityLogs'
   | 'Logout';
 
 export type SalesWorkflowStage =

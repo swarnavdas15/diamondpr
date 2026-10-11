@@ -36,7 +36,6 @@ const MENU_ITEMS: MenuDef[] = [
   { id: 'Users', label: 'Users', icon: '👤' },
   { id: 'Reports', label: 'Reports', icon: '📈' },
   { id: 'Settings', label: 'ERP Settings', icon: '⚙️' },
-  { id: 'ActivityLogs', label: 'Activity Logs', icon: '📜' },
   { id: 'Logout', label: 'Logout', icon: '🚪' },
 ];
 
@@ -80,12 +79,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
           'Logout',
         ];
       case 'ADMIN': {
-        const base = ['Dashboard', 'Tasks', 'ActivityLogs', 'Settings', 'Logout'] as NavMenuItem[];
+        const base = ['Dashboard', 'Tasks', 'Settings', 'Logout'] as NavMenuItem[];
         
         if (!currentUser?.accessibleModules || (Array.isArray(currentUser.accessibleModules) && currentUser.accessibleModules.length === 0)) {
            // Fallback if not configured properly, just give full admin access
            return [
-             'Dashboard', 'ClientDirectory', 'Orders', 'Quotations', 'Purchase', 'Production', 'Dispatch', 'Vendors', 'Users', 'Tasks', 'ActivityLogs', 'Settings', 'Logout'
+             'Dashboard', 'ClientDirectory', 'Orders', 'Quotations', 'Purchase', 'Production', 'Dispatch', 'Vendors', 'Users', 'Tasks', 'Settings', 'Logout'
            ];
         }
 

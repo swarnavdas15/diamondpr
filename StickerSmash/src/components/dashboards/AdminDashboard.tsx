@@ -17,7 +17,7 @@ interface AdminDashboardProps {
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isSuperAdmin = false }) => {
   const { getMaskedOrders, setSelectedOrder } = useERP();
   const orders = getMaskedOrders();
-  const { authAuditLogs, currentUser, users, toggleUserStatus } = useAuth();
+  const { currentUser, users, toggleUserStatus } = useAuth();
   const { width } = useWindowDimensions();
   const isMobile = width < 768;
 
@@ -165,40 +165,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isSuperAdmin = f
           </View>
         </ScrollView>
       </View>
-
-      {/* Security Audit Logs Section (Super Admin Exclusive Detail) */}
-      {effectiveSuperAdmin && (
-        <View style={styles.sectionCard}>
-          <Text style={styles.sectionTitle}>Security & Authentication Activity Audit Logs</Text>
-          <Text style={styles.sectionSub}>Real-time tracking of login, logout, password resets, and OTP verifications.</Text>
-
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 10 }}>
-            <View style={styles.table}>
-              <View style={styles.thRow}>
-                <Text style={[styles.th, { width: 150 }]}>Event Type</Text>
-                <Text style={[styles.th, { width: 130 }]}>User ID</Text>
-                <Text style={[styles.th, { width: 180 }]}>Email Ref</Text>
-                <Text style={[styles.th, { width: 220 }]}>Activity Details</Text>
-                <Text style={[styles.th, { width: 160 }]}>Timestamp</Text>
-              </View>
-
-              {authAuditLogs.map((log) => (
-                <View key={log.id} style={styles.trRow}>
-                  <View style={{ width: 150 }}>
-                    <View style={[styles.eventBadge, log.event.includes('FAILED') ? styles.failBadge : styles.successBadge]}>
-                      <Text style={styles.eventBadgeText}>{log.event}</Text>
-                    </View>
-                  </View>
-                  <Text style={[styles.tdBold, { width: 130 }]}>{log.username || 'N/A'}</Text>
-                  <Text style={[styles.td, { width: 180 }]}>{log.email || 'N/A'}</Text>
-                  <Text style={[styles.td, { width: 220 }]}>{log.details}</Text>
-                  <Text style={[styles.tdSmall, { width: 160 }]}>{new Date(log.timestamp).toLocaleString()}</Text>
-                </View>
-              ))}
-            </View>
-          </ScrollView>
-        </View>
-      )}
     </ScrollView>
   );
 };
