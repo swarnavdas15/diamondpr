@@ -131,6 +131,12 @@ export const CompanyOverview: React.FC<CompanyOverviewProps> = ({ client, contac
               {client.createdAt ? formatAppDate(client.createdAt) : 'Sep 2026'}
             </Text>
           </View>
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>Date of Birth (DOB):</Text>
+            <Text style={[styles.infoValHighlight, { color: '#ec4899', fontWeight: '700' }]}>
+              {client.dateOfBirth ? `🎂 ${client.dateOfBirth}` : 'Not Set'}
+            </Text>
+          </View>
         </View>
       </View>
 

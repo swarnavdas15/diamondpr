@@ -23,10 +23,19 @@ export class OrderService {
       address?: string;
       industry?: string;
       remarks?: string;
+      dateOfBirth?: string;
       clientCode: string;
     },
     userId: string
   ) {
+    let combinedRemarks = data.remarks || '';
+    if (data.dateOfBirth) {
+      const dobStr = String(data.dateOfBirth).trim();
+      if (dobStr) {
+        combinedRemarks = `[DOB:${dobStr}] ${combinedRemarks}`.trim();
+      }
+    }
+
     const client = await db.orm.public.Client.create({
       clientcode: data.clientCode,
       companyName: data.companyName,
@@ -38,7 +47,7 @@ export class OrderService {
       websiteUrl: data.websiteUrl ?? null,
       address: data.address ?? null,
       industry: data.industry ?? null,
-      remarks: data.remarks ?? null,
+      remarks: combinedRemarks || null,
       createdById: userId ? dbId(userId) : undefined
     });
 
@@ -50,7 +59,15 @@ export class OrderService {
       designation: 'Primary Contact'
     });
 
-    return client;
+    const match = (client.remarks || '').match(/\[DOB:([\d\-]+)\]/);
+    const dateOfBirth = match ? match[1] : undefined;
+    const cleanRemarks = (client.remarks || '').replace(/\[DOB:[\d\-]+\]\s*/, '').trim();
+
+    return {
+      ...client,
+      dateOfBirth,
+      remarks: cleanRemarks,
+    };
   }
 
   static async createOrder(

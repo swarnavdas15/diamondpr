@@ -928,18 +928,35 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       ]);
       const clientsArray = clientsRes.data.clients || clientsRes.data;
       const normalizedClients = Array.isArray(clientsArray) 
-        ? clientsArray.map((c: any) => ({ ...c, clientCode: c.clientCode || c.clientcode })) 
+        ? clientsArray.map((c: any) => {
+            const match = (c.remarks || '').match(/\[DOB:([\d\-]+)\]/);
+            const dob = c.dateOfBirth || (match ? match[1] : undefined);
+            const cleanRemarks = (c.remarks || '').replace(/\[DOB:[\d\-]+\]\s*/, '').trim();
+            return {
+              ...c,
+              clientCode: c.clientCode || c.clientcode,
+              dateOfBirth: dob,
+              remarks: cleanRemarks || c.remarks,
+            };
+          }) 
         : [];
       setClients(normalizedClients);
       const tempArray = tempClientsRes?.data?.clients || tempClientsRes?.data || [];
       const normalizedTempClients = Array.isArray(tempArray)
-  ? tempArray.map((c: any) => ({
-      ...c,
-      clientCode: c.clientCode || c.clientcode,
-      isTemporary: true,
-      status: c.status || 'PROSPECT',
-    }))
-  : [];
+        ? tempArray.map((c: any) => {
+            const match = (c.remarks || '').match(/\[DOB:([\d\-]+)\]/);
+            const dob = c.dateOfBirth || (match ? match[1] : undefined);
+            const cleanRemarks = (c.remarks || '').replace(/\[DOB:[\d\-]+\]\s*/, '').trim();
+            return {
+              ...c,
+              clientCode: c.clientCode || c.clientcode,
+              isTemporary: true,
+              status: c.status || 'PROSPECT',
+              dateOfBirth: dob,
+              remarks: cleanRemarks || c.remarks,
+            };
+          })
+        : [];
       setTemporaryClients(normalizedTempClients);
       setOrders(ordersRes.data.orders || ordersRes.data);
       setCompanyContacts(contactsRes.data.contacts || []);

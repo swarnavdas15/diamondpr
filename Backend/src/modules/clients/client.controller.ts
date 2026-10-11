@@ -4,7 +4,7 @@ import * as clientService from './client.service';
 
 export const handleCreateClient = async (req: AuthRequest, res: Response) => {
   try {
-    const { companyName, contactName, contactNo, email, address, gstNumber, panNumber, websiteUrl } = req.body;
+    const { companyName, contactName, contactNo, email, address, gstNumber, panNumber, websiteUrl, remarks, dateOfBirth } = req.body;
     if (!companyName || !contactNo) {
       return res.status(400).json({ error: 'Company name and contact number are required' });
     }
@@ -19,6 +19,8 @@ export const handleCreateClient = async (req: AuthRequest, res: Response) => {
       gstNumber,
       panNumber,
       websiteUrl,
+      remarks,
+      dateOfBirth,
       createdById,
     });
 

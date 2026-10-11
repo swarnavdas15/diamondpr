@@ -42,11 +42,12 @@ export const ClientDirectoryView: React.FC<PlaceholderProps> = ({ onOpenCreateCl
     return {
       title: 'Client Directory & Company Records Report',
       filename: 'Client_Directory_Report',
-      headers: ['Client Code', 'Company Name', 'Contact Name', 'Contact No', 'Email', 'GST Number', 'Industry'],
+      headers: ['Client Code', 'Company Name', 'Contact Name', 'Date of Birth', 'Contact No', 'Email', 'GST Number', 'Industry'],
       rows: displayedClients.map((c) => [
         c.clientCode,
         c.companyName,
         c.contactName || 'N/A',
+        c.dateOfBirth || 'N/A',
         c.contactNo,
         c.email || 'N/A',
         c.gstNumber || 'N/A',
@@ -133,6 +134,7 @@ export const ClientDirectoryView: React.FC<PlaceholderProps> = ({ onOpenCreateCl
               <Text style={[styles.th, { width: 110 }]}>Client Code</Text>
               <Text style={[styles.th, { width: 220 }]}>Company Name</Text>
               <Text style={[styles.th, { width: 170 }]}>Contact Person</Text>
+              <Text style={[styles.th, { width: 120 }]}>DOB (Birthday)</Text>
               <Text style={[styles.th, { width: 130 }]}>Phone</Text>
               <Text style={[styles.th, { width: 180 }]}>Email</Text>
               <Text style={[styles.th, { width: 140 }]}>GST Number</Text>
@@ -159,6 +161,14 @@ export const ClientDirectoryView: React.FC<PlaceholderProps> = ({ onOpenCreateCl
                     </View>
                   )}
                   <Text style={[styles.td, { width: '100%', paddingHorizontal: 0 }]} numberOfLines={1}>{c.contactName || 'N/A'}</Text>
+                </View>
+
+                <View style={{ width: 120, justifyContent: 'center', paddingHorizontal: 8 }}>
+                  {c.dateOfBirth ? (
+                    <Text style={{ fontSize: 12, fontWeight: '700', color: '#ec4899' }}>🎂 {c.dateOfBirth}</Text>
+                  ) : (
+                    <Text style={{ fontSize: 12, color: '#94a3b8' }}>-</Text>
+                  )}
                 </View>
 
                 <Text style={[styles.td, { width: 130 }]}>{c.contactNo}</Text>

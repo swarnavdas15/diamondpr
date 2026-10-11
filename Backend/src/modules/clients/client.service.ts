@@ -1,6 +1,19 @@
 import { db } from '../../prisma/db';
 import { dbId } from '../../prisma/ids';
 
+export const parseClientWithDob = (client: any) => {
+  if (!client) return client;
+  const rawRemarks = client.remarks || '';
+  const match = rawRemarks.match(/\[DOB:([\d\-]+)\]/);
+  const dateOfBirth = match ? match[1] : undefined;
+  const cleanRemarks = rawRemarks.replace(/\[DOB:[\d\-]+\]\s*/, '').trim();
+  return {
+    ...client,
+    dateOfBirth,
+    remarks: cleanRemarks,
+  };
+};
+
 export const createClient = async (data: {
   companyName: string;
   contactName?: string;
@@ -10,11 +23,21 @@ export const createClient = async (data: {
   gstNumber?: string;
   panNumber?: string;
   websiteUrl?: string;
+  remarks?: string;
+  dateOfBirth?: string;
   createdById: string;
 }) => {
   // Auto-generate Client Code
   const count = await db.orm.public.Client.count();
   const clientcode = `CL-${1001 + Number(count)}`;
+
+  let combinedRemarks = data.remarks || '';
+  if (data.dateOfBirth) {
+    const dobStr = String(data.dateOfBirth).trim();
+    if (dobStr) {
+      combinedRemarks = `[DOB:${dobStr}] ${combinedRemarks}`.trim();
+    }
+  }
 
   const client = await db.orm.public.Client.create({
     clientcode,
@@ -26,6 +49,7 @@ export const createClient = async (data: {
     gstNumber: data.gstNumber ?? null,
     panNumber: data.panNumber ?? null,
     websiteUrl: data.websiteUrl ?? null,
+    remarks: combinedRemarks || null,
     createdById: dbId(data.createdById),
   });
 
@@ -38,20 +62,21 @@ export const createClient = async (data: {
     designation: 'Primary Contact'
   });
 
-  return client;
+  return parseClientWithDob(client);
 };
 
 export const listClients = async (temporaryOnly?: boolean) => {
   const clients = await db.orm.public.Client.where({ isDeleted: 0 }).orderBy((c) => c.createdAt.desc()).all();
+  const parsed = clients.map(parseClientWithDob);
   if (temporaryOnly) {
-    return clients.filter((c: any) => (c.clientcode || '').startsWith('TMP-'));
+    return parsed.filter((c: any) => (c.clientcode || '').startsWith('TMP-'));
   }
-  return clients;
+  return parsed;
 };
 
 export const getClientById = async (id: string) => {
   const client = await db.orm.public.Client.where({ id: dbId(id), isDeleted: 0 }).first();
-  return client;
+  return parseClientWithDob(client);
 };
 
 export const promoteClient = async (id: string) => {
@@ -105,6 +130,7 @@ export const updatePrimaryContactProfileImage = async (clientId: string, imageUr
 };
 
 export const updateClient = async (id: string, data: any) => {
+  const existing = await db.orm.public.Client.where({ id: dbId(id) }).first();
   const updateData: any = {};
   if (data.companyName !== undefined) updateData.companyName = data.companyName;
   if (data.contactName !== undefined) updateData.contactName = data.contactName;
@@ -115,8 +141,19 @@ export const updateClient = async (id: string, data: any) => {
   if (data.panNumber !== undefined) updateData.panNumber = data.panNumber;
   if (data.websiteUrl !== undefined) updateData.websiteUrl = data.websiteUrl;
   if (data.industry !== undefined) updateData.industry = data.industry;
-  if (data.remarks !== undefined) updateData.remarks = data.remarks;
   if (data.clientCode !== undefined) updateData.clientcode = data.clientCode;
+
+  if (data.dateOfBirth !== undefined || data.remarks !== undefined) {
+    const prevMatch = (existing?.remarks || '').match(/\[DOB:([\d\-]+)\]/);
+    const existingDob = prevMatch ? prevMatch[1] : undefined;
+    const targetDob = data.dateOfBirth !== undefined ? String(data.dateOfBirth).trim() : existingDob;
+    const baseRemarks = data.remarks !== undefined ? data.remarks : (existing?.remarks || '').replace(/\[DOB:[\d\-]+\]\s*/, '').trim();
+    if (targetDob) {
+      updateData.remarks = `[DOB:${targetDob}] ${baseRemarks}`.trim();
+    } else {
+      updateData.remarks = baseRemarks || null;
+    }
+  }
 
   if (Object.keys(updateData).length > 0) {
     await db.orm.public.Client.where({ id: dbId(id) }).update(updateData);
