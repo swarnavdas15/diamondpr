@@ -18,10 +18,11 @@ export const OrderQuantityTracker: React.FC<OrderQuantityTrackerProps> = ({ orde
   const passedQcQty = order.qcPassedQuantity !== undefined ? order.qcPassedQuantity : (order.qcResult === 'PASSED' ? qcQty : 0);
   const failedQcQty = order.qcFailedQuantity || 0;
 
-  // Calculation of availability & progress
+  // Calculation of availability & progress (Dispatch locked until QC is 100% completed with 0 failures)
+  const isQcUnlocked = !order.qualityTestingRequired || (failedQcQty === 0 && passedQcQty >= totalQty && order.qualityStatus === 'COMPLETED');
   const availableForDispatch = Math.max(
     0,
-    (order.qualityTestingRequired ? passedQcQty : prodQty) - dispQty
+    (isQcUnlocked ? (order.qualityTestingRequired ? passedQcQty : prodQty) : 0) - dispQty
   );
   const pendingProduction = Math.max(0, totalQty - prodQty);
 
@@ -59,7 +60,7 @@ export const OrderQuantityTracker: React.FC<OrderQuantityTrackerProps> = ({ orde
         )}
         {failedQcQty > 0 && (
           <View style={[styles.pendingBadge, { backgroundColor: 'rgba(239, 68, 68, 0.12)', borderColor: '#ef4444' }]}>
-            <Text style={[styles.pendingBadgeText, { color: '#dc2626' }]}>🔁 Returned to Production (Rework): {failedQcQty} PCS</Text>
+            <Text style={[styles.pendingBadgeText, { color: '#dc2626' }]}>🔒 Testing Phase Locked (On Hold): {failedQcQty} PCS Failed</Text>
           </View>
         )}
         {dispQty >= totalQty && totalQty > 0 && (

@@ -201,9 +201,9 @@ export const handleUpdateProductionStage = async (req: AuthRequest, res: Respons
 export const handleUpdateQualityStage = async (req: AuthRequest, res: Response) => {
     try {
       const id = req.params.id as string;
-      const { status, qcRemarks, qcResult, processedQty } = req.body;
+      const { status, qcRemarks, qcResult, processedQty, passedQty, failedQty, isRetest } = req.body;
       const userId = req.user?.userId || '';
-      const order = await updateQualityStage(id, status, userId, qcRemarks, processedQty, qcResult);
+      const order = await updateQualityStage(id, status, userId, qcRemarks, processedQty, qcResult, passedQty, failedQty, isRetest);
     return res.status(200).json({ success: true, message: 'Quality testing stage updated', order });
   } catch (err: any) {
     return res.status(400).json({ success: false, error: err.message || 'Failed to update quality stage' });

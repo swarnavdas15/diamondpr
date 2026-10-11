@@ -18,10 +18,18 @@ export const DispatchDashboard: React.FC = () => {
 
   const pendingDispatch = getMaskedOrders().filter((o) => {
     if (!o.dispatchRequired || o.dispatchStatus === 'COMPLETED') return false;
-    const passedQcQty = o.qualityTestingRequired
-      ? (o.qcPassedQuantity !== undefined ? o.qcPassedQuantity : (o.qcResult === 'PASSED' ? (o.qcQuantity || 0) : 0))
-      : (o.productionRequired ? (o.productionQuantity || 0) : o.requiredQuantity);
-    return passedQcQty > (o.dispatchQuantity || 0);
+    if (o.qualityTestingRequired) {
+      // STRICT LOCK: Order can only be dispatched if testing is 100% completed,
+      // all required items passed, AND fail count is strictly 0!
+      const failedCount = o.qcFailedQuantity || 0;
+      const passedCount = o.qcPassedQuantity || (o.qcResult === 'PASSED' ? (o.qcQuantity || 0) : 0);
+      if (failedCount > 0 || o.qualityStatus !== 'COMPLETED' || passedCount < o.requiredQuantity) {
+        return false; // LOCKED! Cannot dispatch while testing is on hold / failing
+      }
+      return passedCount > (o.dispatchQuantity || 0);
+    }
+    const producedQty = o.productionRequired ? (o.productionQuantity || 0) : o.requiredQuantity;
+    return (o.productionStatus === 'COMPLETED' || producedQty >= o.requiredQuantity) && producedQty > (o.dispatchQuantity || 0);
   });
 
   const completedDispatch = getMaskedOrders().filter((o) => {

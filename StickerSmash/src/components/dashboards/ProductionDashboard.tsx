@@ -28,6 +28,7 @@ export const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ isQCMo
   const [selectedProcessOrder, setSelectedProcessOrder] = useState<Order | null>(null);
   const [processStage, setProcessStage] = useState<'PRODUCTION' | 'QUALITY_TESTING'>('PRODUCTION');
   const [processIsRework, setProcessIsRework] = useState(false);
+  const [processIsRetest, setProcessIsRetest] = useState(false);
 
   const getProductionExportPayload = (): ExportDataPayload => {
     if (activeTab === 'PRODUCTION') {
@@ -61,10 +62,11 @@ export const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ isQCMo
     }
   };
 
-  const handleOpenProcessModal = (ord: Order, stage: 'PRODUCTION' | 'QUALITY_TESTING', isRework = false) => {
+  const handleOpenProcessModal = (ord: Order, stage: 'PRODUCTION' | 'QUALITY_TESTING', isRework = false, isRetest = false) => {
     setSelectedProcessOrder(ord);
     setProcessStage(stage);
     setProcessIsRework(isRework);
+    setProcessIsRetest(isRetest);
     setProcessModalVisible(true);
   };
 
@@ -74,6 +76,7 @@ export const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ isQCMo
     qcResult?: QCResult;
     passedQty?: number;
     failedQty?: number;
+    isRetest?: boolean;
   }) => {
     if (!selectedProcessOrder) return;
 
@@ -84,17 +87,33 @@ export const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ isQCMo
       const calcStatus: DepartmentStatus = (newQty >= selectedProcessOrder.requiredQuantity && newRework === 0) ? 'COMPLETED' : 'IN_PROGRESS';
       updateProductionStage(selectedProcessOrder.id, calcStatus, notes, data.processedQty, processIsRework);
     } else {
-      const remarks = data.remarks || qcRemarksMap[selectedProcessOrder.id] || 'Quality inspection completed.';
+      const remarks = data.remarks || qcRemarksMap[selectedProcessOrder.id] || (data.isRetest ? 'Re-testing completed.' : 'Quality inspection completed.');
       
-      let newPassedQty = 0;
-      if (data.passedQty !== undefined) {
-        newPassedQty = (selectedProcessOrder.qcPassedQuantity || 0) + data.passedQty;
+      let newPassedQty = selectedProcessOrder.qcPassedQuantity || 0;
+      let newFailedQty = selectedProcessOrder.qcFailedQuantity || 0;
+      if (data.isRetest) {
+        newPassedQty = newPassedQty + (data.passedQty || 0);
+        newFailedQty = Math.max(0, newFailedQty - (data.passedQty || 0));
       } else {
-        newPassedQty = data.qcResult === 'PASSED' ? (selectedProcessOrder.qcPassedQuantity || 0) + data.processedQty : (selectedProcessOrder.qcPassedQuantity || 0);
+        newPassedQty = newPassedQty + (data.passedQty || 0);
+        newFailedQty = newFailedQty + (data.failedQty || 0);
       }
       
-      const calcStatus: DepartmentStatus = newPassedQty >= selectedProcessOrder.requiredQuantity ? 'COMPLETED' : 'IN_PROGRESS';
-      updateQualityStage(selectedProcessOrder.id, calcStatus, data.qcResult || 'PASSED', remarks, data.processedQty, data.passedQty, data.failedQty);
+      // Strict rule: Completed only when all required items pass AND fail count is strictly 0
+      const isFullyPassed = newPassedQty >= selectedProcessOrder.requiredQuantity && newFailedQty === 0;
+      const calcStatus: DepartmentStatus = isFullyPassed ? 'COMPLETED' : 'IN_PROGRESS';
+      const result: QCResult = newFailedQty > 0 ? 'FAILED' : 'PASSED';
+      
+      updateQualityStage(
+        selectedProcessOrder.id,
+        calcStatus,
+        result,
+        remarks,
+        data.processedQty,
+        data.passedQty,
+        data.failedQty,
+        data.isRetest
+      );
     }
 
     setProcessModalVisible(false);
@@ -111,7 +130,9 @@ export const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ isQCMo
 
     // Production is Completed
     if (ord.qualityTestingRequired) {
-      if (ord.qualityStatus === 'COMPLETED' && ord.qcResult === 'PASSED') {
+      if (ord.qcFailedQuantity && ord.qcFailedQuantity > 0) {
+        return { label: `🔒 Testing Locked (${ord.qcFailedQuantity} Failed)`, bg: StatusColors.FAILED.bg, text: StatusColors.FAILED.text, border: StatusColors.FAILED.border };
+      } else if (ord.qualityStatus === 'COMPLETED' && (ord.qcFailedQuantity || 0) === 0) {
         return { label: '✓ Ready for Dispatch (QC Passed)', bg: StatusColors.COMPLETED.bg, text: StatusColors.COMPLETED.text, border: StatusColors.COMPLETED.border };
       } else if (ord.qcResult === 'FAILED') {
         return { label: '✕ QC Failed', bg: StatusColors.FAILED.bg, text: StatusColors.FAILED.text, border: StatusColors.FAILED.border };
@@ -129,7 +150,7 @@ export const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ isQCMo
     (o) => o.productionRequired && ((o.purchaseQuantity || 0) > 0 || o.purchaseStatus === 'COMPLETED' || !o.purchaseRequired) && o.productionStatus !== 'COMPLETED'
   );
   const qcQueue = maskedOrders.filter(
-    (o) => o.qualityTestingRequired && (o.productionStatus === 'COMPLETED' || (o.productionQuantity || 0) > (o.qcPassedQuantity || 0)) && o.qualityStatus !== 'COMPLETED'
+    (o) => o.qualityTestingRequired && (o.productionStatus === 'COMPLETED' || (o.productionQuantity || 0) > (o.qcPassedQuantity || 0) || (o.qcFailedQuantity || 0) > 0) && (o.qualityStatus !== 'COMPLETED' || (o.qcFailedQuantity || 0) > 0)
   );
   // Rework Queue: orders returned from QC failure that are back in Production
   const reworkQueue = maskedOrders.filter(
@@ -283,13 +304,18 @@ export const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ isQCMo
               const badge = getComprehensiveBadge(ord);
 
               let qcBadgeStyle = { bg: StatusColors.PENDING.bg, text: StatusColors.PENDING.text, border: StatusColors.PENDING.border };
-              if (ord.qcResult === 'PASSED') {
+              if (ord.qcFailedQuantity && ord.qcFailedQuantity > 0) {
+                qcBadgeStyle = { bg: StatusColors.FAILED.bg, text: StatusColors.FAILED.text, border: StatusColors.FAILED.border };
+              } else if (ord.qcResult === 'PASSED' && ord.qualityStatus === 'COMPLETED') {
                 qcBadgeStyle = { bg: StatusColors.COMPLETED.bg, text: StatusColors.COMPLETED.text, border: StatusColors.COMPLETED.border };
               } else if (ord.qcResult === 'FAILED') {
                 qcBadgeStyle = { bg: StatusColors.FAILED.bg, text: StatusColors.FAILED.text, border: StatusColors.FAILED.border };
               } else if (ord.qualityStatus === 'IN_PROGRESS') {
                 qcBadgeStyle = { bg: StatusColors.IN_PROGRESS.bg, text: StatusColors.IN_PROGRESS.text, border: StatusColors.IN_PROGRESS.border };
               }
+
+              const hasFailedItems = (ord.qcFailedQuantity || 0) > 0;
+              const hasUninspected = (ord.productionQuantity || 0) > ((ord.qcPassedQuantity || 0) + (ord.qcFailedQuantity || 0));
 
               return (
                 <View key={ord.id} style={[styles.orderCard, { borderLeftWidth: 4, borderLeftColor: qcBadgeStyle.bg }]}>
@@ -305,7 +331,11 @@ export const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ isQCMo
                     </TouchableOpacity>
 
                     <View style={[styles.qcBadge, { backgroundColor: qcBadgeStyle.bg, borderWidth: 1, borderColor: qcBadgeStyle.border }]}>
-                      <Text style={[styles.qcBadgeText, { color: qcBadgeStyle.text }]}>QC RESULT: {ord.qcResult}</Text>
+                      <Text style={[styles.qcBadgeText, { color: qcBadgeStyle.text }]}>
+                        {hasFailedItems
+                          ? `🔒 LOCKED: ${ord.qcFailedQuantity} FAILED`
+                          : `QC RESULT: ${ord.qcResult || 'PENDING'}`}
+                      </Text>
                     </View>
                   </View>
 
@@ -316,10 +346,22 @@ export const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ isQCMo
                   <View style={styles.specBox}>
                     <Text style={styles.specTitle}>INSPECTION & TESTING STANDARDS CHECKLIST</Text>
                     <Text style={styles.specVal}>1. Produced Available for QC: <Text style={styles.bold}>{ord.productionQuantity || 0} pcs</Text></Text>
-                    <Text style={styles.specVal}>2. QC Inspected Passed: <Text style={styles.bold}>{ord.qcQuantity || 0} / {ord.productionQuantity || 0} pcs</Text></Text>
+                    <Text style={styles.specVal}>2. QC Inspected Passed: <Text style={styles.bold}>{ord.qcPassedQuantity || 0} / {ord.requiredQuantity} pcs</Text></Text>
                     <Text style={styles.specVal}>3. Hydro-Static Pressure Test: <Text style={styles.bold}>1500 PSI (10 mins hold)</Text></Text>
                     <Text style={styles.specVal}>4. Dimensional Tolerance Verification: <Text style={styles.bold}>±0.5mm Flange Thickness</Text></Text>
                   </View>
+
+                  {/* Testing Phase Lock Notice Banner */}
+                  {hasFailedItems && (
+                    <View style={{ marginTop: Spacing.sm, backgroundColor: 'rgba(239, 68, 68, 0.12)', borderColor: '#ef4444', borderWidth: 1, borderRadius: Radius.md, padding: Spacing.sm }}>
+                      <Text style={{ color: '#ef4444', fontWeight: '800', fontSize: 13, marginBottom: 2 }}>
+                        🔒 TESTING PHASE LOCKED (ON HOLD)
+                      </Text>
+                      <Text style={{ color: Colors.textLight, fontSize: 12 }}>
+                        {ord.qcFailedQuantity} item(s) failed QC inspection. Order cannot proceed to Dispatch until all {ord.qcFailedQuantity} failed items are re-tested, fixed, and verified as Passed (Fail Count must be 0).
+                      </Text>
+                    </View>
+                  )}
 
                   {/* QC Remarks Input */}
                   <View style={styles.notesBox}>
@@ -334,13 +376,31 @@ export const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ isQCMo
                   </View>
 
                   {/* QC Actions */}
-                  <View style={styles.actionRow}>
-                    <TouchableOpacity
-                      style={[styles.actionBtn, styles.btnPassQC]}
-                      onPress={() => handleOpenProcessModal(ord, 'QUALITY_TESTING')}
-                    >
-                      <Text style={styles.actionBtnText}>🔍 Record QC Inspection Quantity</Text>
-                    </TouchableOpacity>
+                  <View style={[styles.actionRow, { flexWrap: 'wrap', gap: Spacing.sm }]}>
+                    {hasFailedItems && (
+                      <TouchableOpacity
+                        style={[styles.actionBtn, { backgroundColor: '#f59e0b', flex: 1, minWidth: 200 }]}
+                        onPress={() => handleOpenProcessModal(ord, 'QUALITY_TESTING', false, true)}
+                      >
+                        <Text style={styles.actionBtnText}>🛠️ Re-test Failed Items ({ord.qcFailedQuantity} PCS)</Text>
+                      </TouchableOpacity>
+                    )}
+                    {hasUninspected && (
+                      <TouchableOpacity
+                        style={[styles.actionBtn, styles.btnPassQC, { flex: 1, minWidth: 200 }]}
+                        onPress={() => handleOpenProcessModal(ord, 'QUALITY_TESTING', false, false)}
+                      >
+                        <Text style={styles.actionBtnText}>🔍 Record QC Inspection Quantity</Text>
+                      </TouchableOpacity>
+                    )}
+                    {!hasFailedItems && !hasUninspected && (
+                      <TouchableOpacity
+                        style={[styles.actionBtn, styles.btnPassQC, { flex: 1, minWidth: 200 }]}
+                        onPress={() => handleOpenProcessModal(ord, 'QUALITY_TESTING', false, false)}
+                      >
+                        <Text style={styles.actionBtnText}>🔍 Record QC Inspection Quantity</Text>
+                      </TouchableOpacity>
+                    )}
                   </View>
                 </View>
               );
@@ -417,6 +477,7 @@ export const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ isQCMo
         onClose={() => setProcessModalVisible(false)}
         onSubmit={handleProcessSubmit}
         isRework={processIsRework}
+        isRetest={processIsRetest}
       />
     </ScrollView>
   );

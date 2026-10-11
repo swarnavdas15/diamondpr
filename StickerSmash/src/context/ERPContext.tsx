@@ -170,7 +170,16 @@ interface ERPContextType {
     }
   ) => Promise<void>;
   updateProductionStage: (orderId: string, status: DepartmentStatus, shopFloorNotes?: string, processedQty?: number, isRework?: boolean) => void;
-  updateQualityStage: (orderId: string, status: DepartmentStatus, qcResult?: QCResult, qcRemarks?: string, processedQty?: number, passedQty?: number, failedQty?: number) => void;
+  updateQualityStage: (
+    orderId: string,
+    status: DepartmentStatus,
+    qcResult?: QCResult,
+    qcRemarks?: string,
+    processedQty?: number,
+    passedQty?: number,
+    failedQty?: number,
+    isRetest?: boolean
+  ) => void;
   updateDispatchStage: (orderId: string, status: DepartmentStatus, logisticsEntry?: string, transportRef?: string, dispatchNotes?: string, processedQty?: number) => void;
   verifyAndCloseOrder: (orderId: string, remarks?: string) => void;
 
@@ -1526,9 +1535,23 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     qcRemarks?: string,
     processedQty?: number,
     passedQty?: number,
-    failedQty?: number
+    failedQty?: number,
+    isRetest?: boolean
   ) => {
-      try { await apiClient.patch(`/orders/${orderId}/quality`, { status, qcResult, processedQty, qcRemarks }); await fetchLiveDashboardData(); } catch (e) { console.error(e); }
+    try {
+      await apiClient.patch(`/orders/${orderId}/quality`, {
+        status,
+        qcResult,
+        processedQty,
+        qcRemarks,
+        passedQty,
+        failedQty,
+        isRetest,
+      });
+      await fetchLiveDashboardData();
+    } catch (e) {
+      console.error(e);
+    }
   };
 
 

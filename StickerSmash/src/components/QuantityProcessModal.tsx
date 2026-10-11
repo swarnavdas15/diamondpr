@@ -19,8 +19,10 @@ interface QuantityProcessModalProps {
     failedQty?: number;
     transportRef?: string;
     logisticsEntry?: string;
+    isRetest?: boolean;
   }) => void;
   isRework?: boolean;
+  isRetest?: boolean;
 }
 
 export const QuantityProcessModal: React.FC<QuantityProcessModalProps> = ({
@@ -30,6 +32,7 @@ export const QuantityProcessModal: React.FC<QuantityProcessModalProps> = ({
   onClose,
   onSubmit,
   isRework,
+  isRetest,
 }) => {
   const { width } = useWindowDimensions();
   const isMobile = width < 768;
@@ -43,6 +46,7 @@ export const QuantityProcessModal: React.FC<QuantityProcessModalProps> = ({
   const [passedQty, setPassedQty] = useState('');
   const [failedQty, setFailedQty] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
+  const [isRetestMode, setIsRetestMode] = useState(false);
 
   // Use real vendors from context; fall back to defaults if none exist
   const vendorList = vendors.length > 0
@@ -57,16 +61,21 @@ export const QuantityProcessModal: React.FC<QuantityProcessModalProps> = ({
       setRemarks('');
       setVendorSelected(order.vendorSelected || defaultVendor);
       setQcResult('PASSED');
-      setQcResult('PASSED');
       setPassedQty('');
       setFailedQty('');
       setTransportRef('');
       setLogisticsEntry('');
       setErrorMsg('');
+      if (stage === 'QUALITY_TESTING') {
+        const hasFailed = (order.qcFailedQuantity || 0) > 0;
+        const producedAvailable = order.productionQuantity || order.requiredQuantity || 1;
+        const uninspected = Math.max(0, producedAvailable - (order.qcPassedQuantity || 0) - (order.qcFailedQuantity || 0));
+        setIsRetestMode(isRetest || (hasFailed && uninspected === 0));
+      } else {
+        setIsRetestMode(false);
+      }
     }
-  }, [order, stage, visible]);
-
-
+  }, [order, stage, visible, isRetest]);
 
   if (!visible || !order) return null;
 
@@ -77,6 +86,11 @@ export const QuantityProcessModal: React.FC<QuantityProcessModalProps> = ({
   let questionPrompt = '';
   let alreadyProcessed = 0;
   let maxAvailable = 0;
+
+  const producedAvailable = order.productionQuantity || totalQty;
+  const currentPassed = order.qcPassedQuantity || 0;
+  const currentFailed = order.qcFailedQuantity || 0;
+  const uninspectedQty = Math.max(0, producedAvailable - (currentPassed + currentFailed));
 
   if (stage === 'PURCHASE') {
     stageTitle = 'Material Item & Vendor Procurement Report';
@@ -92,11 +106,17 @@ export const QuantityProcessModal: React.FC<QuantityProcessModalProps> = ({
       : totalQty;
     maxAvailable = isRework ? (order.reworkQuantity || 0) : Math.max(0, availableMaterial - alreadyProcessed);
   } else if (stage === 'QUALITY_TESTING') {
-    stageTitle = 'Quality Testing & Inspection Result Log';
-    questionPrompt = 'Enter the number of passed and failed items.';
-    alreadyProcessed = order.qcPassedQuantity || 0;
-    const producedAvailable = order.productionQuantity || 0;
-    maxAvailable = Math.max(0, producedAvailable - (order.qcPassedQuantity || 0));
+    if (isRetestMode) {
+      stageTitle = 'Quality Testing: Re-test Failed Items (Lock Active)';
+      questionPrompt = `Enter how many of the ${currentFailed} failed items have now been fixed & passed re-test.`;
+      alreadyProcessed = currentPassed;
+      maxAvailable = currentFailed;
+    } else {
+      stageTitle = 'Quality Testing & Inspection Result Log';
+      questionPrompt = 'Enter the number of newly inspected passed and failed items.';
+      alreadyProcessed = currentPassed;
+      maxAvailable = uninspectedQty;
+    }
   } else if (stage === 'DISPATCH') {
     stageTitle = 'Dispatch & Logistics Shipment Process';
     questionPrompt = 'How many items are being dispatched in this shipment?';
@@ -117,8 +137,29 @@ export const QuantityProcessModal: React.FC<QuantityProcessModalProps> = ({
     setErrorMsg('');
 
     if (stage === 'QUALITY_TESTING') {
-      const pQty = Number(passedQty);
-      const fQty = Number(failedQty);
+      if (isRetestMode) {
+        const pQty = Number(passedQty);
+        if (!passedQty.trim() || isNaN(pQty) || pQty <= 0) {
+          setErrorMsg('Please enter a valid quantity of items that passed re-test (greater than 0).');
+          return;
+        }
+        if (pQty > maxAvailable) {
+          setErrorMsg(`Re-tested quantity cannot exceed currently failed items (${maxAvailable} PCS).`);
+          return;
+        }
+        onSubmit({
+          processedQty: pQty,
+          passedQty: pQty,
+          failedQty: 0,
+          remarks: remarks.trim() || `Re-tested ${pQty} failed items: PASSED inspection.`,
+          qcResult: 'PASSED',
+          isRetest: true,
+        });
+        return;
+      }
+
+      const pQty = Number(passedQty || 0);
+      const fQty = Number(failedQty || 0);
 
       if (passedQty.trim() === '' && failedQty.trim() === '') {
         setErrorMsg('Please enter either passed or failed quantity.');
@@ -137,8 +178,9 @@ export const QuantityProcessModal: React.FC<QuantityProcessModalProps> = ({
         processedQty: pQty + fQty,
         passedQty: pQty,
         failedQty: fQty,
-        remarks: remarks.trim() || undefined,
+        remarks: remarks.trim() || (fQty > 0 ? `QC: ${pQty} passed, ${fQty} failed (Testing locked on hold)` : `QC: ${pQty} passed`),
         qcResult: fQty > 0 ? (pQty > 0 ? undefined : 'FAILED') : 'PASSED',
+        isRetest: false,
       });
       return;
     }
@@ -300,45 +342,129 @@ export const QuantityProcessModal: React.FC<QuantityProcessModalProps> = ({
 
             {stage === 'QUALITY_TESTING' && (
               <View style={{ marginTop: Spacing.sm, gap: 8 }}>
-                <Text style={{ fontSize: 13, fontWeight: '700', color: Colors.textLight, marginBottom: 4 }}>
-                  Inspection Results Breakdown:
-                </Text>
-
-                <View style={{ flexDirection: 'row', gap: Spacing.md }}>
-                  {/* Left Box: PASS */}
-                  <View style={{ flex: 1, backgroundColor: '#f0fdf4', padding: 10, borderRadius: Radius.md, borderWidth: 1.5, borderColor: '#16a34a' }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 }}>
-                      <Text style={{ fontSize: 16 }}>✓</Text>
-                      <Text style={{ color: '#15803d', fontSize: 14, fontWeight: '900', letterSpacing: 0.5 }}>PASS</Text>
-                      <Text style={{ color: '#166534', fontSize: 12, fontWeight: '600' }}>(Passed Qty)</Text>
-                    </View>
-                    <TextInput
-                      style={[styles.input, { fontSize: 16, fontWeight: '800', color: '#15803d', borderColor: '#16a34a', borderWidth: 1.5, backgroundColor: '#ffffff' }]}
-                      placeholder="Pass Qty (e.g. 40)"
-                      placeholderTextColor="#94a3b8"
-                      value={passedQty}
-                      onChangeText={setPassedQty}
-                      keyboardType="numeric"
-                    />
+                {/* Mode Selector when both failed items exist and uninspected items remain */}
+                {currentFailed > 0 && uninspectedQty > 0 && (
+                  <View style={{ flexDirection: 'row', gap: 8, marginBottom: 4 }}>
+                    <TouchableOpacity
+                      style={[styles.modeTab, isRetestMode && styles.modeTabActive]}
+                      onPress={() => {
+                        setIsRetestMode(true);
+                        setPassedQty('');
+                        setFailedQty('');
+                        setErrorMsg('');
+                      }}
+                    >
+                      <Text style={[styles.modeTabText, isRetestMode && styles.modeTabTextActive]}>
+                        🛠️ Re-test Failed Items ({currentFailed} PCS)
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.modeTab, !isRetestMode && styles.modeTabActive]}
+                      onPress={() => {
+                        setIsRetestMode(false);
+                        setPassedQty('');
+                        setFailedQty('');
+                        setErrorMsg('');
+                      }}
+                    >
+                      <Text style={[styles.modeTabText, !isRetestMode && styles.modeTabTextActive]}>
+                        🔍 Inspect New Items ({uninspectedQty} PCS)
+                      </Text>
+                    </TouchableOpacity>
                   </View>
+                )}
 
-                  {/* Right Box: FAIL */}
-                  <View style={{ flex: 1, backgroundColor: '#fef2f2', padding: 10, borderRadius: Radius.md, borderWidth: 1.5, borderColor: '#dc2626' }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 }}>
-                      <Text style={{ fontSize: 16 }}>✕</Text>
-                      <Text style={{ color: '#b91c1c', fontSize: 14, fontWeight: '900', letterSpacing: 0.5 }}>FAIL</Text>
-                      <Text style={{ color: '#991b1b', fontSize: 12, fontWeight: '600' }}>(Failed Qty)</Text>
+                {isRetestMode ? (
+                  <View style={{ gap: 10 }}>
+                    {/* Re-test Lock Banner */}
+                    <View style={{ backgroundColor: '#fef2f2', borderColor: '#ef4444', borderWidth: 1.5, borderRadius: Radius.md, padding: 12 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                        <Text style={{ fontSize: 16 }}>🔒</Text>
+                        <Text style={{ color: '#b91c1c', fontSize: 13, fontWeight: '900' }}>
+                          TESTING PHASE LOCKED (ON HOLD)
+                        </Text>
+                      </View>
+                      <Text style={{ color: '#7f1d1d', fontSize: 12, lineHeight: 18 }}>
+                        Currently Failed: <Text style={{ fontWeight: '800', color: '#b91c1c' }}>{currentFailed} PCS</Text> | Passed: <Text style={{ fontWeight: '800', color: '#15803d' }}>{currentPassed} PCS</Text>
+                      </Text>
+                      <Text style={{ color: '#991b1b', fontSize: 11, marginTop: 4 }}>
+                        Testing phase remains locked on hold until all {currentFailed} failed items are re-tested and Fail Count reaches 0.
+                      </Text>
                     </View>
-                    <TextInput
-                      style={[styles.input, { fontSize: 16, fontWeight: '800', color: '#b91c1c', borderColor: '#dc2626', borderWidth: 1.5, backgroundColor: '#ffffff' }]}
-                      placeholder="Fail Qty (e.g. 60)"
-                      placeholderTextColor="#94a3b8"
-                      value={failedQty}
-                      onChangeText={setFailedQty}
-                      keyboardType="numeric"
-                    />
+
+                    {/* Re-test Passed Input */}
+                    <View style={{ backgroundColor: '#f0fdf4', padding: 12, borderRadius: Radius.md, borderWidth: 1.5, borderColor: '#16a34a' }}>
+                      <Text style={{ color: '#15803d', fontSize: 13, fontWeight: '800', marginBottom: 6 }}>
+                        Re-tested Items Fixed & Passed (PCS) * (Max: {currentFailed} PCS)
+                      </Text>
+                      <TextInput
+                        style={[styles.input, { fontSize: 16, fontWeight: '800', color: '#15803d', borderColor: '#16a34a', borderWidth: 1.5, backgroundColor: '#ffffff' }]}
+                        placeholder={`Enter passed quantity (e.g. ${currentFailed})`}
+                        placeholderTextColor="#94a3b8"
+                        value={passedQty}
+                        onChangeText={setPassedQty}
+                        keyboardType="numeric"
+                        autoFocus
+                      />
+                      <Text style={{ color: '#166534', fontSize: 11, marginTop: 4 }}>
+                        Entering {currentFailed} PCS will reduce Fail Count to 0 and unlock testing for Dispatch.
+                      </Text>
+                    </View>
                   </View>
-                </View>
+                ) : (
+                  <View style={{ gap: 8 }}>
+                    {currentFailed > 0 && (
+                      <View style={{ backgroundColor: '#fef2f2', borderColor: '#ef4444', borderWidth: 1, borderRadius: Radius.sm, padding: 8 }}>
+                        <Text style={{ color: '#b91c1c', fontSize: 11, fontWeight: '700' }}>
+                          🔒 Note: Order currently has {currentFailed} failed items on hold. Testing will remain locked until all failed items pass re-test.
+                        </Text>
+                      </View>
+                    )}
+
+                    <Text style={{ fontSize: 13, fontWeight: '700', color: Colors.textLight, marginBottom: 2 }}>
+                      Inspection Results Breakdown:
+                    </Text>
+
+                    <View style={{ flexDirection: 'row', gap: Spacing.md }}>
+                      {/* Left Box: PASS */}
+                      <View style={{ flex: 1, backgroundColor: '#f0fdf4', padding: 10, borderRadius: Radius.md, borderWidth: 1.5, borderColor: '#16a34a' }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+                          <Text style={{ fontSize: 16 }}>✓</Text>
+                          <Text style={{ color: '#15803d', fontSize: 14, fontWeight: '900', letterSpacing: 0.5 }}>PASS</Text>
+                          <Text style={{ color: '#166534', fontSize: 12, fontWeight: '600' }}>(Passed Qty)</Text>
+                        </View>
+                        <TextInput
+                          style={[styles.input, { fontSize: 16, fontWeight: '800', color: '#15803d', borderColor: '#16a34a', borderWidth: 1.5, backgroundColor: '#ffffff' }]}
+                          placeholder={`Pass Qty (Max: ${uninspectedQty})`}
+                          placeholderTextColor="#94a3b8"
+                          value={passedQty}
+                          onChangeText={setPassedQty}
+                          keyboardType="numeric"
+                        />
+                      </View>
+
+                      {/* Right Box: FAIL */}
+                      <View style={{ flex: 1, backgroundColor: '#fef2f2', padding: 10, borderRadius: Radius.md, borderWidth: 1.5, borderColor: '#dc2626' }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+                          <Text style={{ fontSize: 16 }}>✕</Text>
+                          <Text style={{ color: '#b91c1c', fontSize: 14, fontWeight: '900', letterSpacing: 0.5 }}>FAIL</Text>
+                          <Text style={{ color: '#991b1b', fontSize: 12, fontWeight: '600' }}>(Failed Qty)</Text>
+                        </View>
+                        <TextInput
+                          style={[styles.input, { fontSize: 16, fontWeight: '800', color: '#b91c1c', borderColor: '#dc2626', borderWidth: 1.5, backgroundColor: '#ffffff' }]}
+                          placeholder={`Fail Qty (Max: ${uninspectedQty})`}
+                          placeholderTextColor="#94a3b8"
+                          value={failedQty}
+                          onChangeText={setFailedQty}
+                          keyboardType="numeric"
+                        />
+                      </View>
+                    </View>
+                    <Text style={{ color: '#64748b', fontSize: 11 }}>
+                      ⚠️ Any failed items will immediately lock the testing phase on hold until re-tested and passed.
+                    </Text>
+                  </View>
+                )}
               </View>
             )}
 
@@ -619,5 +745,29 @@ const styles = StyleSheet.create({
   procurementReportVal: {
     color: Colors.textMuted,
     fontSize: 11,
+  },
+  modeTab: {
+    flex: 1,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderRadius: Radius.sm,
+    backgroundColor: Colors.inputBg,
+    borderWidth: 1,
+    borderColor: Colors.borderDark,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modeTabActive: {
+    backgroundColor: '#0284c7',
+    borderColor: '#0284c7',
+  },
+  modeTabText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: Colors.textSubtle,
+  },
+  modeTabTextActive: {
+    color: Colors.white,
+    fontWeight: '800',
   },
 });

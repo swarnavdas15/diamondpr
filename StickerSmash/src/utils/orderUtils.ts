@@ -14,14 +14,33 @@ export const getOrderActiveStage = (order: Order): string => {
     return 'COMPLETED';
   }
 
-  // 2. Dispatch Phase
-  if (order.dispatchRequired && (order.dispatchStatus === 'IN_PROGRESS' || order.qualityStatus === 'COMPLETED')) {
-    return 'DISPATCH';
+  // 2. Dispatch Phase (Unlocked only when Testing is 100% completed with 0 failures)
+  if (order.dispatchRequired) {
+    if (order.dispatchStatus === 'IN_PROGRESS') {
+      return 'DISPATCH';
+    }
+    if (order.qualityTestingRequired) {
+      if (
+        order.qualityStatus === 'COMPLETED' &&
+        (order.qcFailedQuantity || 0) === 0 &&
+        (order.qcPassedQuantity || 0) >= order.requiredQuantity
+      ) {
+        return 'DISPATCH';
+      }
+    } else if (order.productionStatus === 'COMPLETED') {
+      return 'DISPATCH';
+    }
   }
 
-  // 3. QC / Quality Testing Phase
-  if (order.qualityTestingRequired && (order.qualityStatus === 'IN_PROGRESS' || order.productionStatus === 'COMPLETED')) {
-    return 'QUALITY TESTING';
+  // 3. QC / Quality Testing Phase (Locked on hold if fail count > 0)
+  if (order.qualityTestingRequired) {
+    if ((order.qcFailedQuantity || 0) > 0) {
+      return `TESTING (HOLD: ${order.qcFailedQuantity} FAILED)`;
+    }
+    if (order.qualityStatus === 'IN_PROGRESS' || order.productionStatus === 'COMPLETED') {
+      const pQty = order.qcPassedQuantity || 0;
+      return pQty > 0 ? `TESTING (${pQty}/${order.requiredQuantity} PASSED)` : 'QUALITY TESTING';
+    }
   }
 
   // 4. Production Phase (In progress or purchase already completed)

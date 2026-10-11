@@ -681,23 +681,67 @@ export const updateProductionStage = async (id: string, status: string, userId: 
   await updateSalesWorkflowStage(id, nextStage, userId, notes);
   return await getOrderById(id);
 };
-export const updateQualityStage = async (id: string, status: string, userId: string, notes?: string, processedQty?: number, qcResult?: string) => {
+export const updateQualityStage = async (
+  id: string,
+  status: string,
+  userId: string,
+  notes?: string,
+  processedQty?: number,
+  qcResult?: string,
+  passedQty?: number,
+  failedQty?: number,
+  isRetest?: boolean
+) => {
   const order = await db.orm.public.Order.where({ id: dbId(id) }).first();
   if (!order) throw new Error('Order not found');
-  const nextStage = status === 'COMPLETED'
+
+  const updateData: any = {};
+  if (notes !== undefined) updateData.qcRemarks = notes;
+
+  let currentPassed = Math.round(Number(order.qcPassedQuantity || 0));
+  let currentFailed = Math.round(Number(order.qcFailedQuantity || 0));
+  let currentTotalInspected = Math.round(Number(order.qcQuantity || 0));
+
+  if (isRetest) {
+    // Re-testing failed items: items that now pass reduce failed count and increase passed count
+    const retestPassed = Math.max(0, Math.round(Number(passedQty || processedQty || 0)));
+    const maxCanPass = Math.min(retestPassed, currentFailed);
+    currentFailed = Math.max(0, currentFailed - maxCanPass);
+    currentPassed = Math.min(order.requiredQuantity, currentPassed + maxCanPass);
+  } else {
+    // Regular inspection
+    if (passedQty !== undefined || failedQty !== undefined) {
+      const p = Math.max(0, Math.round(Number(passedQty || 0)));
+      const f = Math.max(0, Math.round(Number(failedQty || 0)));
+      currentPassed += p;
+      currentFailed += f;
+      currentTotalInspected += (p + f);
+    } else if (processedQty !== undefined) {
+      const pQty = Math.max(0, Math.round(Number(processedQty || 0)));
+      currentTotalInspected += pQty;
+      if (qcResult === 'PASSED') {
+        currentPassed += pQty;
+      } else if (qcResult === 'FAILED') {
+        currentFailed += pQty;
+      }
+    }
+  }
+
+  updateData.qcPassedQuantity = currentPassed;
+  updateData.qcFailedQuantity = currentFailed;
+  updateData.qcQuantity = Math.max(currentTotalInspected, currentPassed + currentFailed);
+
+  // STRICT REQUIREMENT: Testing phase locked until ALL items pass AND fail count is strictly 0!
+  const isFullyPassed = currentPassed >= order.requiredQuantity && currentFailed === 0;
+  const finalQualityStatus = isFullyPassed ? 'COMPLETED' : 'IN_PROGRESS';
+  updateData.qualityStatus = finalQualityStatus;
+  updateData.qcResult = isFullyPassed ? 'PASSED' : (currentFailed > 0 ? 'FAILED' : 'PASSED');
+
+  const nextStage = finalQualityStatus === 'COMPLETED'
     ? (order.dispatchRequired ? 'DISPATCH' : 'COMPLETED')
     : 'TESTING';
-  const updateData: any = {
-    qualityStatus: status,
-    currentStage: nextStage
-  };
-  if (notes !== undefined) updateData.qcRemarks = notes;
-  if (qcResult !== undefined) updateData.qcResult = qcResult;
-  if (processedQty !== undefined) {
-    updateData.qcQuantity = Math.round(Number(order.qcQuantity || 0) + Number(processedQty));
-    if (qcResult === 'PASSED') updateData.qcPassedQuantity = Math.round(Number(order.qcPassedQuantity || 0) + Number(processedQty));
-    if (qcResult === 'FAILED') updateData.qcFailedQuantity = Math.round(Number(order.qcFailedQuantity || 0) + Number(processedQty));
-  }
+  updateData.currentStage = nextStage;
+
   await db.orm.public.Order.where({ id: dbId(id) }).update(updateData);
   await updateSalesWorkflowStage(id, nextStage, userId, notes);
   return await getOrderById(id);
