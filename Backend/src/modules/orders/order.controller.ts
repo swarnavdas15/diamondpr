@@ -1,6 +1,6 @@
 import { Response } from 'express';
 import { AuthRequest } from '../../middlewares/auth.middleware';
-import { OrderService, createOrder, getOrders, getOrderById, updateSalesWorkflowStage, updatePurchaseStage, addPurchaseBatch, receivePurchaseBatch, updateProductionStage, updateQualityStage, updateDispatchStage, verifyAndCompleteOrder } from './order.service';
+import { OrderService, createOrder, getOrders, getOrderById, updateSalesWorkflowStage, updatePurchaseStage, addPurchaseBatch, deletePurchaseBatch, receivePurchaseBatch, updateProductionStage, updateQualityStage, updateDispatchStage, verifyAndCompleteOrder } from './order.service';
 import { parseBulkOrderExcel } from '../../utils/excelParser';
 import { db } from '../../prisma/db';
 import { maskOrderList, maskOrderData } from '../../middlewares/masking.middleware';
@@ -154,6 +154,23 @@ export const handleReceivePurchaseBatch = async (req: AuthRequest, res: Response
     return res.status(200).json({ message: 'Material received successfully', ...result });
   } catch (err: any) {
     return res.status(400).json({ success: false, error: err.message || 'Failed to record material receipt' });
+  }
+};
+
+export const handleDeletePurchaseBatch = async (req: AuthRequest, res: Response) => {
+  try {
+    const id = req.params.id as string;
+    const batchId = (req.params.batchId || req.body.batchId) as string;
+    const userId = req.user?.userId || '';
+
+    if (!batchId) {
+      return res.status(400).json({ success: false, error: 'Batch ID is required' });
+    }
+
+    const result = await deletePurchaseBatch(id, batchId, userId);
+    return res.status(200).json(result);
+  } catch (err: any) {
+    return res.status(400).json({ success: false, error: err.message || 'Failed to delete purchase batch' });
   }
 };
 

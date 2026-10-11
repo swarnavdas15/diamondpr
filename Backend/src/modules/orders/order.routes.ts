@@ -10,6 +10,7 @@ import {
   handleUpdatePurchaseStage,
   handleAddPurchaseBatch,
   handleReceivePurchaseBatch,
+  handleDeletePurchaseBatch,
   handleUpdateProductionStage,
   handleUpdateQualityStage,
   handleUpdateDispatchStage,
@@ -43,6 +44,7 @@ router.patch('/:id/verify-completion', requireRole(['SUPER_ADMIN', 'ADMIN', 'SAL
 // Department stage routes
 router.patch('/:id/purchase', requireRole(['SUPER_ADMIN', 'ADMIN', 'PURCHASE']), handleUpdatePurchaseStage);
 router.post('/:id/purchase-batch', requireRole(['SUPER_ADMIN', 'ADMIN', 'PURCHASE']), handleAddPurchaseBatch);
+router.delete('/:id/purchase-batch/:batchId', requireRole(['SUPER_ADMIN', 'ADMIN', 'PURCHASE']), handleDeletePurchaseBatch);
 router.post('/:id/purchase-batch/:batchId/receive', requireRole(['SUPER_ADMIN', 'ADMIN', 'PURCHASE']), handleReceivePurchaseBatch);
 router.patch('/:id/purchase-batch/:batchId/receive', requireRole(['SUPER_ADMIN', 'ADMIN', 'PURCHASE']), handleReceivePurchaseBatch);
 router.patch('/:id/production', requireRole(['SUPER_ADMIN', 'ADMIN', 'PRODUCTION']), handleUpdateProductionStage);

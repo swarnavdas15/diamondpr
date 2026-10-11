@@ -158,6 +158,7 @@ interface ERPContextType {
 
   updatePurchaseStage: (orderId: string, status: DepartmentStatus, vendorSelected?: string, procurementNotes?: string, processedQty?: number) => void;
   addPurchaseBatch: (orderId: string, batch: any) => Promise<void>;
+  deletePurchaseBatch: (orderId: string, batchId: string) => Promise<void>;
   receivePurchaseBatch: (
     orderId: string,
     batchId: string,
@@ -1464,7 +1465,17 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       await fetchLiveDashboardData();
     } catch (e: any) {
       console.error(e);
-      throw new Error(e.response?.data?.message || 'Failed to add purchase batch');
+      throw new Error(e.response?.data?.error || e.response?.data?.message || 'Failed to add purchase batch');
+    }
+  };
+
+  const deletePurchaseBatch = async (orderId: string, batchId: string) => {
+    try {
+      await apiClient.delete(`/orders/${orderId}/purchase-batch/${batchId}`);
+      await fetchLiveDashboardData();
+    } catch (e: any) {
+      console.error(e);
+      throw new Error(e.response?.data?.error || e.response?.data?.message || 'Failed to delete purchase batch');
     }
   };
 
@@ -1763,6 +1774,7 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
         updatePurchaseStage,
         addPurchaseBatch,
+        deletePurchaseBatch,
         receivePurchaseBatch,
         updateProductionStage,
         updateQualityStage,

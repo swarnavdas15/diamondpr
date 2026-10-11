@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, useWindowDimensions } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, useWindowDimensions, Platform, Alert } from 'react-native';
 import { useERP } from '../../context/ERPContext';
 import { DepartmentStatus, Order, PurchaseBatch } from '../../types';
 import { Colors, StatusColors, Spacing, Radius } from '../../theme';
@@ -14,7 +14,7 @@ import { ExportDataPayload } from '../../utils/exportUtils';
 export const PurchaseDashboard: React.FC = () => {
   const { width } = useWindowDimensions();
   const isMobile = width < 768;
-  const { getMaskedOrders, addPurchaseBatch, receivePurchaseBatch, setSelectedOrder } = useERP();
+  const { getMaskedOrders, addPurchaseBatch, receivePurchaseBatch, deletePurchaseBatch, setSelectedOrder } = useERP();
   const maskedOrders = getMaskedOrders().filter((o) => o.purchaseRequired);
 
   const [processModalVisible, setProcessModalVisible] = useState(false);
@@ -152,6 +152,21 @@ export const PurchaseDashboard: React.FC = () => {
     } catch (err: any) {
       console.error('Failed to receive batch:', err);
       alert(err.message || 'Failed to record material receipt');
+    }
+  };
+
+  const handleDeleteBatch = async (orderId: string, batchId: string, vendorName: string) => {
+    let confirmed = true;
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      confirmed = window.confirm(`Are you sure you want to cancel the unreceived purchase order for ${vendorName}?`);
+    }
+    if (!confirmed) return;
+
+    try {
+      await deletePurchaseBatch(orderId, batchId);
+    } catch (err: any) {
+      console.error('Failed to delete purchase batch:', err);
+      alert(err.message || 'Failed to cancel purchase batch');
     }
   };
 
@@ -338,10 +353,17 @@ export const PurchaseDashboard: React.FC = () => {
                       </View>
                     </View>
                     <TouchableOpacity
-                      style={styles.addBatchSmallBtn}
+                      style={[
+                        styles.addBatchSmallBtn,
+                        totalOrdered >= ord.requiredQuantity && styles.addBatchSmallBtnAllocated,
+                      ]}
                       onPress={() => handleOpenProcessModal(ord)}
                     >
-                      <Text style={styles.addBatchSmallBtnText}>+ Place Vendor Order</Text>
+                      <Text style={styles.addBatchSmallBtnText}>
+                        {totalOrdered >= ord.requiredQuantity
+                          ? `✓ Ordered (${totalOrdered}/${ord.requiredQuantity})`
+                          : '+ Place Vendor Order'}
+                      </Text>
                     </TouchableOpacity>
                   </View>
 
@@ -440,7 +462,7 @@ export const PurchaseDashboard: React.FC = () => {
                               </View>
                             </View>
 
-                            {/* Action: Receive Button */}
+                            {/* Action: Receive & Cancel Buttons */}
                             <View style={styles.batchActionCol}>
                               {!isFullyReceived ? (
                                 <TouchableOpacity
@@ -453,6 +475,15 @@ export const PurchaseDashboard: React.FC = () => {
                                 <View style={styles.receivedBadge}>
                                   <Text style={styles.receivedBadgeText}>✓ Received</Text>
                                 </View>
+                              )}
+
+                              {bReceived === 0 && (
+                                <TouchableOpacity
+                                  style={styles.deleteBatchBtn}
+                                  onPress={() => handleDeleteBatch(ord.id, b.id, b.vendorName)}
+                                >
+                                  <Text style={styles.deleteBatchBtnText}>✕ Cancel</Text>
+                                </TouchableOpacity>
                               )}
                             </View>
                           </View>
@@ -651,6 +682,9 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
     elevation: 1,
   },
+  addBatchSmallBtnAllocated: {
+    backgroundColor: '#059669',
+  },
   addBatchSmallBtnText: {
     color: '#ffffff',
     fontSize: 11,
@@ -786,6 +820,21 @@ const styles = StyleSheet.create({
   receivedBadgeText: {
     color: '#059669',
     fontSize: 11,
+    fontWeight: '700',
+  },
+  deleteBatchBtn: {
+    backgroundColor: '#fff1f2',
+    borderWidth: 1,
+    borderColor: '#fecdd3',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: Radius.xs,
+    marginTop: 4,
+    alignItems: 'center',
+  },
+  deleteBatchBtnText: {
+    color: '#e11d48',
+    fontSize: 10,
     fontWeight: '700',
   },
   tabRow: {

@@ -56,6 +56,12 @@ export const ReceiveMaterialModal: React.FC<ReceiveMaterialModalProps> = ({
       setErrorMsg('Please enter a valid positive received quantity.');
       return;
     }
+    if (pendingQty > 0 && qty > pendingQty) {
+      setErrorMsg(
+        `Received quantity (${qty} pcs) cannot exceed pending quantity (${pendingQty} pcs) for this vendor batch.`
+      );
+      return;
+    }
     if (!invoiceNumber.trim()) {
       setErrorMsg('Invoice / Bill number is mandatory.');
       return;
@@ -67,6 +73,10 @@ export const ReceiveMaterialModal: React.FC<ReceiveMaterialModalProps> = ({
 
     // New total quantity received for this batch
     const newTotalReceived = alreadyReceived + qty;
+    if (qtyOrdered > 0 && newTotalReceived > qtyOrdered) {
+      setErrorMsg(`Total received cannot exceed ordered quantity of ${qtyOrdered} pcs.`);
+      return;
+    }
 
     setLoading(true);
     try {

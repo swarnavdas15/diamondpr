@@ -42,12 +42,12 @@ export const PurchaseBatchModal: React.FC<PurchaseBatchModalProps> = ({
   useEffect(() => {
     if (visible && order) {
       setVendorName(order.vendorSelected || '');
-      const existingOrdered = (order.purchaseBatches || []).reduce(
+      const existing = (order.purchaseBatches || []).reduce(
         (sum, b) => sum + (b.quantityOrdered || b.quantityReceived || 0),
         0
       );
-      const remainingToOrder = Math.max(0, order.requiredQuantity - existingOrdered);
-      setQuantityOrdered(remainingToOrder > 0 ? String(remainingToOrder) : String(order.requiredQuantity));
+      const remaining = Math.max(0, order.requiredQuantity - existing);
+      setQuantityOrdered(remaining > 0 ? String(remaining) : '');
       setCost('');
       setRemarks('');
       setAlreadyReceived(false);
@@ -60,11 +60,24 @@ export const PurchaseBatchModal: React.FC<PurchaseBatchModalProps> = ({
 
   if (!order) return null;
 
+  const existingOrdered = (order.purchaseBatches || []).reduce(
+    (sum, b) => sum + (b.quantityOrdered || b.quantityReceived || 0),
+    0
+  );
+  const remainingToOrder = Math.max(0, order.requiredQuantity - existingOrdered);
+  const isFullyAllocated = remainingToOrder <= 0;
+
   const handleSubmit = async () => {
     setErrorMsg('');
     const qtyOrd = parseInt(quantityOrdered, 10);
     const costVal = parseFloat(cost) || 0;
 
+    if (isFullyAllocated) {
+      setErrorMsg(
+        `Total required quantity (${order.requiredQuantity} pcs) is already ordered with vendors. Additional vendor orders cannot be placed.`
+      );
+      return;
+    }
     if (!vendorName.trim()) {
       setErrorMsg('Please select or enter a vendor name.');
       return;
@@ -73,12 +86,22 @@ export const PurchaseBatchModal: React.FC<PurchaseBatchModalProps> = ({
       setErrorMsg('Please enter a valid quantity to order (greater than 0).');
       return;
     }
+    if (qtyOrd > remainingToOrder) {
+      setErrorMsg(
+        `Cannot order ${qtyOrd} pcs! Only ${remainingToOrder} pcs remaining to order out of ${order.requiredQuantity} pcs required (${existingOrdered} pcs already ordered).`
+      );
+      return;
+    }
 
     let qtyRec = 0;
     if (alreadyReceived) {
       qtyRec = parseInt(receivedQty, 10);
       if (isNaN(qtyRec) || qtyRec <= 0) {
         setErrorMsg('Please enter a valid received quantity.');
+        return;
+      }
+      if (qtyRec > qtyOrd) {
+        setErrorMsg(`Received quantity (${qtyRec} pcs) cannot exceed ordered quantity (${qtyOrd} pcs).`);
         return;
       }
       if (!invoiceNumber.trim()) {
@@ -120,6 +143,32 @@ export const PurchaseBatchModal: React.FC<PurchaseBatchModalProps> = ({
               Order: <Text style={styles.bold}>{order.orderNumber}</Text> • Total Required:{' '}
               <Text style={styles.bold}>{order.requiredQuantity} pcs</Text>
             </Text>
+
+            {/* Allocation Summary Box */}
+            <View style={styles.allocSummaryBox}>
+              <View style={styles.allocItem}>
+                <Text style={styles.allocLabel}>REQUIRED</Text>
+                <Text style={styles.allocVal}>{order.requiredQuantity} pcs</Text>
+              </View>
+              <View style={styles.allocItem}>
+                <Text style={styles.allocLabel}>ALREADY ORDERED</Text>
+                <Text style={[styles.allocVal, { color: '#d97706' }]}>{existingOrdered} pcs</Text>
+              </View>
+              <View style={styles.allocItem}>
+                <Text style={styles.allocLabel}>REMAINING</Text>
+                <Text style={[styles.allocVal, { color: isFullyAllocated ? '#16a34a' : '#0284c7' }]}>
+                  {remainingToOrder} pcs
+                </Text>
+              </View>
+            </View>
+
+            {isFullyAllocated ? (
+              <View style={styles.warnBox}>
+                <Text style={styles.warnText}>
+                  ⚠️ Required quantity ({order.requiredQuantity} pcs) is already fully allocated across vendor orders. To place an order with a different vendor, delete or cancel an unreceived vendor order first.
+                </Text>
+              </View>
+            ) : null}
 
             {errorMsg ? (
               <View style={styles.errorBox}>
@@ -233,10 +282,16 @@ export const PurchaseBatchModal: React.FC<PurchaseBatchModalProps> = ({
               <TouchableOpacity style={styles.cancelBtn} onPress={onClose} disabled={loading}>
                 <Text style={styles.cancelText}>Cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.submitBtn} onPress={handleSubmit} disabled={loading}>
+              <TouchableOpacity
+                style={[styles.submitBtn, (loading || isFullyAllocated) && styles.submitBtnDisabled]}
+                onPress={handleSubmit}
+                disabled={loading || isFullyAllocated}
+              >
                 <Text style={styles.submitText}>
                   {loading
                     ? 'Saving...'
+                    : isFullyAllocated
+                    ? 'Fully Allocated'
                     : alreadyReceived
                     ? '✓ Place & Mark Received'
                     : '📦 Place Order (Pending Receive)'}
@@ -398,9 +453,51 @@ const styles = StyleSheet.create({
     borderRadius: Radius.md,
     justifyContent: 'center',
   },
+  submitBtnDisabled: {
+    backgroundColor: '#94a3b8',
+    opacity: 0.6,
+  },
   submitText: {
     color: '#ffffff',
     fontWeight: '700',
     fontSize: 13,
+  },
+  allocSummaryBox: {
+    flexDirection: 'row',
+    backgroundColor: '#f8fafc',
+    borderRadius: Radius.md,
+    padding: Spacing.sm,
+    marginBottom: Spacing.md,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    justifyContent: 'space-around',
+  },
+  allocItem: {
+    alignItems: 'center',
+  },
+  allocLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#64748b',
+  },
+  allocVal: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#0f172a',
+    marginTop: 2,
+  },
+  warnBox: {
+    backgroundColor: '#fffbeb',
+    borderRadius: Radius.sm,
+    padding: Spacing.sm,
+    borderWidth: 1,
+    borderColor: '#fde68a',
+    marginBottom: Spacing.sm,
+  },
+  warnText: {
+    color: '#b45309',
+    fontSize: 12,
+    fontWeight: '600',
+    lineHeight: 18,
   },
 });

@@ -373,6 +373,31 @@ export const addPurchaseBatch = async (orderId: string, data: any, userId: strin
 
   const qtyOrdered = Math.max(0, Math.round(Number(data.quantityOrdered || data.quantityReceived || 0)));
   const qtyReceived = Math.max(0, Math.round(Number(data.quantityReceived || 0)));
+
+  if (qtyOrdered <= 0) {
+    throw new Error('Quantity to order must be greater than 0.');
+  }
+
+  // VALIDATION: Prevent ordering more than requiredQuantity
+  const allBatchesBefore = await db.orm.public.PurchaseBatch.where({ orderId: dbId(orderId) }).all();
+  let existingOrdered = 0;
+  for (const b of allBatchesBefore) {
+    const meta = parseBatchRemarks(b.remarks, b.quantityReceived);
+    existingOrdered += (meta.quantityOrdered || b.quantityReceived || 0);
+  }
+
+  const remainingToOrder = Math.max(0, order.requiredQuantity - existingOrdered);
+  if (remainingToOrder <= 0) {
+    throw new Error(`Total required quantity (${order.requiredQuantity} pcs) has already been fully ordered across vendors. Additional vendor orders cannot be placed.`);
+  }
+  if (qtyOrdered > remainingToOrder) {
+    throw new Error(`Cannot order ${qtyOrdered} pcs. Only ${remainingToOrder} pcs remaining to order out of ${order.requiredQuantity} pcs required.`);
+  }
+
+  if (qtyReceived > qtyOrdered) {
+    throw new Error(`Received quantity (${qtyReceived} pcs) cannot exceed ordered quantity (${qtyOrdered} pcs).`);
+  }
+
   const initialStatus = qtyReceived >= qtyOrdered && qtyOrdered > 0
     ? 'FULLY_RECEIVED'
     : (qtyReceived > 0 ? 'PARTIALLY_RECEIVED' : 'ORDERED');
@@ -408,9 +433,6 @@ export const addPurchaseBatch = async (orderId: string, data: any, userId: strin
   }
 
   // REQUIREMENT 3: "Purchase Done" logic:
-  // Order turant "Purchase Done" nahi hoga. Jab poora order cycle complete ho jayega
-  // (yaani jitne order diye the, jaise total 100, wo poore alag-alag vendors se fully receive ho jayenge),
-  // tabhi overall status "Purchase Done" mein convert hoga.
   let calcStatus = 'IN_PROGRESS';
   if (totalReceived >= order.requiredQuantity && allFullyReceived) {
     calcStatus = 'COMPLETED';
@@ -451,6 +473,59 @@ export const addPurchaseBatch = async (orderId: string, data: any, userId: strin
   };
 };
 
+export const deletePurchaseBatch = async (orderId: string, batchId: string, userId: string) => {
+  const batch = await db.orm.public.PurchaseBatch.where({ id: dbId(batchId) }).first();
+  if (!batch) throw new Error('Purchase batch not found');
+
+  if (Number(batch.quantityReceived || 0) > 0) {
+    throw new Error(`Cannot delete batch from ${batch.vendorName} because ${batch.quantityReceived} pcs have already been received. Only unreceived vendor orders can be cancelled.`);
+  }
+
+  await db.orm.public.PurchaseBatch.where({ id: dbId(batchId) }).delete();
+
+  // Recalculate totals across remaining batches
+  const order = await db.orm.public.Order.where({ id: dbId(orderId) }).first();
+  if (!order) throw new Error('Order not found');
+
+  const allBatches = await db.orm.public.PurchaseBatch.where({ orderId: dbId(orderId) }).all();
+  let totalReceived = 0;
+  let allFullyReceived = allBatches.length > 0;
+  for (const b of allBatches) {
+    const meta = parseBatchRemarks(b.remarks, b.quantityReceived);
+    const rec = Number(b.quantityReceived || 0);
+    totalReceived += rec;
+    if (meta.quantityOrdered > 0 && rec < meta.quantityOrdered) {
+      allFullyReceived = false;
+    }
+  }
+
+  let calcStatus = 'IN_PROGRESS';
+  if (allBatches.length === 0) {
+    calcStatus = 'PENDING';
+  } else if (totalReceived >= order.requiredQuantity && allFullyReceived) {
+    calcStatus = 'COMPLETED';
+  } else {
+    calcStatus = 'IN_PROGRESS';
+  }
+
+  await db.orm.public.Order.where({ id: dbId(orderId) }).update({
+    purchaseQuantity: totalReceived,
+    purchaseStatus: calcStatus,
+    procurementNotes: allBatches.length === 0
+      ? 'No active vendor purchase orders.'
+      : `Purchase updated (${totalReceived}/${order.requiredQuantity} pcs received)`
+  });
+
+  await updateSalesWorkflowStage(
+    orderId,
+    'PURCHASE',
+    userId,
+    `Cancelled unreceived purchase order batch for ${batch.vendorName}`
+  );
+
+  return { success: true, message: 'Vendor purchase order cancelled successfully' };
+};
+
 export const receivePurchaseBatch = async (
   orderId: string,
   batchId: string,
@@ -468,6 +543,11 @@ export const receivePurchaseBatch = async (
   const meta = parseBatchRemarks(batch.remarks, batch.quantityReceived);
   const newReceivedQty = Math.max(0, Math.round(Number(data.receivedQuantity || 0)));
   const qtyOrdered = meta.quantityOrdered || newReceivedQty;
+
+  // VALIDATION: Prevent receiving more than ordered
+  if (qtyOrdered > 0 && newReceivedQty > qtyOrdered) {
+    throw new Error(`Received quantity (${newReceivedQty} pcs) cannot exceed ordered quantity (${qtyOrdered} pcs) for ${batch.vendorName}.`);
+  }
 
   const newStatus = newReceivedQty >= qtyOrdered && qtyOrdered > 0
     ? 'FULLY_RECEIVED'
