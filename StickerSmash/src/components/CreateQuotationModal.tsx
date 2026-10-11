@@ -20,6 +20,7 @@ export const CreateQuotationModal: React.FC<CreateQuotationModalProps> = ({ visi
   const isMobile = width < 768;
 
   const [createClientVisible, setCreateClientVisible] = useState(false);
+  const [clientType, setClientType] = useState<'REGISTERED' | 'NON_REGISTERED'>('REGISTERED');
   const [selectedClientId, setSelectedClientId] = useState<string>('');
   const [isTemporaryClient, setIsTemporaryClient] = useState(false);
   const [clientCode, setClientCode] = useState('');
@@ -41,7 +42,7 @@ export const CreateQuotationModal: React.FC<CreateQuotationModalProps> = ({ visi
   // Auto-generate preview codes
   const nextQNum = `QT-2026-${String(quotations.length + 1).padStart(3, '0')}`;
   
-// Calculate next TMP code from actual client data
+  // Calculate next TMP code from actual client data
   const getNextTempCode = () => {
     let maxNum = 1000;
     const allClients = [...clients, ...(temporaryClients || [])];
@@ -60,6 +61,40 @@ export const CreateQuotationModal: React.FC<CreateQuotationModalProps> = ({ visi
   
   const nextTempCode = getNextTempCode();
 
+  const registeredClientOptions = clients
+    .filter((c) => {
+      const u = (c.clientCode || '').toUpperCase();
+      return !c.isTemporary && !u.startsWith('TMP') && !u.startsWith('TEMP');
+    })
+    .map((c) => ({
+      id: c.id,
+      label: c.companyName,
+      code: c.clientCode,
+      sublabel: c.contactName ? `Contact: ${c.contactName} • ${c.contactNo || ''}` : undefined,
+    }));
+
+  const handleClientTypeChange = (type: 'REGISTERED' | 'NON_REGISTERED') => {
+    setClientType(type);
+    setErrorMsg('');
+    if (type === 'NON_REGISTERED') {
+      setIsTemporaryClient(true);
+      setSelectedClientId('');
+      setClientCode(nextTempCode);
+      setCompanyName('');
+      setContactPerson('');
+      setMobileNumber('');
+      setEmail('');
+    } else {
+      setIsTemporaryClient(false);
+      setSelectedClientId('');
+      setClientCode('');
+      setCompanyName('');
+      setContactPerson('');
+      setMobileNumber('');
+      setEmail('');
+    }
+  };
+
   const handleSelectClient = (cId: string) => {
     setSelectedClientId(cId);
     if (!cId) {
@@ -68,18 +103,19 @@ export const CreateQuotationModal: React.FC<CreateQuotationModalProps> = ({ visi
       setContactPerson('');
       setMobileNumber('');
       setEmail('');
-      setIsTemporaryClient(false);
       return;
     }
-    const allKnown = [...clients, ...(temporaryClients || [])];
-    const found = allKnown.find((c) => c.id === cId);
+    const allKnown = clients.filter((c) => {
+      const u = (c.clientCode || '').toUpperCase();
+      return !c.isTemporary && !u.startsWith('TMP') && !u.startsWith('TEMP');
+    });
+    const found = allKnown.find((c) => c.id === cId) || clients.find((c) => c.id === cId);
     if (found) {
       setClientCode(found.clientCode);
       setCompanyName(found.companyName);
       setContactPerson(found.contactName || '');
-      setMobileNumber(found.contactNo);
+      setMobileNumber(found.contactNo || '');
       setEmail(found.email || '');
-      setIsTemporaryClient(!!found.isTemporary);
     }
   };
 
@@ -88,15 +124,21 @@ export const CreateQuotationModal: React.FC<CreateQuotationModalProps> = ({ visi
     setClientCode(newClient.clientCode);
     setCompanyName(newClient.companyName);
     setContactPerson(newClient.contactName || '');
-    setMobileNumber(newClient.contactNo);
+    setMobileNumber(newClient.contactNo || '');
     setEmail(newClient.email || '');
     setIsTemporaryClient(!!newClient.isTemporary);
+    setClientType(newClient.isTemporary ? 'NON_REGISTERED' : 'REGISTERED');
     setSuccessMsg('Client Registered Successfully');
   };
 
- const handleSubmit = async () => {
+  const handleSubmit = async () => {
     setErrorMsg('');
     setSuccessMsg('');
+
+    if (clientType === 'REGISTERED' && !selectedClientId && !companyName.trim()) {
+      setErrorMsg('Please select a registered client or click + Add New Client.');
+      return;
+    }
 
     if (!companyName.trim()) {
       setErrorMsg('Company / Client Name is required.');
@@ -121,20 +163,19 @@ export const CreateQuotationModal: React.FC<CreateQuotationModalProps> = ({ visi
 
     try {
       let finalClientId = selectedClientId;
-      let finalClientCode = clientCode.trim() || nextTempCode;
+      let finalClientCode = clientCode.trim() || (clientType === 'NON_REGISTERED' ? nextTempCode : '');
 
-      // AGAR DROP-DOWN ME CLIENT SELECT NAHI KIYA GAYA HAI:
-      if (!finalClientId) {
+      // Agar Non-Registered client hai ya dropdown se select nahi hua hai:
+      if (!finalClientId || clientType === 'NON_REGISTERED') {
         const newTemp = await createClient({
           companyName: companyName.trim(),
-          clientCode: finalClientCode,
+          clientCode: finalClientCode || nextTempCode,
           contactName: contactPerson.trim(),
           contactNo: mobileNumber.trim(),
           email: email.trim(),
           isTemporary: true,
         });
 
-        // Ensure newly generated id & code are assigned immediately
         finalClientId = newTemp?.id;
         if (newTemp?.clientCode) {
           finalClientCode = newTemp.clientCode;
@@ -144,7 +185,7 @@ export const CreateQuotationModal: React.FC<CreateQuotationModalProps> = ({ visi
       const created = await createQuotation({
         companyName: companyName.trim(),
         clientCode: finalClientCode,
-        clientId: finalClientId, // Ab yeh guaranteed valid id rahegi
+        clientId: finalClientId,
         contactPerson: contactPerson.trim(),
         mobileNumber: mobileNumber.trim(),
         email: email.trim(),
@@ -167,6 +208,7 @@ export const CreateQuotationModal: React.FC<CreateQuotationModalProps> = ({ visi
   };
 
   const handleReset = () => {
+    setClientType('REGISTERED');
     setSelectedClientId('');
     setIsTemporaryClient(false);
     setClientCode('');
@@ -217,161 +259,118 @@ export const CreateQuotationModal: React.FC<CreateQuotationModalProps> = ({ visi
                 </View>
               ) : null}
 
-              {/* Client Searchable Dropdown */}
-              <SearchableDropdown
-                label="Select Client (Directory or Temporary)"
-                placeholder="Search registered client or select prospect..."
-                options={[
-                  ...clients
-                    .filter((c) => {
-                      const u = (c.clientCode || '').toUpperCase();
-                      return !u.startsWith('TMP') && !u.startsWith('TEMP');
-                    })
-                    .map((c) => ({
-                      id: c.id,
-                      label: c.companyName,
-                      code: c.clientCode,
-                      sublabel: c.contactName ? `🏢 Permanent Directory • Contact: ${c.contactName}` : '🏢 Permanent Directory',
-                    })),
-                  ...(temporaryClients || [])
-                    .filter((c) => {
-                      const u = (c.clientCode || '').toUpperCase();
-                      return u.startsWith('TMP') || u.startsWith('TEMP');
-                    })
-                    .map((c) => ({
-                      id: c.id,
-                      label: c.companyName,
-                      code: c.clientCode,
-                      sublabel: c.contactName ? `⏳ Temporary DB • Contact: ${c.contactName}` : '⏳ Temporary DB',
-                    })),
-                ]}
-                selectedValue={selectedClientId}
-                onSelect={handleSelectClient}
-                allowManual={true}
-                manualLabel="+ Register Temporary Client"
-                manualId=""
-                onManualPress={() => {
-                  setSelectedClientId('');
-                  setIsTemporaryClient(true);
-                  setClientCode(nextTempCode);
-                  setCompanyName('');
-                  setContactPerson('');
-                  setMobileNumber('');
-                  setEmail('');
-                }}
-              />
+              {/* Client Type Toggle */}
+              <View style={styles.fieldBlock}>
+                <Text style={styles.label}>Client Type *</Text>
+                <View style={styles.clientTypeToggleContainer}>
+                  <TouchableOpacity
+                    style={[styles.clientTypeTab, clientType === 'REGISTERED' && styles.clientTypeTabActive]}
+                    onPress={() => handleClientTypeChange('REGISTERED')}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={[styles.clientTypeTabText, clientType === 'REGISTERED' && styles.clientTypeTabTextActive]}>
+                      Registered
+                    </Text>
+                  </TouchableOpacity>
 
-              {/* Temporary Client Registration Option Box */}
-              {!selectedClientId ? (
-                <TouchableOpacity
-                  // style={[styles.tempToggleBox, isTemporaryClient && styles.tempToggleBoxActive]}
-                  onPress={() => {
-                    const nextVal = !isTemporaryClient;
-                    setIsTemporaryClient(nextVal);
-                    if (nextVal && (!clientCode || clientCode.startsWith('CL-'))) {
-                      setClientCode(nextTempCode);
-                    }
-                  }}
-                  activeOpacity={0.8}
-                >
-                  {/* <View style={[styles.tempCheckbox, isTemporaryClient && styles.tempCheckboxChecked]}>
-                    <Text style={styles.tempCheckboxText}>{isTemporaryClient ? '✓' : ''}</Text>
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.tempToggleTitle}>Register client in temporary database (Prospect / Lead)</Text>
-                    <Text style={styles.tempToggleSub}>
-                      {isTemporaryClient
-                        ? '⚡ Client will be saved in the temporary database. They will ONLY move to the permanent Client Directory once this quotation is approved and converted to an order.'
-                        : 'Store client details as a temporary lead without adding them to the permanent Client Directory.'}
+                  <TouchableOpacity
+                    style={[styles.clientTypeTab, clientType === 'NON_REGISTERED' && styles.clientTypeTabActive]}
+                    onPress={() => handleClientTypeChange('NON_REGISTERED')}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={[styles.clientTypeTabText, clientType === 'NON_REGISTERED' && styles.clientTypeTabTextActive]}>
+                      Non Registered
                     </Text>
-                  </View> */}
-                </TouchableOpacity>
-              ) : isTemporaryClient ? (
-                <View style={[styles.tempToggleBox, { backgroundColor: 'rgba(245, 158, 11, 0.12)' }]}>
-                  <Text style={{ fontSize: 16 }}>⏳</Text>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.tempToggleTitle}>Linked to Temporary Prospect ({clientCode})</Text>
-                    <Text style={styles.tempToggleSub}>
-                      This client is currently in the temporary database and will be automatically promoted to permanent when converted to an order.
-                    </Text>
-                  </View>
+                  </TouchableOpacity>
                 </View>
-              ) : null}
+              </View>
 
-              {/* Company Name & Client Code */}
-              <View style={styles.rowTwo}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.label}>Company / Client Name *</Text>
+              {/* Company / Client Name */}
+              <View style={styles.fieldBlock}>
+                <Text style={styles.label}>Company / Client Name *</Text>
+                {clientType === 'REGISTERED' ? (
+                  <SearchableDropdown
+                    placeholder="+ Add New Client"
+                    options={registeredClientOptions}
+                    selectedValue={selectedClientId}
+                    onSelect={handleSelectClient}
+                    allowManual={true}
+                    manualLabel="+ Add New Client"
+                    manualId="ADD_NEW"
+                    onManualPress={() => setCreateClientVisible(true)}
+                  />
+                ) : (
                   <TextInput
                     style={styles.input}
-                    placeholder="e.g. Apex Heavy Engineering"
+                    placeholder="e.g. Apex Heavy Engineering Pvt Ltd"
                     placeholderTextColor="#94a3b8"
                     value={companyName}
                     onChangeText={setCompanyName}
                   />
-                </View>
-                <View style={{ width: 140 }}>
-                  <Text style={styles.label}>Client Code *</Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="e.g. CL-1001"
-                    placeholderTextColor="#94a3b8"
-                    autoCapitalize="characters"
-                    value={clientCode}
-                    onChangeText={setClientCode}
-                  />
-                </View>
+                )}
               </View>
 
-              {/* Contact Person & Mobile */}
-              <View style={styles.rowTwo}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.label}>Contact Person *</Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="e.g. Rajesh Mehta"
-                    placeholderTextColor="#94a3b8"
-                    value={contactPerson}
-                    onChangeText={setContactPerson}
-                  />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.label}>Mobile Number *</Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="e.g. +91 98765 43210"
-                    placeholderTextColor="#94a3b8"
-                    keyboardType="phone-pad"
-                    value={mobileNumber}
-                    onChangeText={setMobileNumber}
-                  />
-                </View>
+              {/* Client Code */}
+              <View style={styles.fieldBlock}>
+                <Text style={styles.label}>Client Code *</Text>
+                <TextInput
+                  style={[styles.input, styles.inputAutoFilled]}
+                  placeholder={clientType === 'REGISTERED' ? 'Auto-filled from selected client' : `Auto-filled: ${nextTempCode}`}
+                  placeholderTextColor="#94a3b8"
+                  value={clientCode}
+                  editable={false}
+                />
               </View>
 
-              {/* Email & Inquiry Ref */}
-              <View style={styles.rowTwo}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.label}>Email Address *</Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="e.g. contact@apexheavy.com"
-                    placeholderTextColor="#94a3b8"
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                    value={email}
-                    onChangeText={setEmail}
-                  />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.label}>Inquiry Reference</Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="e.g. INQ-2026-88"
-                    placeholderTextColor="#94a3b8"
-                    value={inquiryRef}
-                    onChangeText={setInquiryRef}
-                  />
-                </View>
+              {/* Contact Person */}
+              <View style={styles.fieldBlock}>
+                <Text style={styles.label}>Contact Person *</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="e.g. Rajesh Mehta"
+                  placeholderTextColor="#94a3b8"
+                  value={contactPerson}
+                  onChangeText={setContactPerson}
+                />
+              </View>
+
+              {/* Mobile Number */}
+              <View style={styles.fieldBlock}>
+                <Text style={styles.label}>Mobile Number *</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="e.g. +91 98765 43210"
+                  placeholderTextColor="#94a3b8"
+                  keyboardType="phone-pad"
+                  value={mobileNumber}
+                  onChangeText={setMobileNumber}
+                />
+              </View>
+
+              {/* Email Address */}
+              <View style={styles.fieldBlock}>
+                <Text style={styles.label}>Email Address *</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="e.g. contact@apexheavy.com"
+                  placeholderTextColor="#94a3b8"
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  value={email}
+                  onChangeText={setEmail}
+                />
+              </View>
+
+              {/* Inquiry Reference */}
+              <View style={styles.fieldBlock}>
+                <Text style={styles.label}>Inquiry Reference</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="e.g. INQ-2026-88"
+                  placeholderTextColor="#94a3b8"
+                  value={inquiryRef}
+                  onChangeText={setInquiryRef}
+                />
               </View>
 
               {/* Quotation Amount & Expected Order Value */}
@@ -527,9 +526,10 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   label: {
-    color: Colors.accentTeal,
-    fontSize: 12,
+    color: Colors.textLight,
+    fontSize: 13,
     fontWeight: '700',
+    marginBottom: 4,
   },
   input: {
     backgroundColor: Colors.inputBg,
@@ -541,6 +541,41 @@ const styles = StyleSheet.create({
     fontSize: 13,
     borderWidth: 1,
     borderColor: Colors.borderDark,
+  },
+  inputAutoFilled: {
+    backgroundColor: '#E2E8F0',
+    color: '#475569',
+    fontWeight: '500',
+  },
+  fieldBlock: {
+    marginBottom: 4,
+  },
+  clientTypeToggleContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#F1F5F9',
+    borderRadius: Radius.md,
+    padding: 3,
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+  },
+  clientTypeTab: {
+    flex: 1,
+    paddingVertical: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: Radius.sm,
+  },
+  clientTypeTabActive: {
+    backgroundColor: '#1E3E42',
+  },
+  clientTypeTabText: {
+    color: '#64748B',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  clientTypeTabTextActive: {
+    color: '#FFFFFF',
+    fontWeight: '800',
   },
   rowTwo: {
     flexDirection: 'row',
