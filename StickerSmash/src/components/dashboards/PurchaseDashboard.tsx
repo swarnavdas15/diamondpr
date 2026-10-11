@@ -308,15 +308,15 @@ export const PurchaseDashboard: React.FC = () => {
                   <View style={{ flexDirection: 'row', gap: 16, flexWrap: 'wrap', marginTop: 4 }}>
                     <Text style={styles.specVal}>
                       Order Required:{' '}
-                      <Text style={[styles.bold, { color: '#38bdf8' }]}>{ord.requiredQuantity} pcs</Text>
+                      <Text style={[styles.bold, { color: '#0284c7' }]}>{ord.requiredQuantity} pcs</Text>
                     </Text>
                     <Text style={styles.specVal}>
                       Vendor Ordered:{' '}
-                      <Text style={[styles.bold, { color: '#f59e0b' }]}>{totalOrdered} pcs</Text>
+                      <Text style={[styles.bold, { color: '#d97706' }]}>{totalOrdered} pcs</Text>
                     </Text>
                     <Text style={styles.specVal}>
                       Received at Store:{' '}
-                      <Text style={[styles.bold, { color: '#10b981' }]}>{purQty} pcs</Text>
+                      <Text style={[styles.bold, { color: '#16a34a' }]}>{purQty} pcs</Text>
                     </Text>
                   </View>
                   {ord.technicalRequirements ? (
@@ -329,9 +329,14 @@ export const PurchaseDashboard: React.FC = () => {
                 {/* VENDOR BREAKDOWN & MATERIAL RECEIVING SECTION */}
                 <View style={styles.batchesSection}>
                   <View style={styles.batchesSectionHeader}>
-                    <Text style={styles.batchesSectionTitle}>
-                      📋 VENDOR PURCHASE ORDERS & RECEIVING STATUS ({batches.length})
-                    </Text>
+                    <View style={styles.titleWithCount}>
+                      <Text style={styles.batchesSectionTitle}>
+                        📋 VENDOR PURCHASE ORDERS & RECEIVING
+                      </Text>
+                      <View style={styles.batchCountBadge}>
+                        <Text style={styles.batchCountBadgeText}>{batches.length}</Text>
+                      </View>
+                    </View>
                     <TouchableOpacity
                       style={styles.addBatchSmallBtn}
                       onPress={() => handleOpenProcessModal(ord)}
@@ -342,9 +347,15 @@ export const PurchaseDashboard: React.FC = () => {
 
                   {batches.length === 0 ? (
                     <View style={styles.noBatchesBox}>
-                      <Text style={styles.noBatchesText}>
-                        No purchase orders placed with vendors yet. Click "+ Place Vendor Order" to assign quantity to a vendor.
-                      </Text>
+                      <View style={styles.noBatchesIconBox}>
+                        <Text style={{ fontSize: 18 }}>📦</Text>
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.noBatchesTitle}>No purchase orders placed with vendors yet</Text>
+                        <Text style={styles.noBatchesText}>
+                          Click "+ Place Vendor Order" to assign quantity ({ord.requiredQuantity} pcs required) to vendors.
+                        </Text>
+                      </View>
                     </View>
                   ) : (
                     <View style={styles.batchesList}>
@@ -357,16 +368,19 @@ export const PurchaseDashboard: React.FC = () => {
 
                         let batchStatusLabel = 'Order Placed (Pending Receive)';
                         let batchStatusColor = '#0284c7';
-                        let batchStatusBg = 'rgba(2, 132, 199, 0.15)';
+                        let batchStatusBg = '#eff6ff';
+                        let batchStatusBorder = '#bfdbfe';
 
                         if (isFullyReceived) {
                           batchStatusLabel = '✓ Fully Received';
-                          batchStatusColor = '#10b981';
-                          batchStatusBg = 'rgba(16, 185, 129, 0.15)';
+                          batchStatusColor = '#16a34a';
+                          batchStatusBg = '#f0fdf4';
+                          batchStatusBorder = '#bbf7d0';
                         } else if (isPartiallyReceived) {
                           batchStatusLabel = `Partially Received (${bReceived}/${bOrdered})`;
-                          batchStatusColor = '#f59e0b';
-                          batchStatusBg = 'rgba(245, 158, 11, 0.15)';
+                          batchStatusColor = '#d97706';
+                          batchStatusBg = '#fffbeb';
+                          batchStatusBorder = '#fde68a';
                         }
 
                         return (
@@ -377,7 +391,7 @@ export const PurchaseDashboard: React.FC = () => {
                                 <View
                                   style={[
                                     styles.batchStatusChip,
-                                    { backgroundColor: batchStatusBg, borderColor: batchStatusColor },
+                                    { backgroundColor: batchStatusBg, borderColor: batchStatusBorder },
                                   ]}
                                 >
                                   <Text style={[styles.batchStatusChipText, { color: batchStatusColor }]}>
@@ -392,14 +406,14 @@ export const PurchaseDashboard: React.FC = () => {
                                   Ordered: <Text style={styles.batchQtyBold}>{bOrdered} pcs</Text>
                                 </Text>
                                 <Text style={styles.batchQtyItem}>
-                                  Received: <Text style={[styles.batchQtyBold, { color: '#10b981' }]}>{bReceived} pcs</Text>
+                                  Received: <Text style={[styles.batchQtyBold, { color: '#16a34a' }]}>{bReceived} pcs</Text>
                                 </Text>
                                 <Text style={styles.batchQtyItem}>
-                                  Pending: <Text style={[styles.batchQtyBold, { color: '#f59e0b' }]}>{bPending} pcs</Text>
+                                  Pending: <Text style={[styles.batchQtyBold, { color: '#d97706' }]}>{bPending} pcs</Text>
                                 </Text>
                                 {b.cost ? (
                                   <Text style={styles.batchQtyItem}>
-                                    Cost: <Text style={styles.batchQtyBold}>₹{b.cost}</Text>
+                                    Cost: <Text style={[styles.batchQtyBold, { color: '#29585c' }]}>₹{b.cost}</Text>
                                   </Text>
                                 ) : null}
                               </View>
@@ -589,12 +603,12 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   batchesSection: {
-    backgroundColor: '#0a192f',
+    backgroundColor: '#f8fafc',
     borderRadius: Radius.md,
     padding: Spacing.md,
     marginTop: Spacing.md,
     borderWidth: 1,
-    borderColor: 'rgba(2, 132, 199, 0.3)',
+    borderColor: '#e2e8f0',
   },
   batchesSectionHeader: {
     flexDirection: 'row',
@@ -604,17 +618,38 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 8,
   },
+  titleWithCount: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   batchesSectionTitle: {
-    color: '#38bdf8',
+    color: '#0f172a',
     fontSize: 12,
     fontWeight: '800',
     letterSpacing: 0.5,
   },
+  batchCountBadge: {
+    backgroundColor: '#e2e8f0',
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 12,
+  },
+  batchCountBadgeText: {
+    color: '#475569',
+    fontSize: 11,
+    fontWeight: '800',
+  },
   addBatchSmallBtn: {
-    backgroundColor: '#0284c7',
+    backgroundColor: Colors.accentTeal || '#29585c',
     paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingVertical: 7,
     borderRadius: Radius.sm,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 2,
+    elevation: 1,
   },
   addBatchSmallBtnText: {
     color: '#ffffff',
@@ -622,39 +657,61 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   noBatchesBox: {
-    backgroundColor: 'rgba(15, 23, 42, 0.6)',
+    backgroundColor: '#ffffff',
     padding: Spacing.md,
     borderRadius: Radius.sm,
     borderWidth: 1,
-    borderColor: '#1e293b',
+    borderColor: '#cbd5e1',
+    borderStyle: 'dashed',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  noBatchesIconBox: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#f1f5f9',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  noBatchesTitle: {
+    color: '#334155',
+    fontSize: 12,
+    fontWeight: '700',
+    marginBottom: 2,
   },
   noBatchesText: {
-    color: '#94a3b8',
-    fontSize: 12,
-    fontStyle: 'italic',
+    color: '#64748b',
+    fontSize: 11,
   },
   batchesList: {
     gap: Spacing.sm,
   },
   batchRowCard: {
-    backgroundColor: '#0f172a',
+    backgroundColor: '#ffffff',
     borderRadius: Radius.sm,
     padding: Spacing.md,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: '#e2e8f0',
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.sm,
     flexWrap: 'wrap',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.03,
+    shadowRadius: 2,
+    elevation: 1,
   },
   batchVendorName: {
-    color: '#f8fafc',
+    color: '#0f172a',
     fontSize: 13,
     fontWeight: '700',
   },
   batchStatusChip: {
     paddingHorizontal: 8,
-    paddingVertical: 2,
+    paddingVertical: 3,
     borderRadius: 4,
     borderWidth: 1,
   },
@@ -669,11 +726,11 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
   },
   batchQtyItem: {
-    color: '#94a3b8',
+    color: '#64748b',
     fontSize: 11,
   },
   batchQtyBold: {
-    color: '#f8fafc',
+    color: '#0f172a',
     fontWeight: '700',
   },
   batchMetaRow: {
@@ -683,16 +740,16 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
   },
   batchMetaText: {
-    color: '#94a3b8',
+    color: '#64748b',
     fontSize: 11,
   },
   batchMetaPending: {
-    color: '#f59e0b',
+    color: '#d97706',
     fontSize: 11,
     fontStyle: 'italic',
   },
   batchMetaVal: {
-    color: '#38bdf8',
+    color: '#0f172a',
     fontWeight: '600',
   },
   batchActionCol: {
@@ -701,12 +758,17 @@ const styles = StyleSheet.create({
     minWidth: 90,
   },
   receiveBtn: {
-    backgroundColor: '#10b981',
+    backgroundColor: '#059669',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: Radius.sm,
     borderWidth: 1,
-    borderColor: '#059669',
+    borderColor: '#047857',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 2,
+    elevation: 1,
   },
   receiveBtnText: {
     color: '#ffffff',
@@ -714,7 +776,7 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   receivedBadge: {
-    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    backgroundColor: '#ecfdf5',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 4,
@@ -722,7 +784,7 @@ const styles = StyleSheet.create({
     borderColor: '#10b981',
   },
   receivedBadgeText: {
-    color: '#10b981',
+    color: '#059669',
     fontSize: 11,
     fontWeight: '700',
   },
