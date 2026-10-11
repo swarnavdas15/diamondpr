@@ -58,12 +58,27 @@ export const handleUpdateTaskStatus = async (req: AuthRequest, res: Response) =>
         : ((task as any).assignedToId ? String((task as any).assignedToId) : null);
       
       const isAssignedUser = assignedUserIdStr ? assignedUserIdStr === String(currentUser.userId) : false;
-      const isDeptUser = !assignedUserIdStr && (task as any).assignedToDepartment === currentUser.role;
 
-      if (!isSuperAdmin && !isAssignedUser && !isDeptUser) {
+      // STRICT RULE: If a task is assigned to a specific user, ONLY that specific user can update its status.
+      if (assignedUserIdStr) {
+        if (!isAssignedUser) {
+          return res.status(403).json({
+            error: 'Permission Denied: Only the specific assigned user can update this task status.',
+            message: 'Permission Denied: Only the specific assigned user can update this task status.'
+          });
+        }
+      } else if ((task as any).assignedToDepartment) {
+        const isDeptUser = (task as any).assignedToDepartment === currentUser.role;
+        if (!isDeptUser && !isSuperAdmin) {
+          return res.status(403).json({
+            error: 'Permission Denied: Only members of this department can update this task status.',
+            message: 'Permission Denied: Only members of this department can update this task status.'
+          });
+        }
+      } else if (!isSuperAdmin) {
         return res.status(403).json({
-          error: 'Permission Denied: Only the specific assigned user can update this task status.',
-          message: 'Permission Denied: Only the specific assigned user can update this task status.'
+          error: 'Permission Denied: Only administrators can update this task status.',
+          message: 'Permission Denied: Only administrators can update this task status.'
         });
       }
     }

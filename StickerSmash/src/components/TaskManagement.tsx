@@ -42,16 +42,28 @@ export const TaskManagement: React.FC<TaskManagementProps> = ({ onOpenCreateTask
   const accessibleTasks = tasks;
 
   // Helper to determine if current user is authorized to update a specific task's status
-  // STRICT RULE: Status change can ONLY be performed by SUPER_ADMIN or the specific assigned user/department. All other users see read-only status.
+  // STRICT RULE: Status change can ONLY be performed by the specific assigned user ID.
+  // All other users (including Super Admin, unless the task is assigned to them) see read-only status.
   const canUpdateTaskStatus = (task: Task): boolean => {
-    if (currentUser.role === 'SUPER_ADMIN') return true;
-    if (task.assignedToUserId && task.assignedToUserId === currentUser.id) return true;
-    if ((task as any).assignedToId && (task as any).assignedToId === currentUser.id) return true;
-    if (task.assignedToName && currentUser.name && task.assignedToName.toLowerCase() === currentUser.name.toLowerCase()) return true;
-    if (task.assignedToDepartment && task.assignedToDepartment === currentUser.role) {
-      if (!task.assignedToUserId && !(task as any).assignedToId) return true;
+    const currentUserId = currentUser.id || (currentUser as any).userId;
+    const assignedUserId = task.assignedToUserId || (task as any).assignedToId;
+
+    if (assignedUserId) {
+      if (currentUserId && String(assignedUserId) === String(currentUserId)) return true;
+      if (task.assignedToName && currentUser.name && task.assignedToName.trim().toLowerCase() === currentUser.name.trim().toLowerCase()) return true;
+      return false;
     }
-    return false;
+
+    if (task.assignedToName) {
+      if (currentUser.name && task.assignedToName.trim().toLowerCase() === currentUser.name.trim().toLowerCase()) return true;
+      return false;
+    }
+
+    if (task.assignedToDepartment) {
+      return currentUser.role === task.assignedToDepartment;
+    }
+
+    return currentUser.role === 'SUPER_ADMIN';
   };
 
   // Step 2: Apply User Tab Filters (My Tasks, Department Tasks, Assigned By Me)
@@ -114,7 +126,7 @@ export const TaskManagement: React.FC<TaskManagementProps> = ({ onOpenCreateTask
 
   const handleMarkAllComplete = () => {
     filteredTasks.forEach(task => {
-      if (task.status !== 'COMPLETED') {
+      if (task.status !== 'COMPLETED' && canUpdateTaskStatus(task)) {
         updateTaskStatus(task.id, 'COMPLETED');
       }
     });
