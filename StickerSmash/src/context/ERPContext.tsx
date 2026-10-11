@@ -965,7 +965,14 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setVendors(vendorsRes.data.vendors || vendorsRes.data);
       }
       if (tasksRes && tasksRes.data && (tasksRes.data.tasks || Array.isArray(tasksRes.data))) {
-        setTasks(tasksRes.data.tasks || tasksRes.data);
+        const rawTasks = tasksRes.data.tasks || tasksRes.data;
+        const normalizedTasks = Array.isArray(rawTasks)
+          ? rawTasks.map((t: any) => ({
+              ...t,
+              assignedToUserId: t.assignedToUserId || t.assignedToId,
+            }))
+          : [];
+        setTasks(normalizedTasks);
       }
     } catch (error) {
       console.error('Failed to fetch ERP data from backend API:', error);
@@ -1588,6 +1595,7 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       dispatchRequired: data.dispatchRequired,
       budget: data.convertedOrderValue,
       items: data.items,
+      customStages: data.customStages,
     });
 
     try {

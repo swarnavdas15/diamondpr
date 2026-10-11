@@ -58,7 +58,7 @@ export const PhoneInput: React.FC<PhoneInputProps> = (props) => {
 
   return (
     <View>
-      <View style={[styles.container, !isValid && styles.invalidContainer, style]}>
+      <View style={[styles.container, !isValid && styles.invalidContainer, style as any]}>
         <TouchableOpacity 
           style={styles.countrySelector}
           onPress={() => setModalVisible(true)}

@@ -390,6 +390,7 @@ export interface CalendarEvent {
   eventDate: string;
   description?: string;
   createdByName: string;
+  createdAt?: string;
 }
 
 export type QuotationStatus =

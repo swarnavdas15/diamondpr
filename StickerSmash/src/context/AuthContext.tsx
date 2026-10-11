@@ -26,6 +26,7 @@ interface AuthContextType {
     employeeId?: string;
     role: Role;
     isActive?: boolean;
+    accessibleModules?: string[];
   }) => Promise<User>;
   updateUser: (userId: string, data: Partial<User>) => Promise<void>;
   adminResetUserPassword: (userId: string, newPass: string) => Promise<void>;
@@ -358,6 +359,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     employeeId?: string;
     role: Role;
     isActive?: boolean;
+    accessibleModules?: string[];
   }) => {
     if (!currentUser || currentUser.role !== 'SUPER_ADMIN') {
       throw new Error('Permission Denied: Only Super Admin can create user accounts.');
@@ -496,7 +498,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             addAuditLog(
               'USER_UPDATED',
               `Super Admin updated client data masking to '${visibility}' for user '${u.email}'.`,
-              'System'
+              currentUser
             );
             return { ...u, clientDataVisibility: visibility as any };
           }

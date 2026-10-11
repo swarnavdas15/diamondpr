@@ -125,6 +125,18 @@ export const QuotationConversionModal: React.FC<QuotationConversionModalProps> =
       return;
     }
 
+    let finalCustomStages = [...customStages];
+    if (isAddingStage && newStageName.trim()) {
+      const userNames = newStageUsers.map(uid => users.find(u => u.id === uid)?.name || 'Unknown User');
+      finalCustomStages.push({
+        stageName: newStageName.trim(),
+        description: newStageDesc.trim(),
+        department: 'CUSTOM_STAGE',
+        assignedUserIds: newStageUsers,
+        assignedUserNames: userNames,
+      });
+    }
+
     onSubmitConversion({
       approvedAmount: amtNum,
       requiredQuantity: qtyNum,
@@ -136,7 +148,7 @@ export const QuotationConversionModal: React.FC<QuotationConversionModalProps> =
       dispatchRequired,
       lostReason: lostReason as LostReason || undefined,
       lostRemarks: lostRemarks.trim() || undefined,
-      customStages,
+      customStages: finalCustomStages,
     });
     handleClose();
   };

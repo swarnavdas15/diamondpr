@@ -57,7 +57,7 @@ export const PurchaseDashboard: React.FC = () => {
   const handleAddBatch = async (data: { vendorName: string; quantityReceived: number; cost: number; remarks: string }) => {
     if (!selectedProcessOrder) return;
     try {
-      await addPurchaseBatch(selectedProcessOrder.id, data);
+      await addPurchaseBatch(selectedProcessOrder.id, data as any);
       setProcessModalVisible(false);
       setSelectedProcessOrder(null);
     } catch (err: any) {

@@ -50,6 +50,7 @@ export const QuotationsView: React.FC<QuotationsViewProps> = ({ onOpenCreateQuot
     markQuotationLost,
     setSelectedOrder,
     deleteQuotation,
+    promoteTemporaryClient,
   } = useERP();
   const { currentUser } = useAuth();
   const isSuperAdmin = currentUser?.role === 'SUPER_ADMIN';

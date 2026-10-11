@@ -45,14 +45,11 @@ export const TaskManagement: React.FC<TaskManagementProps> = ({ onOpenCreateTask
   // STRICT RULE: Status change can ONLY be performed by SUPER_ADMIN or the specific assigned user/department. All other users see read-only status.
   const canUpdateTaskStatus = (task: Task): boolean => {
     if (currentUser.role === 'SUPER_ADMIN') return true;
-    if (task.assignedToUserId) {
-      return task.assignedToUserId === currentUser.id;
-    }
-    if (task.assignedToName) {
-      return !!currentUser.name && task.assignedToName.toLowerCase() === currentUser.name.toLowerCase();
-    }
-    if (task.assignedToDepartment) {
-      return currentUser.role === task.assignedToDepartment;
+    if (task.assignedToUserId && task.assignedToUserId === currentUser.id) return true;
+    if ((task as any).assignedToId && (task as any).assignedToId === currentUser.id) return true;
+    if (task.assignedToName && currentUser.name && task.assignedToName.toLowerCase() === currentUser.name.toLowerCase()) return true;
+    if (task.assignedToDepartment && task.assignedToDepartment === currentUser.role) {
+      if (!task.assignedToUserId && !(task as any).assignedToId) return true;
     }
     return false;
   };
@@ -62,7 +59,8 @@ export const TaskManagement: React.FC<TaskManagementProps> = ({ onOpenCreateTask
     if (viewFilter === 'MY_TASKS') {
       return (
         task.assignedToUserId === currentUser.id ||
-        (task.assignedToName && currentUser.name && task.assignedToName.toLowerCase() === currentUser.name.toLowerCase())
+        (task as any).assignedToId === currentUser.id ||
+        (!!task.assignedToName && !!currentUser.name && task.assignedToName.toLowerCase() === currentUser.name.toLowerCase())
       );
     }
     if (viewFilter === 'DEPT_TASKS') {

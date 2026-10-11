@@ -23,6 +23,7 @@ export interface InitialOrderData {
   qualityTestingRequired?: boolean;
   dispatchRequired?: boolean;
   quotationNumber?: string;
+  customStages?: any[];
 }
 
 interface CreateOrderModalProps {
@@ -143,6 +144,18 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ visible, onC
       if (initialData.productionRequired !== undefined) setProductionRequired(initialData.productionRequired);
       if (initialData.qualityTestingRequired !== undefined) setQualityTestingRequired(initialData.qualityTestingRequired);
       if (initialData.dispatchRequired !== undefined) setDispatchRequired(initialData.dispatchRequired);
+      if (initialData.customStages && initialData.customStages.length > 0) {
+        setCustomStages(initialData.customStages.map((s: any, idx: number) => ({
+          id: s.id || `cs-${Date.now()}-${idx}`,
+          stageName: s.stageName,
+          description: s.description || '',
+          department: s.department || 'CUSTOM_STAGE',
+          assignedUserIds: s.assignedUserIds || [],
+          assignedUserNames: s.assignedUserNames || [],
+          status: 'PENDING',
+          createdAt: s.createdAt || new Date().toISOString(),
+        })));
+      }
     }
   }, [initialData, orderToEdit, visible]);
 

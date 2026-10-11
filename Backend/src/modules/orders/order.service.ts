@@ -169,7 +169,17 @@ export class OrderService {
           if (userIds.length > 0) {
             for (let i = 0; i < userIds.length; i++) {
               const uId = userIds[i];
-              const uName = userNames[i] || undefined;
+              let uName = userNames[i] || undefined;
+              if (!uName && uId) {
+                try {
+                  const assignedUser = await tx.orm.public.User.where({ id: dbId(uId) }).first();
+                  if (assignedUser) {
+                    uName = assignedUser.name;
+                  }
+                } catch {
+                  // ignore
+                }
+              }
               await tx.orm.public.Task.create({
                 title: `[Custom Stage] ${stageName} - ${order.orderNumber}`,
                 description: stageDesc ? `Stage Details: ${stageDesc}` : `Custom Workflow Stage: ${stageName}`,
