@@ -4,6 +4,7 @@ import { useERP } from '../../context/ERPContext';
 import { useAuth } from '../../context/AuthContext';
 import { Order } from '../../types';
 import { Colors, StatusColors, Spacing, Radius, Shadows } from '../../theme';
+import { getOrderActiveStage } from '../../utils/orderUtils';
 
 interface OrderKPIDetailsModalProps {
   visible: boolean;
@@ -145,7 +146,7 @@ export const OrderKPIDetailsModal: React.FC<OrderKPIDetailsModalProps> = ({
                 <Text style={[styles.th, { width: 120 }]}>Order Number</Text>
                 <Text style={[styles.th, { width: 100 }]}>Client Code</Text>
                 <Text style={[styles.th, { width: 180 }]}>Client Name</Text>
-                <Text style={[styles.th, { width: 140 }]}>Sales Stage</Text>
+                <Text style={[styles.th, { width: 140 }]}>Active Stage</Text>
                 <Text style={[styles.th, { width: 110 }]}>Purchase</Text>
                 <Text style={[styles.th, { width: 110 }]}>Production</Text>
                 <Text style={[styles.th, { width: 110 }]}>QC Result</Text>
@@ -176,7 +177,7 @@ export const OrderKPIDetailsModal: React.FC<OrderKPIDetailsModalProps> = ({
                       <Text style={[styles.tdHighlight, { width: 120 }]}>{ord.orderNumber}</Text>
                       <Text style={[styles.td, { width: 100 }]}>{ord.clientCode}</Text>
                       <Text style={[styles.tdBold, { width: 180 }]}>{ord.clientName}</Text>
-                      <Text style={[styles.tdSmall, { width: 140 }]}>{(ord.salesWorkflowStage || 'INITIATION').replace(/_/g, ' ')}</Text>
+                      <Text style={[styles.tdSmall, { width: 140, fontWeight: '700', color: Colors.accentTeal }]}>{getOrderActiveStage(ord)}</Text>
 
                       <View style={{ width: 110 }}>
                         <View style={[styles.statusPill, { backgroundColor: purStyle.bg, borderColor: purStyle.border }]}>

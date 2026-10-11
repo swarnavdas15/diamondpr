@@ -9,6 +9,7 @@ import { SalesKPICards } from './SalesKPICards';
 import { SalesKPIDetailsModal } from './SalesKPIDetailsModal';
 import { ExportButton } from '../ui/ExportButton';
 import { ExportDataPayload } from '../../utils/exportUtils';
+import { getOrderActiveStage } from '../../utils/orderUtils';
 
 interface SalesDashboardProps {
   onOpenCreateClient: () => void;
@@ -89,14 +90,14 @@ export const SalesDashboard: React.FC<SalesDashboardProps> = ({
       return {
         title: 'Sales Department - Orders Report',
         filename: 'Sales_Orders_Report',
-        headers: ['Order No', 'PO Number', 'Client Code', 'Client Name', 'Required Qty', 'Sales Stage', 'Overall Status'],
+        headers: ['Order No', 'PO Number', 'Client Code', 'Client Name', 'Required Qty', 'Current Stage', 'Overall Status'],
         rows: orders.map((o) => [
           o.orderNumber,
           o.poNumber,
           o.clientCode,
           o.clientName || 'N/A',
           o.requiredQuantity,
-          o.salesWorkflowStage,
+          getOrderActiveStage(o),
           o.status,
         ]),
       };
@@ -239,7 +240,7 @@ export const SalesDashboard: React.FC<SalesDashboardProps> = ({
                       {isExpanded && (
                         <View style={styles.mobileCardBody}>
                           <Text style={styles.mobileCardDetail}>Client Name: <Text style={styles.mobileCardVal}>{ord.clientName || 'N/A'}</Text></Text>
-                          <Text style={styles.mobileCardDetail}>Current Stage: <Text style={styles.mobileCardVal}>{ord.salesWorkflowStage ? ord.salesWorkflowStage.replace(/_/g, ' ') : ord.status}</Text></Text>
+                          <Text style={styles.mobileCardDetail}>Current Stage: <Text style={styles.mobileCardVal}>{getOrderActiveStage(ord)}</Text></Text>
                           <View style={{ marginVertical: 6 }}>
                             <View style={styles.progressTrack}>
                               <View style={[styles.progressFill, { width: `${progressPct}%` }]} />
@@ -286,7 +287,7 @@ export const SalesDashboard: React.FC<SalesDashboardProps> = ({
                         <Text style={[styles.tdBold, { width: 100 }]}>{ord.requiredQuantity} units</Text>
 
                         <View style={{ width: 150 }}>
-                          <Text style={styles.tdStage}>{ord.salesWorkflowStage ? ord.salesWorkflowStage.replace(/_/g, ' ') : ord.status}</Text>
+                          <Text style={styles.tdStage}>{getOrderActiveStage(ord)}</Text>
                         </View>
 
                         <View style={{ width: 110, justifyContent: 'center' }}>

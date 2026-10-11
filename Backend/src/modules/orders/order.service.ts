@@ -383,6 +383,12 @@ export const updateSalesWorkflowStage = async (id: string, stage: string, userId
   }
 
   try {
+    await db.orm.public.Order.where({ id: dbId(id) }).update({ currentStage: safeStage as any });
+  } catch (err: any) {
+    console.warn('Order currentStage update skipped:', err.message);
+  }
+
+  try {
     return await db.orm.public.StageLog.create({
       orderId: dbId(id),
       stage: safeStage as OrderStage,
@@ -619,9 +625,14 @@ export const receivePurchaseBatch = async (
     calcStatus = 'IN_PROGRESS';
   }
 
+  const nextPurchaseStage = calcStatus === 'COMPLETED'
+    ? (order.productionRequired ? 'CUTTING' : (order.qualityTestingRequired ? 'TESTING' : (order.dispatchRequired ? 'DISPATCH' : 'COMPLETED')))
+    : 'PURCHASE';
+
   await db.orm.public.Order.where({ id: dbId(orderId) }).update({
     purchaseQuantity: totalReceived,
     purchaseStatus: calcStatus,
+    currentStage: nextPurchaseStage,
     procurementNotes: calcStatus === 'COMPLETED'
       ? 'Material fully procured and verified.'
       : `Material receipt in progress (${totalReceived}/${order.requiredQuantity} pcs received)`
@@ -629,7 +640,7 @@ export const receivePurchaseBatch = async (
 
   await updateSalesWorkflowStage(
     orderId,
-    'PURCHASE',
+    nextPurchaseStage,
     userId,
     `Received ${newReceivedQty} pcs from ${batch.vendorName} (Invoice: ${data.invoiceNumber})`
   );
@@ -638,32 +649,48 @@ export const receivePurchaseBatch = async (
 };
 
 export const updatePurchaseStage = async (id: string, status: string, userId: string, notes?: string, processedQty?: number, vendorSelected?: string) => {
-  const updateData: any = { purchaseStatus: status };
+  const ord = await db.orm.public.Order.where({ id: dbId(id) }).first();
+  const nextStage = status === 'COMPLETED'
+    ? (ord?.productionRequired ? 'CUTTING' : (ord?.qualityTestingRequired ? 'TESTING' : (ord?.dispatchRequired ? 'DISPATCH' : 'COMPLETED')))
+    : 'PURCHASE';
+  const updateData: any = {
+    purchaseStatus: status,
+    currentStage: nextStage
+  };
   if (notes !== undefined) updateData.procurementNotes = notes;
   if (vendorSelected !== undefined) updateData.vendorSelected = vendorSelected;
-  if (processedQty !== undefined) { const ord = await db.orm.public.Order.where({ id: dbId(id) }).first(); updateData.purchaseQuantity = Math.round(Number(ord?.purchaseQuantity || 0) + Number(processedQty)); }
+  if (processedQty !== undefined) { updateData.purchaseQuantity = Math.round(Number(ord?.purchaseQuantity || 0) + Number(processedQty)); }
   await db.orm.public.Order.where({ id: dbId(id) }).update(updateData);
-  await updateSalesWorkflowStage(id, 'PURCHASE', userId, notes);
+  await updateSalesWorkflowStage(id, nextStage, userId, notes);
   return await getOrderById(id);
 };
 export const updateProductionStage = async (id: string, status: string, userId: string, notes?: string, processedQty?: number, isRework?: boolean) => {
   const order = await db.orm.public.Order.where({ id: dbId(id) }).first();
   if (!order) throw new Error('Order not found');
-  const updateData: any = { productionStatus: status };
+  const nextStage = status === 'COMPLETED'
+    ? (order.qualityTestingRequired ? 'TESTING' : (order.dispatchRequired ? 'DISPATCH' : 'COMPLETED'))
+    : ((order.currentStage && ['CUTTING', 'FORGING', 'MACHINING', 'HEAT_TREATMENT'].includes(order.currentStage)) ? order.currentStage : 'CUTTING');
+  const updateData: any = {
+    productionStatus: status,
+    currentStage: nextStage
+  };
   if (notes !== undefined) updateData.shopFloorNotes = notes;
   if (processedQty !== undefined) updateData.productionQuantity = Math.round(Number(order.productionQuantity || 0) + Number(processedQty));
   if (isRework !== undefined) updateData.reworkQuantity = Math.round(Number(order.reworkQuantity || 0) + Number(processedQty || 0));
   await db.orm.public.Order.where({ id: dbId(id) }).update(updateData);
-  const prodStage = (order.currentStage && ['CUTTING', 'FORGING', 'MACHINING', 'HEAT_TREATMENT'].includes(order.currentStage))
-    ? order.currentStage
-    : 'CUTTING';
-  await updateSalesWorkflowStage(id, prodStage, userId, notes);
+  await updateSalesWorkflowStage(id, nextStage, userId, notes);
   return await getOrderById(id);
 };
 export const updateQualityStage = async (id: string, status: string, userId: string, notes?: string, processedQty?: number, qcResult?: string) => {
   const order = await db.orm.public.Order.where({ id: dbId(id) }).first();
   if (!order) throw new Error('Order not found');
-  const updateData: any = { qualityStatus: status };
+  const nextStage = status === 'COMPLETED'
+    ? (order.dispatchRequired ? 'DISPATCH' : 'COMPLETED')
+    : 'TESTING';
+  const updateData: any = {
+    qualityStatus: status,
+    currentStage: nextStage
+  };
   if (notes !== undefined) updateData.qcRemarks = notes;
   if (qcResult !== undefined) updateData.qcResult = qcResult;
   if (processedQty !== undefined) {
@@ -672,17 +699,22 @@ export const updateQualityStage = async (id: string, status: string, userId: str
     if (qcResult === 'FAILED') updateData.qcFailedQuantity = Math.round(Number(order.qcFailedQuantity || 0) + Number(processedQty));
   }
   await db.orm.public.Order.where({ id: dbId(id) }).update(updateData);
-  await updateSalesWorkflowStage(id, 'TESTING', userId, notes);
+  await updateSalesWorkflowStage(id, nextStage, userId, notes);
   return await getOrderById(id);
 };
 export const updateDispatchStage = async (id: string, status: string, userId: string, notes?: string, processedQty?: number, logisticsEntry?: string, transportRef?: string) => {
-  const updateData: any = { dispatchStatus: status };
+  const ord = await db.orm.public.Order.where({ id: dbId(id) }).first();
+  const nextStage = status === 'COMPLETED' ? 'COMPLETED' : 'DISPATCH';
+  const updateData: any = {
+    dispatchStatus: status,
+    currentStage: nextStage
+  };
   if (notes !== undefined) updateData.dispatchNotes = notes;
-  if (processedQty !== undefined) { const ord = await db.orm.public.Order.where({ id: dbId(id) }).first(); updateData.dispatchQuantity = Math.round(Number(ord?.dispatchQuantity || 0) + Number(processedQty)); }
+  if (processedQty !== undefined) { updateData.dispatchQuantity = Math.round(Number(ord?.dispatchQuantity || 0) + Number(processedQty)); }
   if (logisticsEntry !== undefined) updateData.logisticsEntry = logisticsEntry;
   if (transportRef !== undefined) updateData.transportRef = transportRef;
   await db.orm.public.Order.where({ id: dbId(id) }).update(updateData);
-  await updateSalesWorkflowStage(id, 'DISPATCH', userId, notes);
+  await updateSalesWorkflowStage(id, nextStage, userId, notes);
   return await getOrderById(id);
 };
 export const verifyAndCompleteOrder = async (id: string, userId: string, remarks?: string) => {

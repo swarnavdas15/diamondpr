@@ -1008,8 +1008,19 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               else effectiveStage = 'DISPATCH';
             }
 
+            let normalizedSalesWorkflow = ord.salesWorkflowStage || 'ORDER_CONFIRMED';
+            if (
+              normalizedSalesWorkflow === 'QUOTATION' ||
+              normalizedSalesWorkflow === 'QUOTATION_PREPARED' ||
+              normalizedSalesWorkflow === 'QUOTATION_APPROVED' ||
+              normalizedSalesWorkflow === 'INITIATION'
+            ) {
+              normalizedSalesWorkflow = 'ORDER_CONFIRMED';
+            }
+
             return {
               ...ord,
+              salesWorkflowStage: normalizedSalesWorkflow,
               currentStage: effectiveStage,
               purchaseBatches: normalizedBatches,
             };

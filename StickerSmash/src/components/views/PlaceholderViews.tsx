@@ -5,6 +5,7 @@ import { useAuth } from '../../context/AuthContext';
 import { Colors, Spacing, Radius, Shadows } from '../../theme';
 import { ExportButton } from '../ui/ExportButton';
 import { ExportDataPayload } from '../../utils/exportUtils';
+import { getOrderActiveStage } from '../../utils/orderUtils';
 
 interface PlaceholderProps {
   onOpenCreateClient?: () => void;
@@ -251,7 +252,7 @@ export const ProjectsView: React.FC<PlaceholderProps> = () => {
                 <Text style={styles.projectSub}>PO Number: {ord.poNumber} • Required Qty: {ord.requiredQuantity} pcs</Text>
               </View>
               <View style={styles.stageTag}>
-                <Text style={styles.stageTagText}>{(ord.salesWorkflowStage || 'INITIATION').replace(/_/g, ' ')}</Text>
+                <Text style={styles.stageTagText}>{getOrderActiveStage(ord)}</Text>
               </View>
             </View>
             <Text style={styles.specText}>Technical Spec: {ord.technicalRequirements || 'Standard Flange Spec'}</Text>

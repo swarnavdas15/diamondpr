@@ -15,6 +15,7 @@ import { Order, DepartmentStatus } from '../types';
 import { Colors, StatusColors, Spacing, Radius, Shadows } from '../theme';
 import { ExportButton } from './ui/ExportButton';
 import { ExportDataPayload } from '../utils/exportUtils';
+import { getOrderActiveStage } from '../utils/orderUtils';
 import { OrderOverviewModal } from './OrderOverviewModal';
 
 interface OrdersManagementProps {
@@ -152,26 +153,8 @@ export const OrdersManagement: React.FC<OrdersManagementProps> = ({
     return 0;
   };
 
-  // Effective Stage Helper (Fixes Quotation Bug)
-  const getOrderEffectiveStage = (order: Order): string => {
-    if (order.status === 'COMPLETED' || order.dispatchStatus === 'COMPLETED') return 'COMPLETED';
-    if (order.dispatchRequired && (order.dispatchStatus === 'IN_PROGRESS' || order.qualityStatus === 'COMPLETED')) return 'DISPATCH';
-    if (order.qualityTestingRequired && (order.qualityStatus === 'IN_PROGRESS' || order.productionStatus === 'COMPLETED')) return 'QUALITY TESTING';
-    if (order.productionRequired && (order.productionStatus === 'IN_PROGRESS' || order.purchaseStatus === 'COMPLETED')) return 'PRODUCTION';
-    if (order.purchaseRequired) {
-      if (order.purchaseStatus === 'COMPLETED') return 'PURCHASE DONE';
-      if (order.purchaseStatus === 'IN_PROGRESS') {
-        const purQty = order.purchaseQuantity || 0;
-        return purQty > 0 ? `PURCHASE (${purQty}/${order.requiredQuantity})` : 'PURCHASE (PENDING RECEIVE)';
-      }
-      return 'PURCHASE (PENDING)';
-    }
-    const rawStage = String(order.currentStage || '');
-    if (!rawStage || rawStage === 'QUOTATION' || rawStage === 'SALES') {
-      return 'ORDER CONFIRMED';
-    }
-    return rawStage.replace(/_/g, ' ');
-  };
+  // Effective Stage Helper (Guarantees Real Active Stage & No Quotation Label)
+  const getOrderEffectiveStage = (order: Order): string => getOrderActiveStage(order);
 
   // Status Badge Styling Helper
   const getBadgeProps = (order: Order) => {
