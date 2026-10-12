@@ -175,7 +175,12 @@ export const TaskManagement: React.FC<TaskManagementProps> = ({ onOpenCreateTask
   };
 
   return (
-    <View style={styles.card}>
+    <ScrollView
+      style={styles.container}
+      showsVerticalScrollIndicator={false}
+      contentContainerStyle={{ paddingBottom: isMobile ? 84 : 40 }}
+    >
+      <View style={styles.card}>
       {/* Header & Quick Action */}
       <View style={[styles.header, isMobile && styles.headerMobile]}>
         <View style={{ flex: 1 }}>
@@ -507,18 +512,22 @@ export const TaskManagement: React.FC<TaskManagementProps> = ({ onOpenCreateTask
           </View>
         </ScrollView>
       )}
-    </View>
+      </View>
+    </ScrollView>
   );
 };
 
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
   card: {
     backgroundColor: Colors.cardBg,
     borderRadius: Radius.xl,
     padding: Spacing.lg,
     borderWidth: 1,
     borderColor: Colors.borderDark,
-    marginVertical: Spacing.md,
+    marginBottom: Spacing.md,
     ...Shadows.sm,
   },
   header: {
