@@ -938,15 +938,21 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const fetchLiveDashboardData = async () => {
     try {
       const [clientsRes, ordersRes, contactsRes, quotationsRes, vendorsRes, tasksRes, tempClientsRes] = await Promise.all([
-        apiClient.get('/clients'),
-        apiClient.get('/orders'),
-        apiClient.get('/clients/contacts'),
-        apiClient.get('/quotations'),
+        apiClient.get('/clients').catch((err) => {
+          console.warn('Clients fetch notice:', err?.response?.status || err?.message);
+          return { data: { clients: [] } };
+        }),
+        apiClient.get('/orders').catch((err) => {
+          console.warn('Orders fetch notice:', err?.response?.status || err?.message);
+          return { data: { orders: [] } };
+        }),
+        apiClient.get('/clients/contacts').catch(() => ({ data: { contacts: [] } })),
+        apiClient.get('/quotations').catch(() => ({ data: { quotations: [] } })),
         apiClient.get('/vendors').catch(() => ({ data: [] })),
         apiClient.get('/tasks').catch(() => ({ data: [] })),
         apiClient.get('/clients?temporaryOnly=true').catch(() => ({ data: { clients: [] } })),
       ]);
-      const clientsArray = clientsRes.data.clients || clientsRes.data;
+      const clientsArray = clientsRes?.data?.clients || clientsRes?.data || [];
       const normalizedClients = Array.isArray(clientsArray) 
         ? clientsArray.map((c: any) => {
             const match = (c.remarks || '').match(/\[DOB:([\d\-]+)\]/);
@@ -977,7 +983,7 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             };
           })
         : [];
-      const rawOrders = ordersRes.data.orders || ordersRes.data || [];
+      const rawOrders = ordersRes?.data?.orders || ordersRes?.data || [];
       const normalizedOrders = Array.isArray(rawOrders)
         ? rawOrders.map((ord: any) => {
             const normalizedBatches = Array.isArray(ord.purchaseBatches)
@@ -1036,8 +1042,8 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           })
         : [];
       setOrders(normalizedOrders);
-      setCompanyContacts(contactsRes.data.contacts || []);
-      setQuotations(quotationsRes.data.quotations || []);
+      setCompanyContacts(contactsRes?.data?.contacts || contactsRes?.data || []);
+      setQuotations(quotationsRes?.data?.quotations || quotationsRes?.data || []);
       if (vendorsRes && vendorsRes.data && (vendorsRes.data.vendors || Array.isArray(vendorsRes.data))) {
         setVendors(vendorsRes.data.vendors || vendorsRes.data);
       }

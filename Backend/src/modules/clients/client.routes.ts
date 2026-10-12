@@ -8,7 +8,7 @@ const router = Router();
 
 // Only Sales, Admin, Super Admin can manage & view complete Client list
 router.post('/', authenticateToken, requireRole(['SUPER_ADMIN', 'ADMIN', 'SALES']), handleCreateClient);
-router.get('/', authenticateToken, requireRole(['SUPER_ADMIN', 'ADMIN', 'SALES']), handleListClients);
+router.get('/', authenticateToken, handleListClients);
 router.post('/temporary/bulk-delete-permanent', authenticateToken, requireRole(['SUPER_ADMIN', 'ADMIN', 'SALES']), handleBulkDeleteTemporaryClientsPermanent);
 router.delete('/temporary/:id/permanent', authenticateToken, requireRole(['SUPER_ADMIN', 'ADMIN', 'SALES']), handleDeleteTemporaryClientPermanent);
 router.post('/:id/promote', authenticateToken, requireRole(['SUPER_ADMIN', 'ADMIN', 'SALES']), handlePromoteClient);
