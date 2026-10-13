@@ -10,6 +10,7 @@ import { ReceiveMaterialModal } from './ReceiveMaterialModal';
 import { OrderQuantityTracker } from '../OrderQuantityTracker';
 import { ExportButton } from '../ui/ExportButton';
 import { ExportDataPayload } from '../../utils/exportUtils';
+import { ConfirmDeleteModal } from '../ui/ConfirmDeleteModal';
 
 export const PurchaseDashboard: React.FC = () => {
   const { width } = useWindowDimensions();
@@ -17,6 +18,7 @@ export const PurchaseDashboard: React.FC = () => {
   const { getMaskedOrders, addPurchaseBatch, receivePurchaseBatch, deletePurchaseBatch, setSelectedOrder } = useERP();
   const maskedOrders = getMaskedOrders().filter((o) => o.purchaseRequired);
 
+  const [batchToDelete, setBatchToDelete] = useState<{ orderId: string; batchId: string; vendorName: string } | null>(null);
   const [processModalVisible, setProcessModalVisible] = useState(false);
   const [selectedProcessOrder, setSelectedProcessOrder] = useState<Order | null>(null);
 
@@ -480,7 +482,7 @@ export const PurchaseDashboard: React.FC = () => {
                               {bReceived === 0 && (
                                 <TouchableOpacity
                                   style={styles.deleteBatchBtn}
-                                  onPress={() => handleDeleteBatch(ord.id, b.id, b.vendorName)}
+                                  onPress={() => setBatchToDelete({ orderId: ord.id, batchId: b.id, vendorName: b.vendorName })}
                                 >
                                   <Text style={styles.deleteBatchBtnText}>✕ Cancel</Text>
                                 </TouchableOpacity>
@@ -513,6 +515,26 @@ export const PurchaseDashboard: React.FC = () => {
         batch={selectedReceiveBatch}
         onClose={() => setReceiveModalVisible(false)}
         onSubmit={handleReceiveBatch}
+      />
+
+      {/* Cancel Purchase Batch Confirmation Modal */}
+      <ConfirmDeleteModal
+        visible={!!batchToDelete}
+        title="Cancel Purchase Order"
+        itemTitle={batchToDelete?.vendorName}
+        message={batchToDelete ? `Are you sure you want to cancel the unreceived purchase order for "${batchToDelete.vendorName}"? This cannot be undone.` : undefined}
+        confirmText="Yes, Cancel Order"
+        onConfirm={async () => {
+          if (batchToDelete) {
+            try {
+              await deletePurchaseBatch(batchToDelete.orderId, batchToDelete.batchId);
+            } catch (err: any) {
+              alert(err.message || 'Failed to cancel purchase batch');
+            }
+            setBatchToDelete(null);
+          }
+        }}
+        onCancel={() => setBatchToDelete(null)}
       />
     </ScrollView>
   );

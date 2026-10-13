@@ -162,25 +162,8 @@ export const CreateQuotationModal: React.FC<CreateQuotationModalProps> = ({ visi
     }
 
     try {
-      let finalClientId = selectedClientId;
-      let finalClientCode = clientCode.trim() || (clientType === 'NON_REGISTERED' ? nextTempCode : '');
-
-      // Agar Non-Registered client hai ya dropdown se select nahi hua hai:
-      if (!finalClientId || clientType === 'NON_REGISTERED') {
-        const newTemp = await createClient({
-          companyName: companyName.trim(),
-          clientCode: finalClientCode || nextTempCode,
-          contactName: contactPerson.trim(),
-          contactNo: mobileNumber.trim(),
-          email: email.trim(),
-          isTemporary: true,
-        });
-
-        finalClientId = newTemp?.id;
-        if (newTemp?.clientCode) {
-          finalClientCode = newTemp.clientCode;
-        }
-      }
+      const finalClientId = clientType === 'REGISTERED' ? selectedClientId : undefined;
+      const finalClientCode = clientType === 'REGISTERED' ? clientCode.trim() : (clientCode.trim() || undefined);
 
       const created = await createQuotation({
         companyName: companyName.trim(),
@@ -326,11 +309,12 @@ export const CreateQuotationModal: React.FC<CreateQuotationModalProps> = ({ visi
               <View style={styles.fieldBlock}>
                 <Text style={styles.label}>Contact Person *</Text>
                 <TextInput
-                  style={styles.input}
+                  style={[styles.input, clientType === 'REGISTERED' && selectedClientId ? styles.inputAutoFilled : null]}
                   placeholder="e.g. Rajesh Mehta"
                   placeholderTextColor="#94a3b8"
                   value={contactPerson}
                   onChangeText={setContactPerson}
+                  editable={clientType === 'NON_REGISTERED'}
                 />
               </View>
 
@@ -338,12 +322,13 @@ export const CreateQuotationModal: React.FC<CreateQuotationModalProps> = ({ visi
               <View style={styles.fieldBlock}>
                 <Text style={styles.label}>Mobile Number *</Text>
                 <TextInput
-                  style={styles.input}
+                  style={[styles.input, clientType === 'REGISTERED' && selectedClientId ? styles.inputAutoFilled : null]}
                   placeholder="e.g. +91 98765 43210"
                   placeholderTextColor="#94a3b8"
                   keyboardType="phone-pad"
                   value={mobileNumber}
                   onChangeText={setMobileNumber}
+                  editable={clientType === 'NON_REGISTERED'}
                 />
               </View>
 
@@ -351,13 +336,14 @@ export const CreateQuotationModal: React.FC<CreateQuotationModalProps> = ({ visi
               <View style={styles.fieldBlock}>
                 <Text style={styles.label}>Email Address *</Text>
                 <TextInput
-                  style={styles.input}
+                  style={[styles.input, clientType === 'REGISTERED' && selectedClientId ? styles.inputAutoFilled : null]}
                   placeholder="e.g. contact@apexheavy.com"
                   placeholderTextColor="#94a3b8"
                   keyboardType="email-address"
                   autoCapitalize="none"
                   value={email}
                   onChangeText={setEmail}
+                  editable={clientType === 'NON_REGISTERED'}
                 />
               </View>
 

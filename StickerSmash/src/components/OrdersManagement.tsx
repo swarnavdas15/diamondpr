@@ -17,6 +17,7 @@ import { ExportButton } from './ui/ExportButton';
 import { ExportDataPayload } from '../utils/exportUtils';
 import { getOrderActiveStage } from '../utils/orderUtils';
 import { OrderOverviewModal } from './OrderOverviewModal';
+import { ConfirmDeleteModal } from './ui/ConfirmDeleteModal';
 
 interface OrdersManagementProps {
   onNavigateToQuotations?: () => void;
@@ -39,6 +40,7 @@ export const OrdersManagement: React.FC<OrdersManagementProps> = ({
   const { width } = useWindowDimensions();
   const isMobile = width < 768;
 
+  const [orderToDelete, setOrderToDelete] = useState<Order | null>(null);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('ALL');
   const [deptFilter, setDeptFilter] = useState<DepartmentFilter>('ALL');
   const [dateFilter, setDateFilter] = useState<DateFilter>('ALL');
@@ -603,9 +605,7 @@ export const OrdersManagement: React.FC<OrdersManagementProps> = ({
                           style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, borderWidth: 1, borderColor: '#ef4444' }}
                           onPress={(e) => {
                             e.stopPropagation();
-                            if (window.confirm(`Delete order ${order.orderNumber}?`)) {
-                              deleteOrder(order.id);
-                            }
+                            setOrderToDelete(order);
                           }}
                         >
                           <Text style={{ color: '#ef4444', fontSize: 11, fontWeight: '700' }}>🗑</Text>
@@ -641,6 +641,20 @@ export const OrdersManagement: React.FC<OrdersManagementProps> = ({
         </View>
       )}
 
+      {/* Delete Order Confirmation Modal */}
+      <ConfirmDeleteModal
+        visible={!!orderToDelete}
+        title="Delete Order Record"
+        itemTitle={orderToDelete?.orderNumber}
+        message={orderToDelete ? `You are about to permanently delete order "${orderToDelete.orderNumber}" for ${orderToDelete.clientName}. This cannot be undone.` : undefined}
+        onConfirm={async () => {
+          if (orderToDelete) {
+            await deleteOrder(orderToDelete.id);
+            setOrderToDelete(null);
+          }
+        }}
+        onCancel={() => setOrderToDelete(null)}
+      />
     </ScrollView>
   );
 };

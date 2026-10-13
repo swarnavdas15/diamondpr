@@ -6,6 +6,7 @@ import { TaskStatus, Role, Priority, Task } from '../types';
 import { Colors, StatusColors, Spacing, Radius, Shadows } from '../theme';
 import { ExportButton } from './ui/ExportButton';
 import { ExportDataPayload } from '../utils/exportUtils';
+import { ConfirmDeleteModal } from './ui/ConfirmDeleteModal';
 
 interface TaskManagementProps {
   onOpenCreateTask: () => void;
@@ -20,6 +21,7 @@ export const TaskManagement: React.FC<TaskManagementProps> = ({ onOpenCreateTask
   const { width } = useWindowDimensions();
   const isMobile = width < 768;
 
+  const [taskToDelete, setTaskToDelete] = useState<Task | null>(null);
   const [viewFilter, setViewFilter] = useState<TaskViewFilter>('ALL');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('ALL');
   const [deptFilter, setDeptFilter] = useState<string>('ALL');
@@ -361,7 +363,7 @@ export const TaskManagement: React.FC<TaskManagementProps> = ({ onOpenCreateTask
                               );
                             })}
                             {isSuperAdmin && (
-                              <TouchableOpacity style={styles.deleteBtn} onPress={() => handleDelete(task.id)}>
+                              <TouchableOpacity style={styles.deleteBtn} onPress={() => setTaskToDelete(task)}>
                                 <Text style={styles.deleteBtnText}>Delete Task</Text>
                               </TouchableOpacity>
                             )}
@@ -498,7 +500,7 @@ export const TaskManagement: React.FC<TaskManagementProps> = ({ onOpenCreateTask
                     {/* Actions (RBAC: Delete only Super Admin) */}
                     <View style={{ width: 95, justifyContent: 'center' }}>
                       {isSuperAdmin ? (
-                        <TouchableOpacity style={styles.deleteBtn} onPress={() => handleDelete(task.id)}>
+                        <TouchableOpacity style={styles.deleteBtn} onPress={() => setTaskToDelete(task)}>
                           <Text style={styles.deleteBtnText}>Delete</Text>
                         </TouchableOpacity>
                       ) : (
@@ -512,6 +514,25 @@ export const TaskManagement: React.FC<TaskManagementProps> = ({ onOpenCreateTask
           </View>
         </ScrollView>
       )}
+      {/* Delete Task Confirmation Modal */}
+      <ConfirmDeleteModal
+        visible={!!taskToDelete}
+        title="Delete Task Record"
+        itemTitle={taskToDelete?.title}
+        message={taskToDelete ? `You are about to permanently delete task "${taskToDelete.title}". This cannot be undone.` : undefined}
+        onConfirm={async () => {
+          if (taskToDelete) {
+            try {
+              setError('');
+              await deleteTask(taskToDelete.id);
+            } catch (err: any) {
+              setError(err.message || 'Permission denied');
+            }
+            setTaskToDelete(null);
+          }
+        }}
+        onCancel={() => setTaskToDelete(null)}
+      />
       </View>
     </ScrollView>
   );

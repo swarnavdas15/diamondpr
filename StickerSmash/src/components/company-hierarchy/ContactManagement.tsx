@@ -147,7 +147,7 @@ export const ContactManagement: React.FC<ContactManagementProps> = ({
                           {c.fullName}
                         </Text>
                         <Text style={styles.tdSub} numberOfLines={1}>
-                          {c.email || 'No Email'}
+                          {c.email || 'No Email'}{c.dateOfBirth ? ` • 🎂 ${c.dateOfBirth}` : ''}
                         </Text>
                       </View>
                     </TouchableOpacity>

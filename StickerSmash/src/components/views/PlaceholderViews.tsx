@@ -17,7 +17,8 @@ interface PlaceholderProps {
 
 import { CompanyDetailModal } from '../company-hierarchy/CompanyDetailModal';
 import { SuperAdminAnalyticsView } from '../analytics/SuperAdminAnalyticsView';
-import { Client } from '../../types';
+import { Client, Vendor } from '../../types';
+import { ConfirmDeleteModal } from '../ui/ConfirmDeleteModal';
 
 // 1. Client Directory View
 export const ClientDirectoryView: React.FC<PlaceholderProps> = ({ onOpenCreateClient, onOpenEditClient, onOpenCreateOrder }) => {
@@ -60,39 +61,16 @@ export const ClientDirectoryView: React.FC<PlaceholderProps> = ({ onOpenCreateCl
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
       {/* Delete Confirmation Modal */}
-      <Modal transparent visible={!!clientToDelete} animationType="fade">
-        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' }}>
-          <TouchableOpacity style={[StyleSheet.absoluteFill, { zIndex: 1 }]} activeOpacity={1} onPress={() => setClientToDelete(null)} />
-          <View style={{ backgroundColor: '#fff', borderRadius: 12, width: '90%', maxWidth: 400, zIndex: 2, elevation: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 12, overflow: 'hidden' }}>
-            
-            <View style={{ backgroundColor: '#fff', padding: 24, paddingBottom: 16, alignItems: 'center' }}>
-              <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: '#fef2f2', justifyContent: 'center', alignItems: 'center', marginBottom: 16 }}>
-                <Text style={{ fontSize: 28, color: '#ef4444' }}>⚠️</Text>
-              </View>
-              <Text style={{ fontSize: 20, fontWeight: '700', color: '#111827', marginBottom: 8, textAlign: 'center' }}>Delete Client Record</Text>
-              <Text style={{ fontSize: 15, color: '#4b5563', textAlign: 'center', lineHeight: 22 }}>
-                You are about to permanently delete <Text style={{ fontWeight: 'bold', color: '#111827' }}>{clientToDelete?.companyName}</Text>. This will remove all associated data and cannot be undone.
-              </Text>
-            </View>
-
-            <View style={{ flexDirection: 'row', padding: 20, paddingTop: 12, gap: 12, backgroundColor: '#f9fafb', borderTopWidth: 1, borderTopColor: '#f3f4f6' }}>
-              <TouchableOpacity style={{ flex: 1, paddingVertical: 12, borderRadius: 8, backgroundColor: '#fff', borderWidth: 1, borderColor: '#d1d5db', alignItems: 'center' }} onPress={() => setClientToDelete(null)}>
-                <Text style={{ color: '#374151', fontWeight: '600', fontSize: 15 }}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={{ flex: 1, paddingVertical: 12, borderRadius: 8, backgroundColor: '#ef4444', alignItems: 'center', shadowColor: '#ef4444', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 4 }} 
-                onPress={() => { 
-                  if (clientToDelete) deleteClient(clientToDelete.id); 
-                  setClientToDelete(null); 
-                }}
-              >
-                <Text style={{ color: '#fff', fontWeight: '600', fontSize: 15 }}>Yes, Delete</Text>
-              </TouchableOpacity>
-            </View>
-
-          </View>
-        </View>
-      </Modal>
+      <ConfirmDeleteModal
+        visible={!!clientToDelete}
+        title="Delete Client Record"
+        itemTitle={clientToDelete?.companyName}
+        onConfirm={() => {
+          if (clientToDelete) deleteClient(clientToDelete.id);
+          setClientToDelete(null);
+        }}
+        onCancel={() => setClientToDelete(null)}
+      />
 
       {/* Company Org Hierarchy Modal */}
       <CompanyDetailModal
@@ -264,7 +242,6 @@ export const ProjectsView: React.FC<PlaceholderProps> = () => {
 };
 
 import { CreateVendorModal } from '../CreateVendorModal';
-import { Vendor } from '../../types';
 
 // 3. Vendors & Material Supply View
 export const VendorsView: React.FC = () => {
@@ -274,6 +251,7 @@ export const VendorsView: React.FC = () => {
   const [createModalVisible, setCreateModalVisible] = useState(false);
   const [vendorToEdit, setVendorToEdit] = useState<Vendor | null>(null);
   const [vendorToView, setVendorToView] = useState<Vendor | null>(null);
+  const [vendorToDelete, setVendorToDelete] = useState<Vendor | null>(null);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
@@ -609,7 +587,7 @@ export const VendorsView: React.FC = () => {
                       <Text style={styles.actionBtnText}>Edit</Text>
                     </TouchableOpacity>
                     {isSuperAdminOrAdmin && (
-                      <TouchableOpacity style={styles.deleteActionBtn} onPress={() => handleDelete(v.id)}>
+                      <TouchableOpacity style={styles.deleteActionBtn} onPress={() => setVendorToDelete(v)}>
                         <Text style={styles.deleteActionText}>Delete</Text>
                       </TouchableOpacity>
                     )}
@@ -620,6 +598,24 @@ export const VendorsView: React.FC = () => {
           </View>
         </ScrollView>
       </View>
+
+      <ConfirmDeleteModal
+        visible={!!vendorToDelete}
+        title="Delete Vendor Record"
+        itemTitle={vendorToDelete?.vendorName}
+        onConfirm={async () => {
+          if (vendorToDelete) {
+            try {
+              setError('');
+              await deleteVendor(vendorToDelete.id);
+            } catch (err: any) {
+              setError(err.message || 'Permission denied.');
+            }
+            setVendorToDelete(null);
+          }
+        }}
+        onCancel={() => setVendorToDelete(null)}
+      />
     </ScrollView>
   );
 };
@@ -674,11 +670,16 @@ export { QuotationsView } from './QuotationsView';
 // 7. Settings View
 export const SettingsView: React.FC = () => {
   const { currentUser, users, toggleUserMasking } = useAuth();
-  const { temporaryClients, deleteTemporaryClientPermanent, bulkDeleteTemporaryClientsPermanent, refreshData } = useERP();
+  const { temporaryClients, quotations, deleteTemporaryClientPermanent, bulkDeleteTemporaryClientsPermanent, refreshData } = useERP();
   const [activeTab, setActiveTab] = useState<'security' | 'temp-clients'>('security');
   const [selectedTempClients, setSelectedTempClients] = useState<string[]>([]);
-  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [tempClientToDelete, setTempClientToDelete] = useState<{ id: string; name: string } | null>(null);
+  const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false);
   const [error, setError] = useState('');
+
+  React.useEffect(() => {
+    refreshData();
+  }, [activeTab]);
 
   if (currentUser?.role !== 'SUPER_ADMIN') {
     return (
@@ -703,35 +704,9 @@ export const SettingsView: React.FC = () => {
     );
   };
 
-  const handleSingleDelete = async (id: string) => {
-    if (deleteConfirmId === id) {
-      try {
-        setError('');
-        await deleteTemporaryClientPermanent(id);
-        setDeleteConfirmId(null);
-      } catch (e: any) {
-        setError(e.message);
-      }
-    } else {
-      setDeleteConfirmId(id);
-    }
-  };
-
-  const handleBulkDelete = async () => {
-    if (selectedTempClients.length === 0) return;
-    try {
-      setError('');
-      await bulkDeleteTemporaryClientsPermanent(selectedTempClients);
-      setSelectedTempClients([]);
-    } catch (e: any) {
-      setError(e.message);
-    }
-  };
-
-  const getQuotationCount = (clientId: string) => {
-    // This would need quotations from context, but we can compute or show a placeholder
-    // For now, let's just return a mock or compute from API later
-    return '-';
+  const getQuotationCount = (clientId: string, clientCode?: string) => {
+    const list = quotations || [];
+    return list.filter((q) => (q.clientId && q.clientId === clientId) || (clientCode && (q.clientCode || '').toLowerCase() === clientCode.toLowerCase())).length;
   };
 
   return (
@@ -828,7 +803,7 @@ export const SettingsView: React.FC = () => {
             {selectedTempClients.length > 0 && (
               <TouchableOpacity 
                 style={[styles.btnRed, { marginLeft: 10 }]} 
-                onPress={handleBulkDelete}
+                onPress={() => setShowBulkDeleteModal(true)}
                 disabled={selectedTempClients.length === 0}
               >
                 <Text style={styles.btnText}>🗑 Delete Selected ({selectedTempClients.length})</Text>
@@ -868,7 +843,6 @@ export const SettingsView: React.FC = () => {
               ) : (
                 temporaryClients.map((c) => {
                   const isSelected = selectedTempClients.includes(c.id);
-                  const isConfirming = deleteConfirmId === c.id;
                   return (
                     <View key={c.id} style={[{ ...styles.trRow, backgroundColor: isSelected ? 'rgba(245, 158, 11, 0.08)' : Colors.cardBg }]}>
                       <View style={{ width: 50, alignItems: 'center' }}>
@@ -886,32 +860,15 @@ export const SettingsView: React.FC = () => {
                       <Text style={[styles.td, { width: 180 }]}>{c.email || 'N/A'}</Text>
                       <Text style={[styles.td, { width: 120 }]}>{c.createdAt ? new Date(c.createdAt).toLocaleDateString() : 'N/A'}</Text>
                       <View style={{ width: 80, alignItems: 'center' }}>
-                        <Text style={styles.td}>{getQuotationCount(c.id)}</Text>
+                        <Text style={styles.td}>{getQuotationCount(c.id, c.clientCode)}</Text>
                       </View>
                       <View style={{ width: 100, flexDirection: 'row', gap: 6, justifyContent: 'center' }}>
-                        {isConfirming ? (
-                          <>
-                            <TouchableOpacity 
-                              style={{ backgroundColor: '#ef4444', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4 }}
-                              onPress={() => handleSingleDelete(c.id)}
-                            >
-                              <Text style={{ color: '#fff', fontSize: 10, fontWeight: '800' }}>✓ Confirm</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity 
-                              style={{ backgroundColor: '#6b7280', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4 }}
-                              onPress={() => setDeleteConfirmId(null)}
-                            >
-                              <Text style={{ color: '#fff', fontSize: 10, fontWeight: '800' }}>✕</Text>
-                            </TouchableOpacity>
-                          </>
-                        ) : (
-                          <TouchableOpacity 
-                            style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4, borderWidth: 1, borderColor: 'rgba(239, 68, 68, 0.3)' }}
-                            onPress={() => handleSingleDelete(c.id)}
-                          >
-                            <Text style={{ color: '#ef4444', fontSize: 10, fontWeight: '800' }}>🗑 Delete</Text>
-                          </TouchableOpacity>
-                        )}
+                        <TouchableOpacity 
+                          style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4, borderWidth: 1, borderColor: 'rgba(239, 68, 68, 0.3)' }}
+                          onPress={() => setTempClientToDelete({ id: c.id, name: c.companyName })}
+                        >
+                          <Text style={{ color: '#ef4444', fontSize: 10, fontWeight: '800' }}>🗑 Delete</Text>
+                        </TouchableOpacity>
                       </View>
                     </View>
                   );
@@ -921,6 +878,44 @@ export const SettingsView: React.FC = () => {
           </ScrollView>
         </View>
       )}
+
+      {/* Delete Confirmation Modal for Single Temporary Client */}
+      <ConfirmDeleteModal
+        visible={!!tempClientToDelete}
+        title="Delete Temporary Client"
+        itemTitle={tempClientToDelete?.name}
+        message={tempClientToDelete ? `You are about to permanently delete temporary client "${tempClientToDelete.name}". Any linked draft quotations will also be deleted.` : undefined}
+        onConfirm={async () => {
+          if (tempClientToDelete) {
+            try {
+              setError('');
+              await deleteTemporaryClientPermanent(tempClientToDelete.id);
+            } catch (e: any) {
+              setError(e.message);
+            }
+            setTempClientToDelete(null);
+          }
+        }}
+        onCancel={() => setTempClientToDelete(null)}
+      />
+
+      {/* Delete Confirmation Modal for Bulk Delete */}
+      <ConfirmDeleteModal
+        visible={showBulkDeleteModal}
+        title="Delete Temporary Clients"
+        message={`Are you sure you want to permanently delete all ${selectedTempClients.length} selected temporary clients? Any linked draft quotations will also be deleted.`}
+        onConfirm={async () => {
+          try {
+            setError('');
+            await bulkDeleteTemporaryClientsPermanent(selectedTempClients);
+            setSelectedTempClients([]);
+          } catch (e: any) {
+            setError(e.message);
+          }
+          setShowBulkDeleteModal(false);
+        }}
+        onCancel={() => setShowBulkDeleteModal(false)}
+      />
     </ScrollView>
   );
 };

@@ -6,6 +6,7 @@ import { CompanyContact } from '../../types';
 import { Colors, Spacing, Radius, Shadows } from '../../theme';
 import { SearchableDropdown } from '../ui/SearchableDropdown';
 import { PhoneInput } from '../ui/PhoneInput';
+import { DatePickerInput } from '../ui/DatePickerInput';
 
 interface ContactFormModalProps {
   visible: boolean;
@@ -46,6 +47,7 @@ export const ContactFormModal: React.FC<ContactFormModalProps> = ({
   const [whatsapp, setWhatsapp] = useState('');
   const [reportsToId, setReportsToId] = useState<string>('');
   const [notes, setNotes] = useState('');
+  const [dateOfBirth, setDateOfBirth] = useState('');
   const [error, setError] = useState('');
   const [profileImageUri, setProfileImageUri] = useState<string | null>(null);
   const { uploadCompanyContactProfileImage } = useERP();
@@ -74,6 +76,7 @@ export const ContactFormModal: React.FC<ContactFormModalProps> = ({
     setWhatsapp('');
     setReportsToId('');
     setNotes('');
+    setDateOfBirth('');
     setError('');
   };
 
@@ -90,6 +93,7 @@ export const ContactFormModal: React.FC<ContactFormModalProps> = ({
       setWhatsapp(contactToEdit.whatsapp || '');
       setReportsToId(contactToEdit.reportsToId || '');
       setNotes(contactToEdit.notes || '');
+      setDateOfBirth(contactToEdit.dateOfBirth || '');
     } else {
       resetForm();
     }
@@ -127,6 +131,7 @@ export const ContactFormModal: React.FC<ContactFormModalProps> = ({
       whatsapp: cleanWa,
       reportsToId: reportsToId || undefined,
       notes: notes.trim(),
+      dateOfBirth: dateOfBirth.trim() || undefined,
     });
 
     if (profileImageUri && !profileImageUri.startsWith('http')) {
@@ -269,6 +274,14 @@ export const ContactFormModal: React.FC<ContactFormModalProps> = ({
               keyboardType="email-address"
               value={email}
               onChangeText={setEmail}
+            />
+
+            {/* Date of Birth (Contact Birthday Celebrations) */}
+            <DatePickerInput
+              label="Date of Birth (Birthday Celebrations) 🎂"
+              placeholder="Select contact's birthday (YYYY-MM-DD)"
+              value={dateOfBirth}
+              onChangeDate={setDateOfBirth}
             />
 
             {/* Reporting Structure Selector ("Reports To") */}

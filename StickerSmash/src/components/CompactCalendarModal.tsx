@@ -4,6 +4,7 @@ import { useERP } from '../context/ERPContext';
 import { CalendarEvent, CalendarEventType } from '../types';
 import { Colors, Spacing, Radius, Shadows } from '../theme';
 import { EventDetailsModal } from './ui/EventDetailsModal';
+import { ConfirmDeleteModal } from './ui/ConfirmDeleteModal';
 
 interface CompactCalendarModalProps {
   visible: boolean;
@@ -15,6 +16,7 @@ export const CompactCalendarModal: React.FC<CompactCalendarModalProps> = ({ visi
   const isMobile = width < 768;
   const { clients, calendarEvents, companyImportantDates, createCalendarEvent, deleteCalendarEvent, deleteCompanyImportantDate } = useERP();
 
+  const [eventToDelete, setEventToDelete] = useState<{ id: string; title: string } | null>(null);
   const todayDateObj = new Date();
   const todayStr = todayDateObj.toISOString().split('T')[0];
 
@@ -118,7 +120,8 @@ export const CompactCalendarModal: React.FC<CompactCalendarModalProps> = ({ visi
   const selectedDateEvents = filteredEvents.filter((e) => getNormalizedDateStr(e.eventDate) === selectedDate);
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+    <>
+      <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <TouchableOpacity style={[styles.backdrop, isMobile && { padding: 10 }]} activeOpacity={1} onPress={onClose}>
         {/* Top-Right Dropdown Popover Modal Card */}
         <TouchableOpacity activeOpacity={1} style={[styles.popoverCard, isMobile && { padding: 12, maxWidth: '100%', maxHeight: '95%', right: 'auto' }]} onPress={(e) => e.stopPropagation()}>
@@ -312,7 +315,7 @@ export const CompactCalendarModal: React.FC<CompactCalendarModalProps> = ({ visi
                       <View style={[styles.badge, { backgroundColor: getTypeBadgeColor(evt.type) }]}>
                         <Text style={styles.badgeText}>{evt.type.replace('_', ' ')}</Text>
                       </View>
-                      <TouchableOpacity onPress={() => handleDeleteEvent(evt.id)}>
+                      <TouchableOpacity onPress={() => setEventToDelete({ id: evt.id, title: evt.title })}>
                         <Text style={styles.deleteText}>🗑 Delete</Text>
                       </TouchableOpacity>
                     </View>
@@ -332,10 +335,30 @@ export const CompactCalendarModal: React.FC<CompactCalendarModalProps> = ({ visi
           visible={!!viewingEvent}
           event={viewingEvent}
           onClose={() => setViewingEvent(null)}
-          onDelete={(id) => deleteCalendarEvent(id)}
+          onDelete={(id) => {
+            const ev = viewingEvent;
+            setViewingEvent(null);
+            setEventToDelete({ id, title: ev?.title || 'this event' });
+          }}
         />
       </TouchableOpacity>
     </Modal>
+
+    {/* Delete Event Confirmation Modal */}
+    <ConfirmDeleteModal
+      visible={!!eventToDelete}
+      title="Delete Calendar Event"
+      itemTitle={eventToDelete?.title}
+      message={eventToDelete ? `Are you sure you want to permanently delete event "${eventToDelete.title}"? This cannot be undone.` : undefined}
+      onConfirm={() => {
+        if (eventToDelete) {
+          handleDeleteEvent(eventToDelete.id);
+          setEventToDelete(null);
+        }
+      }}
+      onCancel={() => setEventToDelete(null)}
+    />
+    </>
   );
 };
 

@@ -9,7 +9,7 @@ import { SalesKPIDetailsModal } from '../dashboards/SalesKPIDetailsModal';
 import { QuotationSentModal } from '../quotations/QuotationSentModal';
 import { QuotationFollowUpModal } from '../quotations/QuotationFollowUpModal';
 import { QuotationConversionModal, QuotationConversionData } from '../quotations/QuotationConversionModal';
-
+import { ConfirmDeleteModal } from '../ui/ConfirmDeleteModal';
 import { ExportButton } from '../ui/ExportButton';
 import { ExportDataPayload } from '../../utils/exportUtils';
 import { formatDate } from '../../utils/formatUtils';
@@ -58,6 +58,7 @@ export const QuotationsView: React.FC<QuotationsViewProps> = ({ onOpenCreateQuot
   const isMobile = width < 768;
 
   const [expandedQuotations, setExpandedQuotations] = useState<Record<string, boolean>>({});
+  const [quotationToDelete, setQuotationToDelete] = useState<Quotation | null>(null);
 
   const toggleExpandQuotation = (id: string) => {
     setExpandedQuotations((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -651,11 +652,9 @@ export const QuotationsView: React.FC<QuotationsViewProps> = ({ onOpenCreateQuot
                         {isSuperAdmin && (
                           <TouchableOpacity
                             style={{ backgroundColor: 'rgba(239, 68, 68, 0.15)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: Radius.xs, borderWidth: 1, borderColor: '#ef4444', marginLeft: 4 }}
-                            onPress={async (e) => {
+                            onPress={(e) => {
                               e.stopPropagation();
-                              if (window.confirm(`Delete quotation ${q.quotationNumber}?`)) {
-                                await deleteQuotation(q.id);
-                              }
+                              setQuotationToDelete(q);
                             }}
                           >
                             <Text style={{ color: '#ef4444', fontSize: 10, fontWeight: '800' }}>🗑 Delete</Text>
@@ -949,6 +948,21 @@ export const QuotationsView: React.FC<QuotationsViewProps> = ({ onOpenCreateQuot
         activeTab={salesModalTab}
         onClose={() => setSalesModalVisible(false)}
         onSelectTab={setSalesModalTab}
+      />
+
+      {/* Delete Quotation Confirmation Modal */}
+      <ConfirmDeleteModal
+        visible={!!quotationToDelete}
+        title="Delete Quotation"
+        itemTitle={quotationToDelete?.quotationNumber}
+        message={quotationToDelete ? `You are about to permanently delete quotation "${quotationToDelete.quotationNumber}" for ${quotationToDelete.companyName}. This will remove all associated follow-ups and cannot be undone.` : undefined}
+        onConfirm={async () => {
+          if (quotationToDelete) {
+            await deleteQuotation(quotationToDelete.id);
+            setQuotationToDelete(null);
+          }
+        }}
+        onCancel={() => setQuotationToDelete(null)}
       />
     </ScrollView>
   );

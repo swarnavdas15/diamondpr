@@ -166,6 +166,13 @@ export const ContactDrawer: React.FC<ContactDrawerProps> = ({
                 <Text style={styles.infoLabel}>Email:</Text>
                 <Text style={styles.infoVal}>{contact.email || 'N/A'}</Text>
               </View>
+
+              {contact.dateOfBirth ? (
+                <View style={styles.infoRow}>
+                  <Text style={styles.infoLabel}>🎂 Date of Birth:</Text>
+                  <Text style={[styles.infoVal, { color: Colors.accentTeal, fontWeight: '700' }]}>{contact.dateOfBirth}</Text>
+                </View>
+              ) : null}
             </View>
 
             {/* Notes Section */}

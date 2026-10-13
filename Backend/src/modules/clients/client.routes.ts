@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { authenticateToken } from '../../middlewares/auth.middleware';
 import { requireRole } from '../../middlewares/role.middleware';
-import { handleCreateClient, handleListClients, handleUpdateClient, handleDeleteClient, handleUploadProfileImage, handleUploadPrimaryContactProfileImage, handleCreateCompanyContact, handleListCompanyContacts, handleUploadContactProfileImage, handlePromoteClient, handleDeleteTemporaryClientPermanent, handleBulkDeleteTemporaryClientsPermanent } from './client.controller';
+import { handleCreateClient, handleListClients, handleUpdateClient, handleDeleteClient, handleUploadProfileImage, handleUploadPrimaryContactProfileImage, handleCreateCompanyContact, handleListCompanyContacts, handleUpdateCompanyContact, handleDeleteCompanyContact, handleUploadContactProfileImage, handlePromoteClient, handleDeleteTemporaryClientPermanent, handleBulkDeleteTemporaryClientsPermanent } from './client.controller';
 import { uploadImage } from '../../middlewares/upload.middleware';
 
 const router = Router();
@@ -20,6 +20,8 @@ router.patch('/:id/primary-contact-image', authenticateToken, requireRole(['SUPE
 // Company Contacts
 router.post('/contacts', authenticateToken, requireRole(['SUPER_ADMIN', 'ADMIN', 'SALES']), handleCreateCompanyContact);
 router.get('/contacts', authenticateToken, handleListCompanyContacts);
+router.patch('/contacts/:contactId', authenticateToken, requireRole(['SUPER_ADMIN', 'ADMIN', 'SALES']), handleUpdateCompanyContact);
+router.delete('/contacts/:contactId', authenticateToken, requireRole(['SUPER_ADMIN', 'ADMIN', 'SALES']), handleDeleteCompanyContact);
 router.patch('/contacts/:contactId/profile-image', authenticateToken, requireRole(['SUPER_ADMIN', 'ADMIN', 'SALES']), uploadImage.single('profileImage'), handleUploadContactProfileImage);
 
 export default router;

@@ -120,7 +120,19 @@ export const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ isQCMo
     setSelectedProcessOrder(null);
   };
 
+  const isTerminalOrder = (ord: any) =>
+    ord.currentStage === 'COMPLETED' ||
+    ord.dispatchStatus === 'COMPLETED' ||
+    ord.status === 'COMPLETED' ||
+    ((ord.dispatchQuantity || 0) >= (ord.requiredQuantity || 0) && (ord.requiredQuantity || 0) > 0);
+
   const getComprehensiveBadge = (ord: any) => {
+    if (isTerminalOrder(ord)) {
+      return { label: '✓ Order Completed', bg: StatusColors.COMPLETED.bg, text: StatusColors.COMPLETED.text, border: StatusColors.COMPLETED.border };
+    }
+    if (ord.currentStage === 'DISPATCH' || ord.dispatchStatus === 'IN_PROGRESS') {
+      return { label: 'In Dispatch', bg: StatusColors.IN_PROGRESS.bg, text: StatusColors.IN_PROGRESS.text, border: StatusColors.IN_PROGRESS.border };
+    }
     if (ord.productionStatus !== 'COMPLETED') {
       if (ord.productionStatus === 'IN_PROGRESS') {
         return { label: 'Production In Progress', bg: StatusColors.IN_PROGRESS.bg, text: StatusColors.IN_PROGRESS.text, border: StatusColors.IN_PROGRESS.border };
@@ -147,17 +159,35 @@ export const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ isQCMo
   };
 
   const productionQueue = maskedOrders.filter(
-    (o) => o.productionRequired && ((o.purchaseQuantity || 0) > 0 || o.purchaseStatus === 'COMPLETED' || !o.purchaseRequired) && o.productionStatus !== 'COMPLETED'
+    (o) =>
+      !isTerminalOrder(o) &&
+      o.currentStage !== 'DISPATCH' &&
+      o.productionRequired &&
+      ((o.purchaseQuantity || 0) > 0 || o.purchaseStatus === 'COMPLETED' || !o.purchaseRequired) &&
+      o.productionStatus !== 'COMPLETED'
   );
   const qcQueue = maskedOrders.filter(
-    (o) => o.qualityTestingRequired && (o.productionStatus === 'COMPLETED' || (o.productionQuantity || 0) > (o.qcPassedQuantity || 0) || (o.qcFailedQuantity || 0) > 0) && (o.qualityStatus !== 'COMPLETED' || (o.qcFailedQuantity || 0) > 0)
+    (o) =>
+      !isTerminalOrder(o) &&
+      o.currentStage !== 'DISPATCH' &&
+      o.qualityTestingRequired &&
+      (o.productionStatus === 'COMPLETED' || (o.productionQuantity || 0) > (o.qcPassedQuantity || 0) || (o.qcFailedQuantity || 0) > 0) &&
+      (o.qualityStatus !== 'COMPLETED' || (o.qcFailedQuantity || 0) > 0)
   );
   // Rework Queue: orders returned from QC failure that are back in Production
   const reworkQueue = maskedOrders.filter(
-    (o) => o.currentStage === 'PRODUCTION' && (o.qcResult === 'FAILED' || o.qualityStatus === 'REJECTED') && o.productionRequired && o.productionStatus !== 'COMPLETED'
+    (o) =>
+      !isTerminalOrder(o) &&
+      o.currentStage !== 'DISPATCH' &&
+      (o.currentStage === 'PRODUCTION' || (o.reworkQuantity || 0) > 0) &&
+      (o.qcResult === 'FAILED' || o.qualityStatus === 'REJECTED' || (o.reworkQuantity || 0) > 0) &&
+      o.productionRequired &&
+      o.productionStatus !== 'COMPLETED'
   );
   const completedQueue = maskedOrders.filter(
-    (o) => o.productionRequired && (o.qualityTestingRequired ? o.qualityStatus === 'COMPLETED' : o.productionStatus === 'COMPLETED')
+    (o) =>
+      isTerminalOrder(o) ||
+      (o.productionRequired && (o.qualityTestingRequired ? o.qualityStatus === 'COMPLETED' : o.productionStatus === 'COMPLETED'))
   );
 
   return (

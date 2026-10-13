@@ -32,8 +32,9 @@ export const handleCreateClient = async (req: AuthRequest, res: Response) => {
 
 export const handleListClients = async (req: AuthRequest, res: Response) => {
   try {
+    const includeTemporary = req.query.includeTemporary === 'true';
     const temporaryOnly = req.query.temporaryOnly === 'true';
-    const clients = await clientService.listClients(temporaryOnly);
+    const clients = await clientService.listClients({ includeTemporary, temporaryOnly });
     return res.status(200).json({ clients });
   } catch (err: any) {
     console.error('List clients error:', err);
@@ -144,16 +145,38 @@ export const handleUploadPrimaryContactProfileImage = async (req: AuthRequest, r
 
 export const handleCreateCompanyContact = async (req: AuthRequest, res: Response) => {
   try {
-    const { companyId, fullName, designation, department, email, mobile, whatsapp, reportsToId, notes } = req.body;
+    const { companyId, fullName, designation, department, email, mobile, whatsapp, reportsToId, notes, dateOfBirth } = req.body;
     if (!companyId || !fullName) {
       return res.status(400).json({ error: 'companyId and fullName are required' });
     }
     const contact = await clientService.createCompanyContact({
-      companyId, fullName, designation, department, email, mobile, whatsapp, reportsToId, notes
+      companyId, fullName, designation, department, email, mobile, whatsapp, reportsToId, notes, dateOfBirth
     });
     return res.status(201).json({ message: 'Contact created', contact });
   } catch (err: any) {
     return res.status(400).json({ error: err.message || 'Failed to create contact' });
+  }
+};
+
+export const handleUpdateCompanyContact = async (req: AuthRequest, res: Response) => {
+  try {
+    const id = req.params.contactId as string;
+    const contact = await clientService.updateCompanyContact(id, req.body);
+    return res.status(200).json({ message: 'Contact updated successfully', contact });
+  } catch (err: any) {
+    console.error('Update contact error:', err);
+    return res.status(400).json({ error: err.message || 'Failed to update contact' });
+  }
+};
+
+export const handleDeleteCompanyContact = async (req: AuthRequest, res: Response) => {
+  try {
+    const id = req.params.contactId as string;
+    await clientService.deleteCompanyContact(id);
+    return res.status(200).json({ success: true, message: 'Contact deleted successfully' });
+  } catch (err: any) {
+    console.error('Delete contact error:', err);
+    return res.status(400).json({ error: err.message || 'Failed to delete contact' });
   }
 };
 

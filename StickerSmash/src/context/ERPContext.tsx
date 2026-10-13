@@ -39,8 +39,8 @@ interface ERPContextType {
   companyContacts: CompanyContact[];
   addCompanyContact: (contact: Omit<CompanyContact, 'id' | 'createdAt'>) => Promise<CompanyContact>;
   uploadCompanyContactProfileImage: (contactId: string, uri: string, name: string, type: string) => Promise<void>;
-  updateCompanyContact: (id: string, data: Partial<CompanyContact>) => void;
-  deleteCompanyContact: (id: string) => void;
+  updateCompanyContact: (id: string, data: Partial<CompanyContact>) => Promise<void>;
+  deleteCompanyContact: (id: string) => Promise<void>;
   companyImportantDates: CompanyImportantDate[];
   addCompanyImportantDate: (data: Omit<CompanyImportantDate, 'id' | 'createdAt'>) => CompanyImportantDate;
   deleteCompanyImportantDate: (id: string) => void;
@@ -53,7 +53,7 @@ interface ERPContextType {
 
   createQuotation: (data: {
     companyName: string;
-    clientCode: string;
+    clientCode?: string;
     clientId?: string;
     contactPerson: string;
     mobileNumber: string;
@@ -895,6 +895,27 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     });
 
+    // Contact Person Birthdays
+    companyContacts.forEach(ct => {
+      if (ct.dateOfBirth) {
+        const rawDob = String(ct.dateOfBirth).split('T')[0];
+        const dobParts = rawDob.split('-');
+        if (dobParts.length === 3) {
+          const monthDay = `${dobParts[1]}-${dobParts[2]}`;
+          const currentYearDob = `${currentYear}-${monthDay}`;
+          const parentCompany = clients.find(cl => cl.id === ct.companyId)?.companyName || 'Company Contact';
+          birthdayEvents.push({
+            id: `dob-ct-${ct.id}`,
+            title: `🎂 Birthday: ${ct.fullName} (${ct.designation || 'Contact'})`,
+            type: 'BIRTHDAY',
+            eventDate: currentYearDob,
+            description: `Contact Person Date of Birth at ${parentCompany} (Born ${rawDob})`,
+            createdByName: 'System',
+          });
+        }
+      }
+    });
+
     // 5. Company Important Dates
     const companyDateEvents: CalendarEvent[] = (companyImportantDates || []).map(d => ({
       id: `cid-${d.id}`,
@@ -925,7 +946,7 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     ];
 
     return combined.sort((a, b) => new Date(a.eventDate).getTime() - new Date(b.eventDate).getTime());
-  }, [calendarEvents, quotations, tasks, clients, temporaryClients, companyImportantDates, orders]);
+  }, [calendarEvents, quotations, tasks, clients, temporaryClients, companyContacts, companyImportantDates, orders]);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
 
   // Live Backend Fetch
@@ -983,6 +1004,7 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             };
           })
         : [];
+      setTemporaryClients(normalizedTempClients);
       const rawOrders = ordersRes?.data?.orders || ordersRes?.data || [];
       const normalizedOrders = Array.isArray(rawOrders)
         ? rawOrders.map((ord: any) => {
@@ -1014,10 +1036,26 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                 })
               : [];
 
+            const isDispatched =
+              ord.status === 'COMPLETED' ||
+              ord.dispatchStatus === 'COMPLETED' ||
+              ord.currentStage === 'COMPLETED' ||
+              ((ord.dispatchQuantity || 0) >= (ord.requiredQuantity || 0) && (ord.requiredQuantity || 0) > 0);
+
             let effectiveStage = ord.currentStage;
-            if (!effectiveStage || effectiveStage === 'QUOTATION' || effectiveStage === 'SALES') {
-              if (ord.status === 'COMPLETED' || ord.dispatchStatus === 'COMPLETED') effectiveStage = 'COMPLETED';
-              else if (ord.purchaseRequired && ord.purchaseStatus !== 'COMPLETED') effectiveStage = 'PURCHASE';
+            let effDispatchStatus = ord.dispatchStatus;
+            let effProductionStatus = ord.productionStatus;
+            let effQualityStatus = ord.qualityStatus;
+            let effReworkQuantity = ord.reworkQuantity || 0;
+
+            if (isDispatched) {
+              effectiveStage = 'COMPLETED';
+              effDispatchStatus = 'COMPLETED';
+              effProductionStatus = 'COMPLETED';
+              effQualityStatus = 'COMPLETED';
+              effReworkQuantity = 0;
+            } else if (!effectiveStage || effectiveStage === 'QUOTATION' || effectiveStage === 'SALES') {
+              if (ord.purchaseRequired && ord.purchaseStatus !== 'COMPLETED') effectiveStage = 'PURCHASE';
               else if (ord.productionRequired && ord.productionStatus !== 'COMPLETED') effectiveStage = 'CUTTING';
               else if (ord.qualityTestingRequired && ord.qualityStatus !== 'COMPLETED') effectiveStage = 'TESTING';
               else effectiveStage = 'DISPATCH';
@@ -1035,14 +1073,32 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
             return {
               ...ord,
+              status: isDispatched ? 'COMPLETED' : ord.status,
               salesWorkflowStage: normalizedSalesWorkflow,
               currentStage: effectiveStage,
+              dispatchStatus: effDispatchStatus,
+              productionStatus: effProductionStatus,
+              qualityStatus: effQualityStatus,
+              reworkQuantity: effReworkQuantity,
               purchaseBatches: normalizedBatches,
             };
           })
         : [];
       setOrders(normalizedOrders);
-      setCompanyContacts(contactsRes?.data?.contacts || contactsRes?.data || []);
+      const rawContacts = contactsRes?.data?.contacts || contactsRes?.data || [];
+      const normalizedContacts = Array.isArray(rawContacts)
+        ? rawContacts.map((ct: any) => {
+            const match = (ct.notes || '').match(/\[DOB:([\d\-]+)\]/);
+            const dob = ct.dateOfBirth || (match ? match[1] : undefined);
+            const cleanNotes = (ct.notes || '').replace(/\[DOB:[\d\-]+\]\s*/, '').trim();
+            return {
+              ...ct,
+              dateOfBirth: dob,
+              notes: cleanNotes || ct.notes,
+            };
+          })
+        : [];
+      setCompanyContacts(normalizedContacts);
       setQuotations(quotationsRes?.data?.quotations || quotationsRes?.data || []);
       if (vendorsRes && vendorsRes.data && (vendorsRes.data.vendors || Array.isArray(vendorsRes.data))) {
         setVendors(vendorsRes.data.vendors || vendorsRes.data);
@@ -1104,14 +1160,26 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  const updateCompanyContact = (id: string, data: Partial<CompanyContact>) => {
-    setCompanyContacts((prev) =>
-      prev.map((c) => (c.id === id ? { ...c, ...data } : c))
-    );
+  const updateCompanyContact = async (id: string, data: Partial<CompanyContact>) => {
+    try {
+      await apiClient.patch(`/clients/contacts/${id}`, data);
+      await fetchLiveDashboardData();
+    } catch (e) {
+      console.error('Failed to update company contact:', e);
+      setCompanyContacts((prev) =>
+        prev.map((c) => (c.id === id ? { ...c, ...data } : c))
+      );
+    }
   };
 
-  const deleteCompanyContact = (id: string) => {
-    setCompanyContacts((prev) => prev.filter((c) => c.id !== id));
+  const deleteCompanyContact = async (id: string) => {
+    try {
+      await apiClient.delete(`/clients/contacts/${id}`);
+      await fetchLiveDashboardData();
+    } catch (e) {
+      console.error('Failed to delete company contact:', e);
+      setCompanyContacts((prev) => prev.filter((c) => c.id !== id));
+    }
   };
 
   const createVendor = async (data: Omit<Vendor, 'id' | 'createdAt'>): Promise<Vendor> => {

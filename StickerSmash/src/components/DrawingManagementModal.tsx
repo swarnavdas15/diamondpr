@@ -4,6 +4,7 @@ import { View, Text, Modal, TouchableOpacity, ScrollView, TextInput, StyleSheet,
 import { useERP } from '../context/ERPContext';
 import { DrawingStatus, OrderDrawing } from '../types';
 import { Colors, StatusColors, Spacing, Radius, Shadows } from '../theme';
+import { ConfirmDeleteModal } from './ui/ConfirmDeleteModal';
 
 interface DrawingManagementModalProps {
   visible: boolean;
@@ -17,6 +18,7 @@ export const DrawingManagementModal: React.FC<DrawingManagementModalProps> = ({ 
   const { orders, uploadOrderDrawing, updateDrawingStatus, deleteOrderDrawing } = useERP();
   const order = orders.find((o) => o.id === orderId);
 
+  const [drawingToDelete, setDrawingToDelete] = useState<OrderDrawing | null>(null);
   const [drawingNumber, setDrawingNumber] = useState('');
   const [drawingName, setDrawingName] = useState('');
   const [fileName, setFileName] = useState('');
@@ -66,7 +68,8 @@ export const DrawingManagementModal: React.FC<DrawingManagementModalProps> = ({ 
   };
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+    <>
+      <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <TouchableOpacity style={[styles.backdrop, isMobile && { padding: 10 }]} activeOpacity={1} onPress={onClose}>
         <TouchableOpacity activeOpacity={1} style={[styles.modalContainer, isMobile && { padding: 14, maxHeight: '95%' }]} onPress={(e) => e.stopPropagation()}>
           {/* Header */}
@@ -238,7 +241,7 @@ export const DrawingManagementModal: React.FC<DrawingManagementModalProps> = ({ 
 
                       <TouchableOpacity
                         style={[styles.statusBtn, styles.btnDelete]}
-                        onPress={() => deleteOrderDrawing(orderId, drw.id)}
+                        onPress={() => setDrawingToDelete(drw)}
                       >
                         <Text style={styles.statusBtnText}>🗑 Delete</Text>
                       </TouchableOpacity>
@@ -272,6 +275,21 @@ export const DrawingManagementModal: React.FC<DrawingManagementModalProps> = ({ 
         </TouchableOpacity>
       </TouchableOpacity>
     </Modal>
+
+    <ConfirmDeleteModal
+      visible={!!drawingToDelete}
+      title="Delete Drawing Record"
+      itemTitle={drawingToDelete?.drawingName || drawingToDelete?.drawingNumber}
+      message={drawingToDelete ? `You are about to permanently delete drawing "${drawingToDelete.drawingNumber} - ${drawingToDelete.drawingName}". This cannot be undone.` : undefined}
+      onConfirm={() => {
+        if (drawingToDelete) {
+          deleteOrderDrawing(orderId, drawingToDelete.id);
+          setDrawingToDelete(null);
+        }
+      }}
+      onCancel={() => setDrawingToDelete(null)}
+    />
+    </>
   );
 };
 

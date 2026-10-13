@@ -17,7 +17,12 @@ export const DispatchDashboard: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'PENDING' | 'COMPLETED'>('PENDING');
 
   const pendingDispatch = getMaskedOrders().filter((o) => {
-    if (!o.dispatchRequired || o.dispatchStatus === 'COMPLETED') return false;
+    if (
+      !o.dispatchRequired ||
+      o.dispatchStatus === 'COMPLETED' ||
+      o.currentStage === 'COMPLETED' ||
+      ((o.dispatchQuantity || 0) >= (o.requiredQuantity || 0) && (o.requiredQuantity || 0) > 0)
+    ) return false;
     if (o.qualityTestingRequired) {
       // STRICT LOCK: Order can only be dispatched if testing is 100% completed,
       // all required items passed, AND fail count is strictly 0!
@@ -34,7 +39,11 @@ export const DispatchDashboard: React.FC = () => {
 
   const completedDispatch = getMaskedOrders().filter((o) => {
     if (!o.dispatchRequired) return false;
-    return o.dispatchStatus === 'COMPLETED' || (o.dispatchQuantity || 0) > 0;
+    return (
+      o.dispatchStatus === 'COMPLETED' ||
+      o.currentStage === 'COMPLETED' ||
+      ((o.dispatchQuantity || 0) >= (o.requiredQuantity || 0) && (o.requiredQuantity || 0) > 0)
+    );
   });
 
   const maskedOrders = activeTab === 'PENDING' ? pendingDispatch : completedDispatch;

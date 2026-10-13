@@ -138,6 +138,7 @@ export interface CompanyContact {
   profileImage?: string;
   reportsToId?: string;
   notes?: string;
+  dateOfBirth?: string;
   createdAt?: string;
 }
 

@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, Modal, TextInput, ScrollView, StyleSheet 
 import { CompanyImportantDate, CompanyDateType } from '../../types';
 import { Colors, Spacing, Radius, Shadows } from '../../theme';
 import { DatePickerInput } from '../ui/DatePickerInput';
+import { ConfirmDeleteModal } from '../ui/ConfirmDeleteModal';
 
 interface CompanyImportantDatesProps {
   companyId: string;
@@ -29,6 +30,7 @@ export const CompanyImportantDates: React.FC<CompanyImportantDatesProps> = ({
   onAddImportantDate,
   onDeleteImportantDate,
 }) => {
+  const [dateToDelete, setDateToDelete] = useState<CompanyImportantDate | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [title, setTitle] = useState('');
   const [dateType, setDateType] = useState<CompanyDateType>('CONTRACT_RENEWAL');
@@ -129,7 +131,7 @@ export const CompanyImportantDates: React.FC<CompanyImportantDatesProps> = ({
                   {canManage && (
                     <TouchableOpacity
                       style={styles.deleteTouch}
-                      onPress={() => onDeleteImportantDate(item.id)}
+                      onPress={() => setDateToDelete(item)}
                     >
                       <Text style={styles.deleteText}>🗑 Delete</Text>
                     </TouchableOpacity>
@@ -201,6 +203,21 @@ export const CompanyImportantDates: React.FC<CompanyImportantDatesProps> = ({
           </TouchableOpacity>
         </TouchableOpacity>
       </Modal>
+
+      {/* Delete Reminder Confirmation Modal */}
+      <ConfirmDeleteModal
+        visible={!!dateToDelete}
+        title="Delete Reminder / Date"
+        itemTitle={dateToDelete?.title}
+        message={dateToDelete ? `Are you sure you want to permanently delete the reminder "${dateToDelete.title}"?` : undefined}
+        onConfirm={() => {
+          if (dateToDelete) {
+            onDeleteImportantDate(dateToDelete.id);
+            setDateToDelete(null);
+          }
+        }}
+        onCancel={() => setDateToDelete(null)}
+      />
     </View>
   );
 };

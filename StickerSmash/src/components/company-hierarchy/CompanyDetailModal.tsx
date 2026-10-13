@@ -10,6 +10,7 @@ import { ContactFormModal } from './ContactFormModal';
 import { ContactDrawer } from './ContactDrawer';
 import { CompanyImportantDates } from './CompanyImportantDates';
 import { Colors, Spacing, Radius, Shadows } from '../../theme';
+import { ConfirmDeleteModal } from '../ui/ConfirmDeleteModal';
 
 interface CompanyDetailModalProps {
   visible: boolean;
@@ -46,6 +47,7 @@ export const CompanyDetailModal: React.FC<CompanyDetailModalProps> = ({
 
   const [drawerVisible, setDrawerVisible] = useState(false);
   const [selectedContact, setSelectedContact] = useState<CompanyContact | null>(null);
+  const [contactToDelete, setContactToDelete] = useState<CompanyContact | null>(null);
 
   if (!client) return null;
 
@@ -94,11 +96,13 @@ export const CompanyDetailModal: React.FC<CompanyDetailModalProps> = ({
   };
 
   const handleDeleteContact = (contactId: string) => {
-    deleteCompanyContact(contactId);
+    const found = clientContacts.find((c) => c.id === contactId);
+    setContactToDelete(found || ({ id: contactId, fullName: 'this contact' } as any));
   };
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+    <>
+      <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <TouchableOpacity style={[styles.backdrop, isMobile && { padding: 10 }]} activeOpacity={1} onPress={onClose}>
         <TouchableOpacity activeOpacity={1} style={[styles.card, isMobile && { padding: 14, maxHeight: '95%' }]} onPress={(e) => e.stopPropagation()}>
           {/* Header Banner */}
@@ -236,6 +240,23 @@ export const CompanyDetailModal: React.FC<CompanyDetailModalProps> = ({
         </TouchableOpacity>
       </TouchableOpacity>
     </Modal>
+
+    <ConfirmDeleteModal
+      visible={!!contactToDelete}
+      title="Delete Contact Record"
+      itemTitle={contactToDelete?.fullName}
+      message={contactToDelete ? `You are about to permanently delete contact "${contactToDelete.fullName}". This cannot be undone.` : undefined}
+      onConfirm={() => {
+        if (contactToDelete) {
+          deleteCompanyContact(contactToDelete.id);
+          setContactToDelete(null);
+          setDrawerVisible(false);
+          setSelectedContact(null);
+        }
+      }}
+      onCancel={() => setContactToDelete(null)}
+    />
+    </>
   );
 };
 

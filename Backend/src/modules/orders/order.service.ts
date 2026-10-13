@@ -310,11 +310,20 @@ export const parseBatchRemarks = (rawRemarks?: string | null, rawQtyReceived?: n
 export const formatOrderWithBatches = (order: any) => {
   if (!order) return order;
 
-  // Resolve legacy or invalid QUOTATION stage to active manufacturing/procurement stage
-  if (!order.currentStage || order.currentStage === 'QUOTATION' || order.currentStage === 'SALES') {
-    if (order.status === 'COMPLETED' || order.dispatchStatus === 'COMPLETED') {
-      order.currentStage = 'COMPLETED';
-    } else if (order.purchaseRequired && order.purchaseStatus !== 'COMPLETED') {
+  const isDispatched =
+    order.status === 'COMPLETED' ||
+    order.dispatchStatus === 'COMPLETED' ||
+    order.currentStage === 'COMPLETED' ||
+    ((order.dispatchQuantity || 0) >= (order.requiredQuantity || 0) && (order.requiredQuantity || 0) > 0);
+
+  if (isDispatched) {
+    order.currentStage = 'COMPLETED';
+    order.dispatchStatus = 'COMPLETED';
+    order.productionStatus = 'COMPLETED';
+    order.qualityStatus = 'COMPLETED';
+    order.reworkQuantity = 0;
+  } else if (!order.currentStage || order.currentStage === 'QUOTATION' || order.currentStage === 'SALES') {
+    if (order.purchaseRequired && order.purchaseStatus !== 'COMPLETED') {
       order.currentStage = 'PURCHASE';
     } else if (order.productionRequired && order.productionStatus !== 'COMPLETED') {
       order.currentStage = 'CUTTING';
@@ -675,8 +684,16 @@ export const updateProductionStage = async (id: string, status: string, userId: 
     currentStage: nextStage
   };
   if (notes !== undefined) updateData.shopFloorNotes = notes;
-  if (processedQty !== undefined) updateData.productionQuantity = Math.round(Number(order.productionQuantity || 0) + Number(processedQty));
-  if (isRework !== undefined) updateData.reworkQuantity = Math.round(Number(order.reworkQuantity || 0) + Number(processedQty || 0));
+  if (isRework) {
+    const curRework = Math.round(Number(order.reworkQuantity || 0));
+    const processed = Math.round(Number(processedQty || 0));
+    updateData.reworkQuantity = Math.max(0, curRework - processed);
+  } else if (processedQty !== undefined) {
+    updateData.productionQuantity = Math.round(Number(order.productionQuantity || 0) + Number(processedQty));
+  }
+  if (status === 'COMPLETED') {
+    updateData.reworkQuantity = 0;
+  }
   await db.orm.public.Order.where({ id: dbId(id) }).update(updateData);
   await updateSalesWorkflowStage(id, nextStage, userId, notes);
   return await getOrderById(id);
@@ -748,13 +765,29 @@ export const updateQualityStage = async (
 };
 export const updateDispatchStage = async (id: string, status: string, userId: string, notes?: string, processedQty?: number, logisticsEntry?: string, transportRef?: string) => {
   const ord = await db.orm.public.Order.where({ id: dbId(id) }).first();
-  const nextStage = status === 'COMPLETED' ? 'COMPLETED' : 'DISPATCH';
+  if (!ord) throw new Error('Order not found');
+  const newDispatchQty = processedQty !== undefined 
+    ? Math.round(Number(ord.dispatchQuantity || 0) + Number(processedQty))
+    : Math.round(Number(ord.dispatchQuantity || 0));
+  const isFullyDispatched = status === 'COMPLETED' || (newDispatchQty >= (ord.requiredQuantity || 0) && (ord.requiredQuantity || 0) > 0);
+  const nextStage = isFullyDispatched ? 'COMPLETED' : 'DISPATCH';
+  const finalStatus = isFullyDispatched ? 'COMPLETED' : status;
+
   const updateData: any = {
-    dispatchStatus: status,
+    dispatchStatus: finalStatus,
     currentStage: nextStage
   };
+  if (processedQty !== undefined) {
+    updateData.dispatchQuantity = newDispatchQty;
+  }
+  if (isFullyDispatched) {
+    updateData.currentStage = 'COMPLETED';
+    updateData.dispatchStatus = 'COMPLETED';
+    updateData.productionStatus = 'COMPLETED';
+    updateData.qualityStatus = 'COMPLETED';
+    updateData.reworkQuantity = 0;
+  }
   if (notes !== undefined) updateData.dispatchNotes = notes;
-  if (processedQty !== undefined) { updateData.dispatchQuantity = Math.round(Number(ord?.dispatchQuantity || 0) + Number(processedQty)); }
   if (logisticsEntry !== undefined) updateData.logisticsEntry = logisticsEntry;
   if (transportRef !== undefined) updateData.transportRef = transportRef;
   await db.orm.public.Order.where({ id: dbId(id) }).update(updateData);
@@ -762,7 +795,13 @@ export const updateDispatchStage = async (id: string, status: string, userId: st
   return await getOrderById(id);
 };
 export const verifyAndCompleteOrder = async (id: string, userId: string, remarks?: string) => {
-  await db.orm.public.Order.where({ id: dbId(id) }).update({ currentStage: 'COMPLETED' });
+  await db.orm.public.Order.where({ id: dbId(id) }).update({
+    currentStage: 'COMPLETED',
+    dispatchStatus: 'COMPLETED',
+    productionStatus: 'COMPLETED',
+    qualityStatus: 'COMPLETED',
+    reworkQuantity: 0,
+  });
   await updateSalesWorkflowStage(id, 'COMPLETED', userId, remarks);
   return await getOrderById(id);
 };

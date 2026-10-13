@@ -10,7 +10,12 @@ export const getOrderActiveStage = (order: Order): string => {
   if (!order) return 'PENDING';
 
   // 1. Fully Completed or Shipped
-  if (order.status === 'COMPLETED' || order.dispatchStatus === 'COMPLETED') {
+  if (
+    order.status === 'COMPLETED' ||
+    order.dispatchStatus === 'COMPLETED' ||
+    order.currentStage === 'COMPLETED' ||
+    ((order.dispatchQuantity || 0) >= (order.requiredQuantity || 0) && (order.requiredQuantity || 0) > 0)
+  ) {
     return 'COMPLETED';
   }
 
