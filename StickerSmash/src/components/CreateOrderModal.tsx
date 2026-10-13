@@ -695,17 +695,20 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ visible, onC
               </View>
             </View>
 
-            <View style={{ flexDirection: 'row', gap: 12, marginTop: 12 }}>
-              {orderToEdit && (
-                <TouchableOpacity
-                  style={[styles.submitBtn, { flex: 1, backgroundColor: Colors.inputBg, borderWidth: 1, borderColor: Colors.borderDark }]}
-                  onPress={handleClose}
-                >
-                  <Text style={[styles.submitBtnText, { color: Colors.textMuted }]}>Cancel</Text>
-                </TouchableOpacity>
-              )}
-              <TouchableOpacity style={[styles.submitBtn, orderToEdit ? { flex: 1 } : {}]} onPress={handleSubmit}>
-                <Text style={styles.submitBtnText}>{orderToEdit ? 'Save Changes' : 'Initiate Order with Configured Pipeline'}</Text>
+            <View style={[styles.footerRow, isMobile && styles.footerRowMobile]}>
+              <TouchableOpacity
+                style={[styles.cancelBtn, isMobile && { width: '100%' }]}
+                onPress={handleClose}
+              >
+                <Text style={styles.cancelBtnText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.submitBtn, { flex: isMobile ? undefined : 2 }, isMobile && { width: '100%' }]}
+                onPress={handleSubmit}
+              >
+                <Text style={styles.submitBtnText}>
+                  {orderToEdit ? '✓ Save Changes' : '🚀 Initiate Order with Configured Pipeline'}
+                </Text>
               </TouchableOpacity>
             </View>
           </ScrollView>
@@ -960,18 +963,50 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginBottom: 8,
   },
+  footerRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 20,
+    marginBottom: 8,
+    alignItems: 'center',
+  },
+  footerRowMobile: {
+    flexDirection: 'column-reverse',
+    gap: 10,
+  },
+  cancelBtn: {
+    flex: 1,
+    backgroundColor: Colors.inputBg,
+    borderWidth: 1,
+    borderColor: Colors.borderDark,
+    borderRadius: Radius.md,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 48,
+  },
+  cancelBtnText: {
+    color: Colors.textMuted,
+    fontSize: 13.5,
+    fontWeight: '700',
+  },
   submitBtn: {
     backgroundColor: Colors.industrialOrange,
-    borderRadius: 8,
-    paddingVertical: 12,
+    borderRadius: Radius.md,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
     alignItems: 'center',
-    marginTop: 12,
+    justifyContent: 'center',
+    minHeight: 48,
     ...Shadows.glowOrange,
   },
   submitBtnText: {
     color: Colors.white,
-    fontSize: 13,
+    fontSize: 13.5,
     fontWeight: '800',
+    textAlign: 'center',
+    letterSpacing: 0.3,
   },
   customizerHeaderRow: {
     flexDirection: 'row',

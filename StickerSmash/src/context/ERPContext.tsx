@@ -1061,6 +1061,19 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               else effectiveStage = 'DISPATCH';
             }
 
+            const isOrderStarted =
+              (ord.purchaseQuantity || 0) > 0 ||
+              (ord.productionQuantity || 0) > 0 ||
+              (ord.qcQuantity || 0) > 0 ||
+              (ord.dispatchQuantity || 0) > 0 ||
+              ord.purchaseStatus === 'COMPLETED' ||
+              ord.purchaseStatus === 'IN_PROGRESS' ||
+              ord.productionStatus === 'COMPLETED' ||
+              ord.productionStatus === 'IN_PROGRESS' ||
+              ['PURCHASE', 'CUTTING', 'FORGING', 'MACHINING', 'HEAT_TREATMENT', 'PRODUCTION', 'TESTING', 'DISPATCH'].includes(effectiveStage);
+
+            const resolvedStatus = isDispatched ? 'COMPLETED' : (isOrderStarted ? 'IN_PROGRESS' : (ord.status || 'PENDING'));
+
             let normalizedSalesWorkflow = ord.salesWorkflowStage || 'ORDER_CONFIRMED';
             if (
               normalizedSalesWorkflow === 'QUOTATION' ||
@@ -1073,7 +1086,7 @@ export const ERPProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
             return {
               ...ord,
-              status: isDispatched ? 'COMPLETED' : ord.status,
+              status: resolvedStatus,
               salesWorkflowStage: normalizedSalesWorkflow,
               currentStage: effectiveStage,
               dispatchStatus: effDispatchStatus,

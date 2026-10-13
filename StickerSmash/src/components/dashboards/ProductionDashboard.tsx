@@ -22,7 +22,7 @@ export const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ isQCMo
 
   const [shopFloorNotesMap, setShopFloorNotesMap] = useState<{ [key: string]: string }>({});
   const [qcRemarksMap, setQcRemarksMap] = useState<{ [key: string]: string }>({});
-  const [activeTab, setActiveTab] = useState<'PRODUCTION' | 'QUALITY_TESTING' | 'REWORK'>(isQCMode ? 'QUALITY_TESTING' : 'PRODUCTION');
+  const [activeTab, setActiveTab] = useState<'PRODUCTION' | 'QUALITY_TESTING'>(isQCMode ? 'QUALITY_TESTING' : 'PRODUCTION');
 
   const [processModalVisible, setProcessModalVisible] = useState(false);
   const [selectedProcessOrder, setSelectedProcessOrder] = useState<Order | null>(null);
@@ -174,16 +174,7 @@ export const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ isQCMo
       (o.productionStatus === 'COMPLETED' || (o.productionQuantity || 0) > (o.qcPassedQuantity || 0) || (o.qcFailedQuantity || 0) > 0) &&
       (o.qualityStatus !== 'COMPLETED' || (o.qcFailedQuantity || 0) > 0)
   );
-  // Rework Queue: orders returned from QC failure that are back in Production
-  const reworkQueue = maskedOrders.filter(
-    (o) =>
-      !isTerminalOrder(o) &&
-      o.currentStage !== 'DISPATCH' &&
-      (o.currentStage === 'PRODUCTION' || (o.reworkQuantity || 0) > 0) &&
-      (o.qcResult === 'FAILED' || o.qualityStatus === 'REJECTED' || (o.reworkQuantity || 0) > 0) &&
-      o.productionRequired &&
-      o.productionStatus !== 'COMPLETED'
-  );
+
   const completedQueue = maskedOrders.filter(
     (o) =>
       isTerminalOrder(o) ||
@@ -230,18 +221,6 @@ export const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ isQCMo
             🔍 Quality ({qcQueue.length})
           </Text>
         </TouchableOpacity>
-
-        {reworkQueue.length > 0 && (
-          <TouchableOpacity
-            style={[styles.tabBtn, activeTab === 'REWORK' && { backgroundColor: '#ef4444', borderColor: '#ef4444' }]}
-            onPress={() => setActiveTab('REWORK')}
-          >
-            <Text style={[styles.tabText, activeTab === 'REWORK' && styles.tabTextActive]}>
-              🔁 Rework ({reworkQueue.length})
-            </Text>
-          </TouchableOpacity>
-        )}
-
       </View>
 
       {/* SECTION 1: PRODUCTION WORK ORDERS QUEUE */}
@@ -435,64 +414,6 @@ export const ProductionDashboard: React.FC<ProductionDashboardProps> = ({ isQCMo
                 </View>
               );
             })
-          )}
-        </View>
-      )}
-
-      {/* SECTION 3: REWORK QUEUE — Orders returned from QC failure */}
-      {(activeTab as string) === 'REWORK' && (
-        <View style={[styles.sectionCard, { borderColor: '#ef4444' }]}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: Spacing.md, gap: Spacing.sm }}>
-            <Text style={[styles.sectionTitle, { color: '#ef4444', flex: 1, marginBottom: 0 }]}>
-              🔁 QC Failed — Production Rework Queue
-            </Text>
-            <View style={{ backgroundColor: 'rgba(239, 68, 68, 0.15)', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, borderWidth: 1, borderColor: '#ef4444' }}>
-              <Text style={{ color: '#ef4444', fontSize: 11, fontWeight: '800' }}>{reworkQueue.length} ORDERS</Text>
-            </View>
-          </View>
-          {reworkQueue.length === 0 ? (
-            <Text style={styles.emptyText}>✅ No rework required. All orders are on track.</Text>
-          ) : (
-            reworkQueue.map((ord) => (
-              <View key={ord.id} style={[styles.orderCard, { borderLeftColor: '#ef4444', borderLeftWidth: 4 }]}>
-                <TouchableOpacity onPress={() => setSelectedOrder(ord)}>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                    <Text style={{ color: Colors.textLight, fontWeight: '800', fontSize: 14 }}>{ord.orderNumber}</Text>
-                    <View style={{ backgroundColor: 'rgba(239, 68, 68, 0.15)', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, borderWidth: 1, borderColor: '#ef4444' }}>
-                      <Text style={{ color: '#ef4444', fontSize: 10, fontWeight: '800' }}>🔁 REWORK REQUIRED</Text>
-                    </View>
-                  </View>
-                  <Text style={{ color: Colors.textSubtle, fontSize: 12 }}>PO: {ord.poNumber} • Client: {ord.clientCode}</Text>
-                </TouchableOpacity>
-
-                <OrderQuantityTracker order={ord} style={{ marginTop: 8 }} />
-
-                <View style={{ marginTop: 8, backgroundColor: 'rgba(239, 68, 68, 0.07)', borderRadius: 8, padding: 10 }}>
-                  <Text style={{ color: '#ef4444', fontSize: 11, fontWeight: '800', marginBottom: 4 }}>⚠️ QC FAILURE DETAILS</Text>
-                  <Text style={{ color: Colors.textSubtle, fontSize: 12 }}>
-                    QC Result: <Text style={{ fontWeight: '700', color: '#ef4444' }}>FAILED</Text>
-                  </Text>
-                  <Text style={{ color: Colors.textSubtle, fontSize: 12 }}>
-                    QC Remarks: {ord.qcRemarks || 'Defects found during quality inspection. Rework required.'}
-                  </Text>
-                  {ord.qcFailedQuantity != null && ord.qcFailedQuantity > 0 && (
-                    <Text style={{ color: Colors.textSubtle, fontSize: 12, marginTop: 3 }}>
-                      Failed Qty: <Text style={{ fontWeight: '700', color: '#ef4444' }}>{ord.qcFailedQuantity} PCS</Text>
-                      {ord.qcPassedQuantity != null && ord.qcPassedQuantity > 0 && (
-                        <Text style={{ color: '#10b981' }}> | Passed: {ord.qcPassedQuantity} PCS (dispatch eligible)</Text>
-                      )}
-                    </Text>
-                  )}
-                </View>
-
-                <TouchableOpacity
-                  style={[styles.actionBtn, { backgroundColor: '#ef4444', marginTop: 8 }]}
-                  onPress={() => handleOpenProcessModal(ord, 'PRODUCTION', true)}
-                >
-                  <Text style={styles.actionBtnText}>🔧 Record Rework Progress</Text>
-                </TouchableOpacity>
-              </View>
-            ))
           )}
         </View>
       )}

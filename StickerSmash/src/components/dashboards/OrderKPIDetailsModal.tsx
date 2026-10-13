@@ -32,15 +32,32 @@ export const OrderKPIDetailsModal: React.FC<OrderKPIDetailsModalProps> = ({
 
   const orders = getMaskedOrders();
   const totalOrders = orders.length;
-  const activeOrders = orders.filter((o) => o.status === 'IN_PROGRESS');
-  const completedOrders = orders.filter((o) => o.status === 'COMPLETED');
+
+  const isOrderCompleted = (o: any) =>
+    o.status === 'COMPLETED' ||
+    o.currentStage === 'COMPLETED' ||
+    o.dispatchStatus === 'COMPLETED' ||
+    ((o.dispatchQuantity || 0) >= (o.requiredQuantity || 0) && (o.requiredQuantity || 0) > 0);
+
+  const activeOrders = orders.filter(
+    (o) =>
+      !isOrderCompleted(o) &&
+      (
+        o.productionStatus === 'IN_PROGRESS' ||
+        (o.currentStage && ['CUTTING', 'FORGING', 'MACHINING', 'HEAT_TREATMENT', 'PRODUCTION', 'TESTING'].includes(o.currentStage)) ||
+        (o.productionRequired && (o.purchaseStatus === 'COMPLETED' || !o.purchaseRequired)) ||
+        o.status === 'IN_PROGRESS'
+      )
+  );
+  const completedOrders = orders.filter((o) => isOrderCompleted(o));
   const completionRate = totalOrders > 0 ? Math.round((completedOrders.length / totalOrders) * 100) : 0;
   const bottleneckOrders = orders.filter(
     (o) =>
-      o.status === 'IN_PROGRESS' &&
+      !isOrderCompleted(o) &&
       (
         o.qcResult === 'FAILED' ||
-        (o.productionStatus === 'IN_PROGRESS' && o.qualityStatus === 'REJECTED') ||
+        (o.qcFailedQuantity || 0) > 0 ||
+        (o.reworkQuantity || 0) > 0 ||
         (o.purchaseStatus === 'IN_PROGRESS' && (o.purchaseQuantity || 0) > 0 && o.currentStage === 'PURCHASE')
       )
   );

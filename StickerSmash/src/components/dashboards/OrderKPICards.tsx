@@ -20,18 +20,37 @@ export const OrderKPICards: React.FC<OrderKPICardsProps> = ({ style }) => {
   >('TOTAL_PIPELINE');
 
   const totalOrders = orders.length;
-  const activeOrders = orders.filter((o) => o.status === 'IN_PROGRESS').length;
-  const completedOrders = orders.filter((o) => o.status === 'COMPLETED').length;
+
+  const isOrderCompleted = (o: any) =>
+    o.status === 'COMPLETED' ||
+    o.currentStage === 'COMPLETED' ||
+    o.dispatchStatus === 'COMPLETED' ||
+    ((o.dispatchQuantity || 0) >= (o.requiredQuantity || 0) && (o.requiredQuantity || 0) > 0);
+
+  // Active work orders in Shop Floor or active pipeline
+  const activeOrders = orders.filter(
+    (o) =>
+      !isOrderCompleted(o) &&
+      (
+        o.productionStatus === 'IN_PROGRESS' ||
+        (o.currentStage && ['CUTTING', 'FORGING', 'MACHINING', 'HEAT_TREATMENT', 'PRODUCTION', 'TESTING'].includes(o.currentStage)) ||
+        (o.productionRequired && (o.purchaseStatus === 'COMPLETED' || !o.purchaseRequired)) ||
+        o.status === 'IN_PROGRESS'
+      )
+  ).length;
+
+  const completedOrders = orders.filter((o) => isOrderCompleted(o)).length;
   const completionRate = totalOrders > 0 ? Math.round((completedOrders / totalOrders) * 100) : 0;
-  // Bottleneck: orders stuck mid-pipeline (QC failed, or production blocked waiting for rework)
-  // NOT freshly created orders that just have PENDING purchase status
+
+  // Bottlenecks: orders with QC failure, testing locked, rework required, or stuck partial purchases
   const delayedOrders = orders.filter(
     (o) =>
-      o.status === 'IN_PROGRESS' &&
+      !isOrderCompleted(o) &&
       (
-        o.qcResult === 'FAILED' ||  // QC failed → rework needed
-        (o.productionStatus === 'IN_PROGRESS' && o.qualityStatus === 'REJECTED') || // rework loop
-        (o.purchaseStatus === 'IN_PROGRESS' && (o.purchaseQuantity || 0) > 0 && o.currentStage === 'PURCHASE') // partial purchase stuck
+        o.qcResult === 'FAILED' ||
+        (o.qcFailedQuantity || 0) > 0 ||
+        (o.reworkQuantity || 0) > 0 ||
+        (o.purchaseStatus === 'IN_PROGRESS' && (o.purchaseQuantity || 0) > 0 && o.currentStage === 'PURCHASE')
       )
   ).length;
 
