@@ -35,17 +35,32 @@ export const ClientDirectoryView: React.FC<PlaceholderProps> = ({ onOpenCreateCl
     address: 'MASKED'
   } : c);
   
+  const [searchQuery, setSearchQuery] = useState('');
   const [selectedClientForModal, setSelectedClientForModal] = useState<Client | null>(null);
   const [clientToDelete, setClientToDelete] = useState<Client | null>(null);
   const { width } = useWindowDimensions();
   const isMobile = width < 768;
+
+  const filteredClients = displayedClients.filter((c) => {
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.toLowerCase().trim();
+    return (
+      (c.clientCode && c.clientCode.toLowerCase().includes(q)) ||
+      (c.companyName && c.companyName.toLowerCase().includes(q)) ||
+      (c.contactName && c.contactName.toLowerCase().includes(q)) ||
+      (c.contactNo && c.contactNo.toLowerCase().includes(q)) ||
+      (c.email && c.email.toLowerCase().includes(q)) ||
+      (c.gstNumber && c.gstNumber.toLowerCase().includes(q)) ||
+      (c.industry && c.industry.toLowerCase().includes(q))
+    );
+  });
 
   const getClientExportPayload = (): ExportDataPayload => {
     return {
       title: 'Client Directory & Company Records Report',
       filename: 'Client_Directory_Report',
       headers: ['Client Code', 'Company Name', 'Contact Name', 'Date of Birth', 'Contact No', 'Email', 'GST Number', 'Industry'],
-      rows: displayedClients.map((c) => [
+      rows: filteredClients.map((c) => [
         c.clientCode,
         c.companyName,
         c.contactName || 'N/A',
@@ -100,11 +115,51 @@ export const ClientDirectoryView: React.FC<PlaceholderProps> = ({ onOpenCreateCl
       </View>
 
       <View style={styles.card}>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.sm }}>
-          <Text style={styles.cardTitle}>Registered Client Directory</Text>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.sm, flexWrap: 'wrap', gap: 8 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <Text style={styles.cardTitle}>Registered Client Directory</Text>
+            <View style={{ backgroundColor: 'rgba(56, 189, 248, 0.12)', paddingHorizontal: 8, paddingVertical: 2, borderRadius: Radius.full }}>
+              <Text style={{ color: Colors.accentTeal, fontSize: 11, fontWeight: '700' }}>
+                {filteredClients.length} {filteredClients.length === 1 ? 'Client' : 'Clients'}
+              </Text>
+            </View>
+          </View>
           <Text style={{ color: Colors.accentTeal, fontSize: 11, fontWeight: '700' }}>
             💡 Click any company row to view detailed CRM Profile & Organization Tree Chart
           </Text>
+        </View>
+
+        {/* Search Bar */}
+        <View style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          backgroundColor: Colors.inputBg,
+          borderRadius: Radius.sm,
+          borderWidth: 1,
+          borderColor: Colors.borderDark,
+          paddingHorizontal: 12,
+          paddingVertical: 8,
+          marginBottom: Spacing.md,
+        }}>
+          <Text style={{ marginRight: 8, fontSize: 14 }}>🔍</Text>
+          <TextInput
+            style={{
+              flex: 1,
+              color: Colors.textLight,
+              fontSize: 13,
+              padding: 0,
+              outlineStyle: 'none' as any,
+            }}
+            placeholder="Search clients by code, company name, contact, phone, email, GST..."
+            placeholderTextColor="#94a3b8"
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+          />
+          {searchQuery ? (
+            <TouchableOpacity onPress={() => setSearchQuery('')} style={{ padding: 4 }}>
+              <Text style={{ color: '#94a3b8', fontSize: 14 }}>✕</Text>
+            </TouchableOpacity>
+          ) : null}
         </View>
 
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
@@ -121,7 +176,14 @@ export const ClientDirectoryView: React.FC<PlaceholderProps> = ({ onOpenCreateCl
               {canManageClient && <Text style={[styles.th, { width: 140 }]}>Actions</Text>}
             </View>
 
-            {clients.map((c) => (
+            {filteredClients.length === 0 ? (
+              <View style={{ padding: Spacing.xl, alignItems: 'center', justifyContent: 'center', width: 1200 }}>
+                <Text style={{ color: Colors.textMuted, fontSize: 14 }}>
+                  {searchQuery ? `No clients found matching "${searchQuery}".` : 'No registered clients found.'}
+                </Text>
+              </View>
+            ) : (
+              filteredClients.map((c) => (
               <TouchableOpacity
                 key={c.id}
                 style={styles.trRow}
@@ -199,7 +261,7 @@ export const ClientDirectoryView: React.FC<PlaceholderProps> = ({ onOpenCreateCl
                   </View>
                 )}
               </TouchableOpacity>
-            ))}
+            )))}
           </View>
         </ScrollView>
       </View>

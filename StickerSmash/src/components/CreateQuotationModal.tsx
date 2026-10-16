@@ -2,11 +2,12 @@ import React, { useState } from 'react';
 import { View, Text, Modal, TouchableOpacity, TextInput, ScrollView, StyleSheet, useWindowDimensions } from 'react-native';
 import { useERP } from '../context/ERPContext';
 import { useAuth } from '../context/AuthContext';
-import { QuotationStatus, Client } from '../types';
+import { QuotationStatus, Client, CompanyContact } from '../types';
 import { Colors, Spacing, Radius, Shadows } from '../theme';
 import { SearchableDropdown } from './ui/SearchableDropdown';
 import { DatePickerInput } from './ui/DatePickerInput';
 import { CreateClientModal } from './CreateClientModal';
+import { ContactFormModal } from './company-hierarchy/ContactFormModal';
 
 interface CreateQuotationModalProps {
   visible: boolean;
@@ -14,14 +15,24 @@ interface CreateQuotationModalProps {
 }
 
 export const CreateQuotationModal: React.FC<CreateQuotationModalProps> = ({ visible, onClose }) => {
-  const { clients, temporaryClients, quotations, createQuotation, createClient } = useERP();
+  const {
+    clients,
+    temporaryClients,
+    quotations,
+    createQuotation,
+    createClient,
+    companyContacts,
+    addCompanyContact,
+  } = useERP();
   const { currentUser } = useAuth();
   const { width } = useWindowDimensions();
   const isMobile = width < 768;
 
   const [createClientVisible, setCreateClientVisible] = useState(false);
+  const [createContactVisible, setCreateContactVisible] = useState(false);
   const [clientType, setClientType] = useState<'REGISTERED' | 'NON_REGISTERED'>('REGISTERED');
   const [selectedClientId, setSelectedClientId] = useState<string>('');
+  const [selectedContactId, setSelectedContactId] = useState<string>('');
   const [isTemporaryClient, setIsTemporaryClient] = useState(false);
   const [clientCode, setClientCode] = useState('');
   const [companyName, setCompanyName] = useState('');
@@ -73,9 +84,43 @@ export const CreateQuotationModal: React.FC<CreateQuotationModalProps> = ({ visi
       sublabel: c.contactName ? `Contact: ${c.contactName} • ${c.contactNo || ''}` : undefined,
     }));
 
+  const clientContacts = React.useMemo(() => {
+    if (!selectedClientId) return [];
+    const fromStore = companyContacts.filter((c) => c.companyId === selectedClientId);
+
+    // Also include primary contact from client if not already in store
+    const currentClient = clients.find((c) => c.id === selectedClientId);
+    const result = [...fromStore];
+    if (currentClient && currentClient.contactName) {
+      const alreadyInList = result.some(
+        (c) => c.fullName.trim().toLowerCase() === currentClient.contactName?.trim().toLowerCase()
+      );
+      if (!alreadyInList) {
+        result.unshift({
+          id: `primary-${currentClient.id}`,
+          companyId: currentClient.id,
+          fullName: currentClient.contactName,
+          designation: 'Primary Contact',
+          department: 'Management',
+          mobile: currentClient.contactNo || '',
+          email: currentClient.email || '',
+          whatsapp: currentClient.contactNo || '',
+        });
+      }
+    }
+    return result;
+  }, [selectedClientId, companyContacts, clients]);
+
+  const contactOptions = clientContacts.map((c) => ({
+    id: c.id,
+    label: c.fullName,
+    sublabel: [c.designation, c.mobile, c.email].filter(Boolean).join(' • '),
+  }));
+
   const handleClientTypeChange = (type: 'REGISTERED' | 'NON_REGISTERED') => {
     setClientType(type);
     setErrorMsg('');
+    setSelectedContactId('');
     if (type === 'NON_REGISTERED') {
       setIsTemporaryClient(true);
       setSelectedClientId('');
@@ -100,6 +145,7 @@ export const CreateQuotationModal: React.FC<CreateQuotationModalProps> = ({ visi
     if (!cId) {
       setClientCode('');
       setCompanyName('');
+      setSelectedContactId('');
       setContactPerson('');
       setMobileNumber('');
       setEmail('');
@@ -113,9 +159,54 @@ export const CreateQuotationModal: React.FC<CreateQuotationModalProps> = ({ visi
     if (found) {
       setClientCode(found.clientCode);
       setCompanyName(found.companyName);
-      setContactPerson(found.contactName || '');
-      setMobileNumber(found.contactNo || '');
+
+      // Find contacts for this client
+      const storeContacts = companyContacts.filter((c) => c.companyId === found.id);
+      if (storeContacts.length > 0) {
+        const primary = storeContacts.find((c) => c.fullName.toLowerCase() === (found.contactName || '').toLowerCase()) || storeContacts[0];
+        setSelectedContactId(primary.id);
+        setContactPerson(primary.fullName);
+        setMobileNumber(primary.mobile || found.contactNo || '');
+        setEmail(primary.email || found.email || '');
+      } else if (found.contactName) {
+        setSelectedContactId(`primary-${found.id}`);
+        setContactPerson(found.contactName);
+        setMobileNumber(found.contactNo || '');
+        setEmail(found.email || '');
+      } else {
+        setSelectedContactId('');
+        setContactPerson('');
+        setMobileNumber('');
+        setEmail(found.email || '');
+      }
+    }
+  };
+
+  const handleSelectContact = (contactId: string) => {
+    setSelectedContactId(contactId);
+    const found = clientContacts.find((c) => c.id === contactId);
+    if (found) {
+      setContactPerson(found.fullName);
+      setMobileNumber(found.mobile || '');
       setEmail(found.email || '');
+    }
+  };
+
+  const handleAddContactSubmit = async (data: Omit<CompanyContact, 'id' | 'createdAt'>) => {
+    try {
+      const newContact = await addCompanyContact(data);
+      if (newContact) {
+        setSelectedContactId(newContact.id);
+        setContactPerson(newContact.fullName);
+        setMobileNumber(newContact.mobile || '');
+        setEmail(newContact.email || '');
+      }
+      setSuccessMsg(`Contact "${data.fullName}" added to Client Directory successfully!`);
+      setTimeout(() => setSuccessMsg(''), 3500);
+      return newContact;
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Failed to add contact');
+      throw err;
     }
   };
 
@@ -123,6 +214,7 @@ export const CreateQuotationModal: React.FC<CreateQuotationModalProps> = ({ visi
     setSelectedClientId(newClient.id);
     setClientCode(newClient.clientCode);
     setCompanyName(newClient.companyName);
+    setSelectedContactId(`primary-${newClient.id}`);
     setContactPerson(newClient.contactName || '');
     setMobileNumber(newClient.contactNo || '');
     setEmail(newClient.email || '');
@@ -193,6 +285,7 @@ export const CreateQuotationModal: React.FC<CreateQuotationModalProps> = ({ visi
   const handleReset = () => {
     setClientType('REGISTERED');
     setSelectedClientId('');
+    setSelectedContactId('');
     setIsTemporaryClient(false);
     setClientCode('');
     setCompanyName('');
@@ -307,15 +400,45 @@ export const CreateQuotationModal: React.FC<CreateQuotationModalProps> = ({ visi
 
               {/* Contact Person */}
               <View style={styles.fieldBlock}>
-                <Text style={styles.label}>Contact Person *</Text>
-                <TextInput
-                  style={[styles.input, clientType === 'REGISTERED' && selectedClientId ? styles.inputAutoFilled : null]}
-                  placeholder="e.g. Rajesh Mehta"
-                  placeholderTextColor="#94a3b8"
-                  value={contactPerson}
-                  onChangeText={setContactPerson}
-                  editable={clientType === 'NON_REGISTERED'}
-                />
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                  <Text style={[styles.label, { marginBottom: 0 }]}>Contact Person *</Text>
+                  {clientType === 'REGISTERED' && selectedClientId ? (
+                    <TouchableOpacity
+                      onPress={() => setCreateContactVisible(true)}
+                      style={{ paddingHorizontal: 4, paddingVertical: 2 }}
+                    >
+                      <Text style={{ color: Colors.accentTeal, fontSize: 12, fontWeight: '700' }}>
+                        + Add New Contact
+                      </Text>
+                    </TouchableOpacity>
+                  ) : null}
+                </View>
+
+                {clientType === 'REGISTERED' ? (
+                  <SearchableDropdown
+                    placeholder={
+                      !selectedClientId
+                        ? 'Select client first...'
+                        : (contactOptions.length === 0 ? '+ Add New Contact' : 'Select Contact Person...')
+                    }
+                    options={contactOptions}
+                    selectedValue={selectedContactId}
+                    onSelect={handleSelectContact}
+                    disabled={!selectedClientId}
+                    allowManual={!!selectedClientId}
+                    manualLabel="+ Add New Contact"
+                    manualId="ADD_NEW_CONTACT"
+                    onManualPress={() => setCreateContactVisible(true)}
+                  />
+                ) : (
+                  <TextInput
+                    style={styles.input}
+                    placeholder="e.g. Rajesh Mehta"
+                    placeholderTextColor="#94a3b8"
+                    value={contactPerson}
+                    onChangeText={setContactPerson}
+                  />
+                )}
               </View>
 
               {/* Mobile Number */}
@@ -328,7 +451,6 @@ export const CreateQuotationModal: React.FC<CreateQuotationModalProps> = ({ visi
                   keyboardType="phone-pad"
                   value={mobileNumber}
                   onChangeText={setMobileNumber}
-                  editable={clientType === 'NON_REGISTERED'}
                 />
               </View>
 
@@ -343,7 +465,6 @@ export const CreateQuotationModal: React.FC<CreateQuotationModalProps> = ({ visi
                   autoCapitalize="none"
                   value={email}
                   onChangeText={setEmail}
-                  editable={clientType === 'NON_REGISTERED'}
                 />
               </View>
 
@@ -451,6 +572,17 @@ export const CreateQuotationModal: React.FC<CreateQuotationModalProps> = ({ visi
         onClose={() => setCreateClientVisible(false)}
         onClientCreated={handleClientCreated}
       />
+
+      {/* Nested Add Contact Person Modal */}
+      {selectedClientId ? (
+        <ContactFormModal
+          visible={createContactVisible}
+          companyId={selectedClientId}
+          existingContacts={clientContacts}
+          onClose={() => setCreateContactVisible(false)}
+          onSubmit={handleAddContactSubmit}
+        />
+      ) : null}
     </Modal>
   );
 };
